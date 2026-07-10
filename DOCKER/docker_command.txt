@@ -1,0 +1,17 @@
+# Stop everything
+docker compose down
+
+# Stop but KEEP your database data
+docker compose down --volumes
+
+# Restart after changes to app.py
+docker compose restart app
+
+# Full rebuild after changing requirements.txt
+docker compose up --build
+
+# View live logs
+docker compose logs -f
+
+# Check running containers
+docker ps
