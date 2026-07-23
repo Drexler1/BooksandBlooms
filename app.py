@@ -4509,6 +4509,12 @@ def run_auto_migration():
     except Exception as exc:
         app.logger.error(f"[migration] Step 19 (stock_requests table) failed: {exc}")
 
+    # ── STEP 20: add gcash_ref column to transactions ─────────────────────────
+    try:
+        _ensure_gcash_ref_column()
+    except Exception as exc:
+        app.logger.error(f"[migration] Step 20 (gcash_ref column) failed: {exc}")
+
     app.logger.info("[migration] run_auto_migration complete.")
 
 
@@ -4550,6 +4556,29 @@ def _ensure_vat_columns():
         app.logger.info("[migration] VAT columns ensured on transactions")
     except Exception as exc:
         app.logger.error(f"[migration] _ensure_vat_columns: {exc}")
+
+
+def _ensure_gcash_ref_column():
+    """
+    Idempotent: add gcash_ref VARCHAR(50) to `transactions` if not present.
+    Stores the GCash reference number entered by the cashier at checkout.
+    """
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "ALTER TABLE `transactions` "
+                "ADD COLUMN `gcash_ref` VARCHAR(50) DEFAULT NULL "
+                "AFTER `payment_method`"
+            )
+            conn.commit()
+            app.logger.info("[migration] Added transactions.gcash_ref")
+        except Exception:
+            pass  # column already exists
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[migration] _ensure_gcash_ref_column: {exc}")
 
 
 def _ensure_cup_eligible_column():
@@ -5922,6 +5951,7 @@ def api_pos_checkout():
         return jsonify({"success": False, "message": "Invalid numeric values"}), 400
 
     note = (data.get("note") or "").strip()[:255] or None
+    gcash_ref = (data.get("gcash_ref") or "").strip()[:50] or None
 
     # ── Resolve cashier info ────────────────────────────────────────────────────
     cashier_id = session.get("employee_id") or session.get("admin_id")
@@ -6097,8 +6127,8 @@ def api_pos_checkout():
             INSERT INTO transactions
                 (cashier_id, cashier_name, subtotal, discount_amount,
                  tax_amount, total_amount, amount_tendered, change_amount,
-                 payment_method, note, discount_type, net_sales, vat_amount)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 payment_method, gcash_ref, note, discount_type, net_sales, vat_amount)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
             (
                 cashier_id,
@@ -6110,6 +6140,7 @@ def api_pos_checkout():
                 amount_tendered,
                 change_amount,
                 payment_method,
+                gcash_ref,
                 note,
                 discount_type_str,
                 net_sales,
@@ -6232,6 +6263,7 @@ def api_pos_checkout():
             "amount_tendered": amount_tendered,
             "change_amount": change_amount,
             "payment_method": payment_method,
+            "gcash_ref": gcash_ref,
             "note": note,
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
@@ -6290,7 +6322,7 @@ def api_pos_transactions():
             SELECT t.transaction_id, t.cashier_id, t.cashier_name,
                    t.subtotal, t.discount_amount, t.tax_amount, t.total_amount,
                    t.amount_tendered, t.change_amount,
-                   t.payment_method, t.note, t.status, t.created_at,
+                   t.payment_method, t.gcash_ref, t.note, t.status, t.created_at,
                    COALESCE(t.discount_type, 'none')                        AS discount_type,
                    COALESCE(t.net_sales, ROUND(t.total_amount / 1.12, 2))   AS net_sales,
                    COALESCE(t.vat_amount, ROUND(t.total_amount / 1.12 * 0.12, 2)) AS vat_amount,
