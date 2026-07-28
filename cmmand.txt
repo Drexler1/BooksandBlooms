@@ -2,5 +2,5 @@
 pip install -r requirements.txt
 
 --SOURCE CONTROL TO GITHUB--
-git origin master:main --force
+git push origin master:main --force
 
