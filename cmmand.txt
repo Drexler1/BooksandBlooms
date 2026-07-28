@@ -1,0 +1,6 @@
+--INSTALL PACKAGES--
+pip install -r requirements.txt
+
+--SOURCE CONTROL TO GITHUB--
+git origin master:main --force
+
