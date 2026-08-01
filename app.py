@@ -3362,8 +3362,10 @@ def api_send_low_stock_alert():
     """
     Manually trigger a low-stock alert email right now.
     Fetches the current low-stock items and sends a formatted email report.
+    Accessible by any authenticated session (admin, manager, or cashier).
     """
-    if not is_super_admin():
+    allowed_roles = {"admin", "manager", "cashier"}
+    if session.get("role") not in allowed_roles:
         return jsonify({"success": False, "message": "Unauthorized"}), 403
     _ensure_email_settings_table()
 

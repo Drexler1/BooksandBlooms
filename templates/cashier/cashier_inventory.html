@@ -582,6 +582,103 @@
             border: 1.5px solid #ddd; background: white;
         }
 
+        /* ── Stock Alert Button ── */
+        .btn-alert {
+            background: #fff3e0;
+            color: #e65100;
+            border-color: #ffcc80;
+        }
+
+        .btn-alert:hover {
+            background: #ff9800;
+            color: white;
+            border-color: #ff9800;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(255, 152, 0, 0.35);
+        }
+
+        .btn-alert .alert-badge {
+            display: none;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.68rem;
+            font-weight: 800;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .btn-alert .alert-badge.visible { display: flex; }
+
+        /* ── Stock Alert Modal ── */
+        .alert-modal-w { max-width: 540px; }
+
+        .alert-summary-banner {
+            display: flex; gap: 1rem; padding: 1rem;
+            background: #fff3e0; border: 1px solid #ffcc80;
+            border-radius: 10px; margin-bottom: 1.25rem; align-items: center;
+        }
+
+        .alert-summary-banner.critical { background: #fce4ec; border-color: #ef9a9a; }
+        .alert-summary-icon { font-size: 2rem; flex-shrink: 0; }
+        .alert-summary-title { font-weight: 700; font-size: 1rem; color: var(--black); }
+        .alert-summary-sub { font-size: 0.82rem; color: #888; margin-top: 2px; }
+
+        .alert-counts { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+
+        .alert-count-chip {
+            display: flex; align-items: center; gap: 0.4rem;
+            padding: 0.4rem 0.9rem; border-radius: 20px;
+            font-size: 0.82rem; font-weight: 700;
+        }
+
+        .alert-count-chip.out { background: rgba(220,53,69,0.1); color: #dc3545; }
+        .alert-count-chip.low { background: rgba(255,152,0,0.1);  color: #e65100; }
+        .alert-count-chip.ok  { background: rgba(76,175,80,0.1);  color: #388e3c; }
+
+        .alert-items-list {
+            max-height: 240px; overflow-y: auto;
+            border: 1px solid #f0f0f0; border-radius: 8px; margin-bottom: 1rem;
+        }
+
+        .alert-items-list::-webkit-scrollbar { width: 4px; }
+        .alert-items-list::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 3px; }
+
+        .alert-item-row {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.6rem 1rem; border-bottom: 1px solid #f5f5f5; font-size: 0.85rem;
+        }
+
+        .alert-item-row:last-child { border-bottom: none; }
+
+        .alert-item-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .alert-item-dot.out { background: var(--danger); }
+        .alert-item-dot.low { background: var(--warning); }
+
+        .alert-item-name { font-weight: 600; flex: 1; }
+        .alert-item-stock { font-size: 0.78rem; color: #888; white-space: nowrap; }
+
+        .alert-item-badge {
+            font-size: 0.7rem; font-weight: 700;
+            padding: 0.15rem 0.55rem; border-radius: 20px; white-space: nowrap;
+        }
+
+        .alert-item-badge.out { background: rgba(220,53,69,0.1); color: var(--danger); }
+        .alert-item-badge.low { background: rgba(255,152,0,0.12); color: #e65100; }
+
+        .alert-no-issues { text-align: center; padding: 2rem 1rem; color: #bbb; }
+        .alert-no-issues-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .alert-no-issues p { font-size: 0.88rem; }
+
+        .alert-recipient-box {
+            background: #f9f9f9; border: 1px solid #e0e0e0;
+            border-radius: 8px; padding: 0.75rem 1rem;
+            font-size: 0.82rem; color: #666;
+        }
+
         .conn-dot {
             width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
         }
@@ -1088,6 +1185,10 @@
                             <span class="conn-dot online" id="connDot"></span>
                             <span id="connText">Online</span>
                         </span>
+                        <button class="btn btn-alert btn-sm" id="stockAlertBtn">
+                            🔔 Stock Alert
+                            <span class="alert-badge" id="alertBadge">0</span>
+                        </button>
                         <button class="btn btn-outline btn-sm" onclick="refreshAll()">🔄 Refresh</button>
                     </div>
                 </div>
@@ -1245,6 +1346,28 @@
             </div><!-- /container -->
         </main>
     </div><!-- /app-shell -->
+
+    <!-- ── STOCK ALERT Modal ── -->
+    <div class="modal-overlay" id="stockAlertModal">
+        <div class="modal alert-modal-w">
+            <div class="modal-header">
+                <h3>🔔 Stock <span>Alert</span></h3>
+                <button class="modal-close" id="closeAlertModal">✕</button>
+            </div>
+            <div class="modal-body" id="alertModalBody">
+                <div class="alert-no-issues">
+                    <div class="alert-no-issues-icon">⏳</div>
+                    <p>Checking stock levels…</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="cancelAlertBtn">Close</button>
+                <button class="btn btn-warning" id="sendAlertBtn" style="display:none;">
+                    📧 Send Alert Email
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- ── REQUEST NEW ITEM Modal ── -->
     <div class="modal-overlay" id="requestItemModal">
@@ -1437,6 +1560,7 @@
             document.getElementById('statOk').textContent    = ok;
             document.getElementById('statLow').textContent   = low;
             document.getElementById('statOut').textContent   = out;
+            updateAlertBadge();
         }
 
         /* ═══════════════════════════════════════
@@ -1824,7 +1948,7 @@
         /* ═══════════════════════════════════════
            MODAL CLOSE ON BACKDROP CLICK
         ═══════════════════════════════════════ */
-        ['consumeModal', 'restockModal', 'requestItemModal'].forEach(id => {
+        ['consumeModal', 'restockModal', 'requestItemModal', 'stockAlertModal'].forEach(id => {
             document.getElementById(id).addEventListener('click', e => {
                 if (e.target.id === id) closeModal(id);
             });
@@ -1896,6 +2020,120 @@
         }
 
         /* ═══════════════════════════════════════
+           STOCK ALERT
+        ═══════════════════════════════════════ */
+        function updateAlertBadge() {
+            const lowCount = allItems.filter(i => i.status === 'low').length;
+            const outCount = allItems.filter(i => i.status === 'out').length;
+            const total = lowCount + outCount;
+            const badge = document.getElementById('alertBadge');
+            const btn   = document.getElementById('stockAlertBtn');
+            badge.textContent = total;
+            badge.classList.toggle('visible', total > 0);
+            if (outCount > 0) {
+                btn.style.background   = '#fce4ec';
+                btn.style.color        = '#c62828';
+                btn.style.borderColor  = '#ef9a9a';
+            } else if (lowCount > 0) {
+                btn.style.background   = '#fff3e0';
+                btn.style.color        = '#e65100';
+                btn.style.borderColor  = '#ffcc80';
+            } else {
+                btn.style.background   = '';
+                btn.style.color        = '';
+                btn.style.borderColor  = '';
+            }
+        }
+
+        async function openAlertModal() {
+            openModal('stockAlertModal');
+            const body    = document.getElementById('alertModalBody');
+            const sendBtn = document.getElementById('sendAlertBtn');
+            sendBtn.style.display = 'none';
+            body.innerHTML = `<div class="alert-no-issues"><div class="alert-no-issues-icon">⏳</div><p>Checking stock levels…</p></div>`;
+
+            const outItems   = allItems.filter(i => i.status === 'out');
+            const lowItems   = allItems.filter(i => i.status === 'low');
+            const alertItems = [...outItems, ...lowItems];
+
+            if (!alertItems.length) {
+                body.innerHTML = `
+                <div class="alert-no-issues">
+                    <div class="alert-no-issues-icon">✅</div>
+                    <p style="font-weight:700;color:#388e3c;font-size:0.95rem;">All stock levels are healthy!</p>
+                    <p style="margin-top:0.4rem;color:#888;">No supplies are below their reorder point.</p>
+                </div>`;
+                sendBtn.style.display = 'none';
+            } else {
+                const outCount   = outItems.length;
+                const lowCount   = lowItems.length;
+                const isCritical = outCount > 0;
+
+                // Fetch recipient email from settings (same as admin flow)
+                let recipientEmail = '—';
+                try {
+                    const r = await fetch('/api/settings/email');
+                    const d = await r.json();
+                    if (d.smtp_user || d.alert_recipient) {
+                        recipientEmail = d.alert_recipient || d.smtp_user || '—';
+                    }
+                } catch (_) {}
+
+                const itemRows = alertItems.map(item => `
+                <div class="alert-item-row">
+                    <span class="alert-item-dot ${item.status}"></span>
+                    <span class="alert-item-name">${escHtml(item.name)}</span>
+                    <span class="alert-item-stock">${fmtNum(item.stock)} ${escHtml(item.unit)} / reorder ≤${fmtNum(item.reorder_point)}</span>
+                    <span class="alert-item-badge ${item.status}">${item.status === 'out' ? 'Out of Stock' : 'Low Stock'}</span>
+                </div>`).join('');
+
+                body.innerHTML = `
+                <div class="alert-summary-banner ${isCritical ? 'critical' : ''}">
+                    <div class="alert-summary-icon">${isCritical ? '🚨' : '⚠️'}</div>
+                    <div>
+                        <div class="alert-summary-title">${isCritical ? 'Critical stock alert!' : 'Low stock warning'}</div>
+                        <div class="alert-summary-sub">${alertItems.length} item${alertItems.length !== 1 ? 's' : ''} need${alertItems.length === 1 ? 's' : ''} attention — reviewed as of now</div>
+                    </div>
+                </div>
+                <div class="alert-counts">
+                    ${outCount ? `<span class="alert-count-chip out">🚨 ${outCount} Out of Stock</span>` : ''}
+                    ${lowCount ? `<span class="alert-count-chip low">⚠️ ${lowCount} Low Stock</span>` : ''}
+                </div>
+                <div class="alert-items-list">${itemRows}</div>
+                <div class="alert-recipient-box">
+                    📧 Alert will be sent to: <strong>${recipientEmail}</strong>
+                </div>`;
+                sendBtn.style.display = 'inline-flex';
+            }
+        }
+
+        document.getElementById('stockAlertBtn').addEventListener('click', openAlertModal);
+        document.getElementById('closeAlertModal').addEventListener('click', () => closeModal('stockAlertModal'));
+        document.getElementById('cancelAlertBtn').addEventListener('click', () => closeModal('stockAlertModal'));
+
+        document.getElementById('sendAlertBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('sendAlertBtn');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Sending…';
+            try {
+                const res  = await fetch('/api/settings/email/send-low-stock-alert', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ ${data.message || 'Alert email sent!'}`, 'success');
+                    closeModal('stockAlertModal');
+                } else {
+                    showToast(`❌ ${data.message || 'Failed to send alert'}`, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '📧 Send Alert Email';
+                }
+            } catch (_) {
+                showToast('❌ Network error — could not send alert', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '📧 Send Alert Email';
+            }
+        });
+
+        /* ═══════════════════════════════════════
            INIT
         ═══════════════════════════════════════ */
         (async () => {
@@ -1916,4 +2154,4 @@
     </script>
 </body>
 
-</html>
+</html> 
