@@ -1114,16 +1114,6 @@
                         </div>
                         <div class="toggle-item">
                             <div class="toggle-info">
-                                <strong>👤 New Employee Registration</strong>
-                                <span>Be alerted whenever a new staff or cashier account is created in the system.</span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="newEmployeeEnabled">
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>
-                        <div class="toggle-item">
-                            <div class="toggle-info">
                                 <strong>🔐 Failed Login Attempts</strong>
                                 <span>Get a security alert when repeated failed login attempts are detected on any account.</span>
                             </div>
@@ -1139,6 +1129,16 @@
                             </div>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="maintenanceEnabled">
+                                <span class="toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="toggle-item">
+                            <div class="toggle-info">
+                                <strong>⏱️ Overtime Request Notifications</strong>
+                                <span>Receive an email whenever a cashier submits an overtime request, so you can review and approve it promptly.</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="overtimeRequestEnabled" checked>
                                 <span class="toggle-track"></span>
                             </label>
                         </div>
@@ -1537,11 +1537,11 @@
             if (s.smtp_user) onEmailInput(s.smtp_user, false);
 
             // Alert toggles
-            document.getElementById('lowStockEnabled').checked     = !!s.low_stock_enabled;
-            document.getElementById('dailySummaryEnabled').checked  = !!s.daily_summary_enabled;
-            document.getElementById('newEmployeeEnabled').checked   = !!s.new_employee_enabled;
-            document.getElementById('failedLoginEnabled').checked   = !!s.failed_login_enabled;
-            document.getElementById('maintenanceEnabled').checked   = !!s.maintenance_enabled;
+            document.getElementById('lowStockEnabled').checked          = !!s.low_stock_enabled;
+            document.getElementById('dailySummaryEnabled').checked       = !!s.daily_summary_enabled;
+            document.getElementById('failedLoginEnabled').checked        = !!s.failed_login_enabled;
+            document.getElementById('maintenanceEnabled').checked        = !!s.maintenance_enabled;
+            document.getElementById('overtimeRequestEnabled').checked    = s.overtime_request_enabled !== undefined ? !!s.overtime_request_enabled : true;
 
             // Low-stock threshold (blank = use product settings)
             document.getElementById('lowStockThreshold').value = s.low_stock_threshold > 0 ? s.low_stock_threshold : '';
@@ -1758,12 +1758,12 @@
             smtp_user:              document.getElementById('smtpUser').value.trim(),
             smtp_use_tls:           document.getElementById('smtpUseTls').value === '1' ? 1 : 0,
             alert_recipient:        document.getElementById('alertRecipient').value.trim(),
-            low_stock_enabled:      document.getElementById('lowStockEnabled').checked ? 1 : 0,
-            low_stock_threshold:    parseInt(document.getElementById('lowStockThreshold').value) || 0,
-            daily_summary_enabled:  document.getElementById('dailySummaryEnabled').checked ? 1 : 0,
-            new_employee_enabled:   document.getElementById('newEmployeeEnabled').checked ? 1 : 0,
-            failed_login_enabled:   document.getElementById('failedLoginEnabled').checked ? 1 : 0,
-            maintenance_enabled:    document.getElementById('maintenanceEnabled').checked ? 1 : 0,
+            low_stock_enabled:          document.getElementById('lowStockEnabled').checked ? 1 : 0,
+            low_stock_threshold:        parseInt(document.getElementById('lowStockThreshold').value) || 0,
+            daily_summary_enabled:      document.getElementById('dailySummaryEnabled').checked ? 1 : 0,
+            failed_login_enabled:       document.getElementById('failedLoginEnabled').checked ? 1 : 0,
+            maintenance_enabled:        document.getElementById('maintenanceEnabled').checked ? 1 : 0,
+            overtime_request_enabled:   document.getElementById('overtimeRequestEnabled').checked ? 1 : 0,
         };
         // Only include password if user typed a new one
         if (newPass) payload.smtp_password = newPass;

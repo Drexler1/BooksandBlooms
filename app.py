@@ -2978,6 +2978,216 @@ def admin_settings():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
+def _send_overtime_request_email_with_cfg(employee_name, employee_id, request_date,
+                                           extended_hours, reason, cfg):
+    """
+    Send an overtime request notification email using a **pre-fetched** cfg dict.
+
+    This variant is designed to run safely inside a background thread: it never
+    touches flask_mysqldb (which uses thread-local connections and would be None
+    in a new thread).  The caller is responsible for fetching and passing cfg
+    before spawning the thread.
+    """
+    if not cfg:
+        app.logger.warning("[overtime_email] No email settings available; skipping notification.")
+        return
+
+    if not cfg.get("overtime_request_enabled", 1):
+        app.logger.info("[overtime_email] overtime_request_enabled is OFF; skipping notification.")
+        return
+
+    missing = [f for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient")
+               if not cfg.get(f)]
+    if missing:
+        app.logger.warning(f"[overtime_email] Missing SMTP fields {missing}; cannot send notification.")
+        return
+
+    try:
+        review_url = "http://127.0.0.1:5000/admin_settings"
+
+        html_body = f"""
+        <div style="font-family:DM Sans,Arial,sans-serif;max-width:560px;margin:0 auto;
+                    border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+          <div style="background:#1a1a1a;padding:20px 28px;border-bottom:3px solid #c9a961;">
+            <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+            <p style="color:#aaa;margin:4px 0 0;font-size:0.85rem;">Overtime Request Notification</p>
+          </div>
+          <div style="padding:28px;">
+            <h3 style="color:#1a1a1a;margin-top:0;">⏱️ New Overtime Request Submitted</h3>
+            <p style="color:#555;line-height:1.6;">
+              A cashier has submitted an overtime request and is waiting for your approval.
+            </p>
+            <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:0.92rem;">
+              <tr style="background:#f9f5ec;">
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;width:40%;">👤 Employee</td>
+                <td style="padding:10px 14px;color:#333;">{employee_name} (ID #{employee_id})</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">📅 Request Date</td>
+                <td style="padding:10px 14px;color:#333;">{request_date}</td>
+              </tr>
+              <tr style="background:#f9f5ec;">
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">⏳ Extended Hours</td>
+                <td style="padding:10px 14px;color:#333;">{float(extended_hours):.1f} hour(s)</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">📝 Reason</td>
+                <td style="padding:10px 14px;color:#333;">{reason or '—'}</td>
+              </tr>
+            </table>
+            <div style="margin-top:22px;text-align:center;">
+              <a href="{review_url}"
+                 style="background:#c9a961;color:#1a1a1a;padding:12px 28px;border-radius:8px;
+                        text-decoration:none;font-weight:700;font-size:0.95rem;display:inline-block;">
+                🔍 Review Request in Admin Panel
+              </a>
+            </div>
+            <div style="background:#f5f5f5;border-radius:8px;padding:12px 16px;margin-top:22px;
+                        font-size:0.82rem;color:#888;">
+              This notification was sent automatically by the Books &amp; Blooms Café POS system.
+              You can disable it under Admin Settings → Notifications.
+            </div>
+          </div>
+        </div>
+        """
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"⏱️ Overtime Request — {employee_name} ({request_date})"
+        msg["From"] = cfg["smtp_user"]
+        msg["To"] = cfg["alert_recipient"]
+        msg.attach(MIMEText(html_body, "html"))
+
+        port = int(cfg.get("smtp_port") or 587)
+        use_tls = bool(cfg.get("smtp_use_tls", True))
+
+        if use_tls:
+            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=15)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+        else:
+            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=15)
+
+        server.login(cfg["smtp_user"], cfg["smtp_password"])
+        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
+        server.quit()
+        app.logger.info(
+            f"[overtime_email] Notification sent to {cfg['alert_recipient']} "
+            f"for employee {employee_id} ({request_date})"
+        )
+    except Exception as exc:
+        app.logger.error(f"[overtime_email] Failed to send notification: {exc}")
+
+
+def _send_overtime_request_email(employee_name, employee_id, request_date, extended_hours, reason):
+    """
+    Send an overtime request notification email to the alert recipient (owner/admin).
+    Fires only when overtime_request_enabled is set to 1 in email_alert_settings.
+    Runs in the calling thread; wrap in threading.Thread if you need non-blocking behaviour.
+
+    NOTE: Kept for backward compatibility. New code should call
+    _send_overtime_request_email_with_cfg() with a pre-fetched cfg dict instead,
+    especially from background threads where mysql.connection is not available.
+    """
+    try:
+        _ensure_email_settings_table()
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("SELECT * FROM email_alert_settings ORDER BY id LIMIT 1")
+        cfg = cur.fetchone()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[overtime_email] DB fetch failed: {exc}")
+        return
+
+    if not cfg:
+        app.logger.warning("[overtime_email] No email settings row found; skipping notification.")
+        return
+
+    if not cfg.get("overtime_request_enabled", 1):
+        app.logger.info("[overtime_email] overtime_request_enabled is OFF; skipping notification.")
+        return
+
+    missing = [f for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient") if not cfg.get(f)]
+    if missing:
+        app.logger.warning(f"[overtime_email] Missing SMTP fields {missing}; cannot send notification.")
+        return
+
+    try:
+        review_url = "http://127.0.0.1:5000/admin_settings"  # adjust to production URL if needed
+
+        html_body = f"""
+        <div style="font-family:DM Sans,Arial,sans-serif;max-width:560px;margin:0 auto;
+                    border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+          <div style="background:#1a1a1a;padding:20px 28px;border-bottom:3px solid #c9a961;">
+            <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+            <p style="color:#aaa;margin:4px 0 0;font-size:0.85rem;">Overtime Request Notification</p>
+          </div>
+          <div style="padding:28px;">
+            <h3 style="color:#1a1a1a;margin-top:0;">⏱️ New Overtime Request Submitted</h3>
+            <p style="color:#555;line-height:1.6;">
+              A cashier has submitted an overtime request and is waiting for your approval.
+            </p>
+            <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:0.92rem;">
+              <tr style="background:#f9f5ec;">
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;width:40%;">👤 Employee</td>
+                <td style="padding:10px 14px;color:#333;">{employee_name} (ID #{employee_id})</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">📅 Request Date</td>
+                <td style="padding:10px 14px;color:#333;">{request_date}</td>
+              </tr>
+              <tr style="background:#f9f5ec;">
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">⏳ Extended Hours</td>
+                <td style="padding:10px 14px;color:#333;">{float(extended_hours):.1f} hour(s)</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">📝 Reason</td>
+                <td style="padding:10px 14px;color:#333;">{reason or '—'}</td>
+              </tr>
+            </table>
+            <div style="margin-top:22px;text-align:center;">
+              <a href="{review_url}"
+                 style="background:#c9a961;color:#1a1a1a;padding:12px 28px;border-radius:8px;
+                        text-decoration:none;font-weight:700;font-size:0.95rem;display:inline-block;">
+                🔍 Review Request in Admin Panel
+              </a>
+            </div>
+            <div style="background:#f5f5f5;border-radius:8px;padding:12px 16px;margin-top:22px;
+                        font-size:0.82rem;color:#888;">
+              This notification was sent automatically by the Books &amp; Blooms Café POS system.
+              You can disable it under Admin Settings → Notifications.
+            </div>
+          </div>
+        </div>
+        """
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"⏱️ Overtime Request — {employee_name} ({request_date})"
+        msg["From"] = cfg["smtp_user"]
+        msg["To"] = cfg["alert_recipient"]
+        msg.attach(MIMEText(html_body, "html"))
+
+        port = int(cfg.get("smtp_port") or 587)
+        use_tls = bool(cfg.get("smtp_use_tls", True))
+
+        if use_tls:
+            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=10)
+            server.ehlo()
+            server.starttls()
+        else:
+            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=10)
+
+        server.login(cfg["smtp_user"], cfg["smtp_password"])
+        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
+        server.quit()
+        app.logger.info(
+            f"[overtime_email] Notification sent to {cfg['alert_recipient']} "
+            f"for employee {employee_id} ({request_date})"
+        )
+    except Exception as exc:
+        app.logger.error(f"[overtime_email] Failed to send notification: {exc}")
+
+
 def _ensure_email_settings_table():
     """
     Create the email_alert_settings table if it does not already exist.
@@ -2997,9 +3207,9 @@ def _ensure_email_settings_table():
                 low_stock_enabled   TINYINT(1)    NOT NULL DEFAULT 1,
                 low_stock_threshold INT           NOT NULL DEFAULT 5,
                 daily_summary_enabled       TINYINT(1) NOT NULL DEFAULT 1,
-                new_employee_enabled        TINYINT(1) NOT NULL DEFAULT 0,
                 failed_login_enabled        TINYINT(1) NOT NULL DEFAULT 1,
                 maintenance_enabled         TINYINT(1) NOT NULL DEFAULT 0,
+                overtime_request_enabled    TINYINT(1) NOT NULL DEFAULT 1,
                 updated_at          TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
                                     ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -3068,9 +3278,9 @@ def api_save_email_settings():
         "low_stock_enabled",
         "low_stock_threshold",
         "daily_summary_enabled",
-        "new_employee_enabled",
         "failed_login_enabled",
         "maintenance_enabled",
+        "overtime_request_enabled",
     }
     updates = {k: v for k, v in data.items() if k in allowed}
 
@@ -10399,10 +10609,54 @@ def api_overtime_request_submit():
         (employee_id, attendance_id, req_date, extended_hours, reason),
     )
     mysql.connection.commit()
+
+    # Fetch employee name for the notification email.
+    # The employees table stores full_name AES-encrypted; there is no first_name/last_name column.
+    cur.execute(
+        "SELECT full_name FROM employees WHERE employee_id=%s LIMIT 1",
+        (employee_id,),
+    )
+    name_row = cur.fetchone()
+    raw_name = name_row["full_name"] if name_row else ""
+    employee_name = aes_decrypt(raw_name) if raw_name else f"Employee #{employee_id}"
+    if not employee_name:
+        employee_name = f"Employee #{employee_id}"
+
+    # Also pre-fetch SMTP settings here (in the request thread) so the background
+    # thread never has to touch flask_mysqldb's thread-local connection.
+    email_cfg = None
+    try:
+        _ensure_email_settings_table()
+        cfg_cur = mysql.connection.cursor(DictCursor)
+        cfg_cur.execute("SELECT * FROM email_alert_settings ORDER BY id LIMIT 1")
+        email_cfg = cfg_cur.fetchone()
+        cfg_cur.close()
+    except Exception as _cfg_exc:
+        app.logger.warning(f"[overtime] Could not pre-fetch email settings: {_cfg_exc}")
+
     cur.close()
+
     app.logger.info(
         f"[overtime] Employee {employee_id} submitted OT request for {req_date} ({extended_hours}h)"
     )
+
+    # Send email notification in a true background thread.
+    # We pass email_cfg directly so the thread does NOT need a DB connection at all —
+    # flask_mysqldb connections are thread-local and would be None inside a new thread.
+    import threading
+
+    def _send_email_bg(emp_name, emp_id, req_date_str, ext_h, rsn, cfg):
+        try:
+            _send_overtime_request_email_with_cfg(emp_name, emp_id, req_date_str, ext_h, rsn, cfg)
+        except Exception as _ex:
+            app.logger.error(f"[overtime_email_thread] Unhandled error: {_ex}")
+
+    threading.Thread(
+        target=_send_email_bg,
+        args=(employee_name, employee_id, str(req_date), extended_hours, reason, email_cfg),
+        daemon=True,
+    ).start()
+
     return jsonify(
         {"success": True, "message": "Overtime request submitted successfully"}
     )

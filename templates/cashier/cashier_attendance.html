@@ -2316,11 +2316,21 @@
 
                 <div id="otError" style="display:none;background:#fff3f3;border:1px solid #ffcdd2;color:#c62828;padding:0.6rem 0.85rem;border-radius:8px;margin-bottom:1rem;font-size:0.9rem;"></div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" id="otModalFooter">
                 <button class="btn btn-outline" id="cancelOTModal">Cancel</button>
                 <div class="modal-footer-right">
                     <button class="btn btn-primary" id="submitOTBtn">Submit Request</button>
                 </div>
+            </div>
+
+            <!-- Success panel (hidden until request is accepted) -->
+            <div id="otSuccessPanel" style="display:none;text-align:center;padding:2.5rem 2rem 2rem;">
+                <div style="font-size:3rem;margin-bottom:0.75rem;">✅</div>
+                <h3 style="color:#2e7d32;margin:0 0 0.5rem;font-size:1.2rem;">Request Submitted!</h3>
+                <p style="color:#555;font-size:0.9rem;margin:0 0 1.5rem;">
+                    Your overtime request has been sent.<br>The manager will review and notify you.
+                </p>
+                <button class="btn btn-primary" id="otSuccessClose">Done</button>
             </div>
         </div>
     </div>
@@ -2831,15 +2841,28 @@
             });
 
             // Open / close
+            // Helper: reset OT modal back to the form view
+            function resetOTModal() {
+                const formBody   = document.querySelector('#otModal .modal-body');
+                const footer     = document.getElementById('otModalFooter');
+                const successPnl = document.getElementById('otSuccessPanel');
+                if (formBody)   formBody.style.display   = '';
+                if (footer)     footer.style.display     = '';
+                if (successPnl) successPnl.style.display = 'none';
+                if (otHoursEl)  otHoursEl.value  = '';
+                if (otReasonEl) otReasonEl.value = '';
+                if (otCountEl)  otCountEl.textContent = '0 / 500';
+                if (otErrorEl)  { otErrorEl.style.display = 'none'; otErrorEl.textContent = ''; }
+            }
+
             document.getElementById('openOTModal')?.addEventListener('click', () => {
                 if (otDateEl) otDateEl.value = new Date().toISOString().slice(0, 10);
-                if (otHoursEl) otHoursEl.value = '';
-                if (otReasonEl) otReasonEl.value = '';
-                if (otErrorEl) { otErrorEl.style.display = 'none'; otErrorEl.textContent = ''; }
+                resetOTModal();
                 otModal?.classList.add('open');
             });
-            document.getElementById('closeOTModal')?.addEventListener('click', () => otModal?.classList.remove('open'));
-            document.getElementById('cancelOTModal')?.addEventListener('click', () => otModal?.classList.remove('open'));
+            document.getElementById('closeOTModal')?.addEventListener('click', () => { resetOTModal(); otModal?.classList.remove('open'); });
+            document.getElementById('cancelOTModal')?.addEventListener('click', () => { resetOTModal(); otModal?.classList.remove('open'); });
+            document.getElementById('otSuccessClose')?.addEventListener('click', () => { resetOTModal(); otModal?.classList.remove('open'); });
 
             // Submit
             document.getElementById('submitOTBtn')?.addEventListener('click', async () => {
@@ -2863,8 +2886,13 @@
                     });
                     const data = await res.json();
                     if (data.success) {
-                        otModal?.classList.remove('open');
-                        showToast('Overtime request submitted! ✅', 'success');
+                        // Show success panel inside the modal
+                        const formBody   = document.querySelector('#otModal .modal-body');
+                        const footer     = document.getElementById('otModalFooter');
+                        const successPnl = document.getElementById('otSuccessPanel');
+                        if (formBody)   formBody.style.display   = 'none';
+                        if (footer)     footer.style.display     = 'none';
+                        if (successPnl) successPnl.style.display = 'block';
                         loadOTRequests();
                     } else {
                         showOTError(data.message || 'Failed to submit request.');
