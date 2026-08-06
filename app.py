@@ -12,6 +12,7 @@ from flask import (
     url_for,
     jsonify,
 )
+from decimal import Decimal
 from flask_mysqldb import MySQL
 from MySQLdb.cursors import DictCursor
 from flask_wtf.csrf import CSRFProtect, CSRFError
@@ -2978,8 +2979,9 @@ def admin_settings():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
-def _send_overtime_request_email_with_cfg(employee_name, employee_id, request_date,
-                                           extended_hours, reason, cfg):
+def _send_overtime_request_email_with_cfg(
+    employee_name, employee_id, request_date, extended_hours, reason, cfg
+):
     """
     Send an overtime request notification email using a **pre-fetched** cfg dict.
 
@@ -2989,17 +2991,26 @@ def _send_overtime_request_email_with_cfg(employee_name, employee_id, request_da
     before spawning the thread.
     """
     if not cfg:
-        app.logger.warning("[overtime_email] No email settings available; skipping notification.")
+        app.logger.warning(
+            "[overtime_email] No email settings available; skipping notification."
+        )
         return
 
     if not cfg.get("overtime_request_enabled", 1):
-        app.logger.info("[overtime_email] overtime_request_enabled is OFF; skipping notification.")
+        app.logger.info(
+            "[overtime_email] overtime_request_enabled is OFF; skipping notification."
+        )
         return
 
-    missing = [f for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient")
-               if not cfg.get(f)]
+    missing = [
+        f
+        for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient")
+        if not cfg.get(f)
+    ]
     if missing:
-        app.logger.warning(f"[overtime_email] Missing SMTP fields {missing}; cannot send notification.")
+        app.logger.warning(
+            f"[overtime_email] Missing SMTP fields {missing}; cannot send notification."
+        )
         return
 
     try:
@@ -3079,7 +3090,9 @@ def _send_overtime_request_email_with_cfg(employee_name, employee_id, request_da
         app.logger.error(f"[overtime_email] Failed to send notification: {exc}")
 
 
-def _send_overtime_request_email(employee_name, employee_id, request_date, extended_hours, reason):
+def _send_overtime_request_email(
+    employee_name, employee_id, request_date, extended_hours, reason
+):
     """
     Send an overtime request notification email to the alert recipient (owner/admin).
     Fires only when overtime_request_enabled is set to 1 in email_alert_settings.
@@ -3100,20 +3113,32 @@ def _send_overtime_request_email(employee_name, employee_id, request_date, exten
         return
 
     if not cfg:
-        app.logger.warning("[overtime_email] No email settings row found; skipping notification.")
+        app.logger.warning(
+            "[overtime_email] No email settings row found; skipping notification."
+        )
         return
 
     if not cfg.get("overtime_request_enabled", 1):
-        app.logger.info("[overtime_email] overtime_request_enabled is OFF; skipping notification.")
+        app.logger.info(
+            "[overtime_email] overtime_request_enabled is OFF; skipping notification."
+        )
         return
 
-    missing = [f for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient") if not cfg.get(f)]
+    missing = [
+        f
+        for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient")
+        if not cfg.get(f)
+    ]
     if missing:
-        app.logger.warning(f"[overtime_email] Missing SMTP fields {missing}; cannot send notification.")
+        app.logger.warning(
+            f"[overtime_email] Missing SMTP fields {missing}; cannot send notification."
+        )
         return
 
     try:
-        review_url = "http://127.0.0.1:5000/admin_settings"  # adjust to production URL if needed
+        review_url = (
+            "http://127.0.0.1:5000/admin_settings"  # adjust to production URL if needed
+        )
 
         html_body = f"""
         <div style="font-family:DM Sans,Arial,sans-serif;max-width:560px;margin:0 auto;
@@ -3206,14 +3231,23 @@ def _ensure_email_settings_table():
                 alert_recipient     VARCHAR(255)  NOT NULL DEFAULT '',
                 low_stock_enabled   TINYINT(1)    NOT NULL DEFAULT 1,
                 low_stock_threshold INT           NOT NULL DEFAULT 5,
-                daily_summary_enabled       TINYINT(1) NOT NULL DEFAULT 1,
-                failed_login_enabled        TINYINT(1) NOT NULL DEFAULT 1,
-                maintenance_enabled         TINYINT(1) NOT NULL DEFAULT 0,
-                overtime_request_enabled    TINYINT(1) NOT NULL DEFAULT 1,
+                daily_summary_enabled       TINYINT(1)  NOT NULL DEFAULT 1,
+                daily_summary_time          VARCHAR(5)  NOT NULL DEFAULT '22:30',
+                failed_login_enabled        TINYINT(1)  NOT NULL DEFAULT 1,
+                maintenance_enabled         TINYINT(1)  NOT NULL DEFAULT 0,
+                overtime_request_enabled    TINYINT(1)  NOT NULL DEFAULT 1,
                 updated_at          TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
                                     ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
+        # Migration: add daily_summary_time for existing installations
+        cur.execute("SHOW COLUMNS FROM email_alert_settings LIKE 'daily_summary_time'")
+        if not cur.fetchone():
+            cur.execute(
+                "ALTER TABLE email_alert_settings "
+                "ADD COLUMN daily_summary_time VARCHAR(5) NOT NULL DEFAULT '22:30' "
+                "AFTER daily_summary_enabled"
+            )
         # Seed one default row so GET always returns something
         cur.execute("SELECT COUNT(*) AS cnt FROM email_alert_settings")
         if cur.fetchone()[0] == 0:
@@ -3278,6 +3312,7 @@ def api_save_email_settings():
         "low_stock_enabled",
         "low_stock_threshold",
         "daily_summary_enabled",
+        "daily_summary_time",
         "failed_login_enabled",
         "maintenance_enabled",
         "overtime_request_enabled",
@@ -3565,6 +3600,29 @@ def api_test_email():
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
+# ── POST /api/settings/email/send-daily-summary ──────────────────────────────
+@app.route("/api/settings/email/send-daily-summary", methods=["POST"])
+@csrf.exempt
+def api_send_daily_summary():
+    """
+    Manually trigger the Daily Sales Summary email right now.
+    Useful when the scheduled send time was already missed (e.g. server was
+    just started after the target hour, or the admin wants a test run).
+    Super-admin only.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    import threading as _t
+
+    def _run():
+        with app.app_context():
+            _send_daily_sales_summary_email()
+
+    _t.Thread(target=_run, daemon=True, name="daily-summary-manual").start()
+    return jsonify({"success": True, "message": "Daily Sales Summary is being sent now."})
+
+
 # ── POST /api/settings/email/send-low-stock-alert ────────────────────────────
 @app.route("/api/settings/email/send-low-stock-alert", methods=["POST"])
 @csrf.exempt
@@ -3786,6 +3844,254 @@ def api_send_low_stock_alert():
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
+# ── Daily Sales Summary ───────────────────────────────────────────────────────
+
+
+def _send_daily_sales_summary_email(target_date=None, cfg=None):
+    """
+    Build and send the end-of-day sales summary email for `target_date`
+    (defaults to yesterday).  Accepts a pre-fetched `cfg` dict so it can
+    run safely inside a background thread without touching flask_mysqldb.
+    """
+    from datetime import date as _date
+
+    if target_date is None:
+        target_date = _date.today() - timedelta(days=1)
+
+    date_str = target_date.strftime("%B %d, %Y")  # e.g. "August 03, 2026"
+    date_sql = target_date.strftime("%Y-%m-%d")
+
+    # ── Fetch cfg if not supplied ─────────────────────────────────────────────
+    if cfg is None:
+        try:
+            _ensure_email_settings_table()
+            cur = mysql.connection.cursor(DictCursor)
+            cur.execute("SELECT * FROM email_alert_settings ORDER BY id LIMIT 1")
+            cfg = cur.fetchone()
+            cur.close()
+        except Exception as exc:
+            app.logger.error(f"[daily_summary] Could not fetch email settings: {exc}")
+            return
+
+    if not cfg:
+        app.logger.warning("[daily_summary] No email settings row found; skipping.")
+        return
+
+    if not cfg.get("daily_summary_enabled", 1):
+        app.logger.info("[daily_summary] daily_summary_enabled is OFF; skipping.")
+        return
+
+    missing = [
+        f
+        for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient")
+        if not cfg.get(f)
+    ]
+    if missing:
+        app.logger.warning(
+            f"[daily_summary] Missing SMTP fields {missing}; cannot send."
+        )
+        return
+
+    # ── Query yesterday's sales data ──────────────────────────────────────────
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        # Overall totals
+        cur.execute(
+            """
+            SELECT
+                COUNT(*)                          AS transaction_count,
+                COALESCE(SUM(total_amount), 0)    AS gross_revenue,
+                COALESCE(SUM(discount_amount), 0) AS total_discounts,
+                COALESCE(AVG(total_amount), 0)    AS avg_order_value,
+                SUM(CASE WHEN payment_method = 'cash'  THEN 1 ELSE 0 END) AS cash_count,
+                SUM(CASE WHEN payment_method != 'cash' THEN 1 ELSE 0 END) AS digital_count
+            FROM transactions
+            WHERE DATE(created_at) = %s AND status = 'completed'
+        """,
+            (date_sql,),
+        )
+        totals = cur.fetchone()
+
+        # Top 5 selling items
+        cur.execute(
+            """
+            SELECT ti.product_name,
+                   SUM(ti.quantity)               AS units_sold,
+                   SUM(ti.quantity * ti.unit_price) AS item_revenue
+            FROM transaction_items ti
+            JOIN transactions t ON t.transaction_id = ti.transaction_id
+            WHERE DATE(t.created_at) = %s AND t.status = 'completed'
+            GROUP BY ti.product_name
+            ORDER BY units_sold DESC
+            LIMIT 5
+        """,
+            (date_sql,),
+        )
+        top_items = cur.fetchall()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[daily_summary] DB query failed: {exc}")
+        return
+
+    tx_count = int(totals["transaction_count"] or 0)
+    gross = float(totals["gross_revenue"] or 0)
+    discounts = float(totals["total_discounts"] or 0)
+    net_revenue = gross - discounts
+    avg_order = float(totals["avg_order_value"] or 0)
+    cash_count = int(totals["cash_count"] or 0)
+    digital_count = int(totals["digital_count"] or 0)
+
+    # ── Build top-items rows ──────────────────────────────────────────────────
+    top_rows_html = ""
+    if top_items:
+        for rank, item in enumerate(top_items, 1):
+            medal = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][rank - 1]
+            top_rows_html += f"""
+            <tr style="{'background:#f9f5ec;' if rank % 2 == 1 else ''}">
+              <td style="padding:10px 14px;text-align:center;font-size:1.1rem;">{medal}</td>
+              <td style="padding:10px 14px;font-weight:600;color:#333;">{item['product_name']}</td>
+              <td style="padding:10px 14px;text-align:center;color:#555;">{int(item['units_sold'])}</td>
+              <td style="padding:10px 14px;text-align:center;color:#7a5c1e;font-weight:600;">
+                ₱{float(item['item_revenue']):.2f}
+              </td>
+            </tr>"""
+    else:
+        top_rows_html = """
+            <tr>
+              <td colspan="4" style="padding:14px;text-align:center;color:#aaa;">
+                No sales recorded for this day.
+              </td>
+            </tr>"""
+
+    no_sales_banner = ""
+    if tx_count == 0:
+        no_sales_banner = """
+        <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;
+                    padding:12px 16px;margin-bottom:20px;color:#856404;font-size:0.88rem;">
+          ⚠️ No completed transactions were recorded for this day.
+        </div>"""
+
+    # ── HTML email body ───────────────────────────────────────────────────────
+    html_body = f"""
+    <div style="font-family:DM Sans,Arial,sans-serif;max-width:600px;margin:0 auto;
+                border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+
+      <!-- Header -->
+      <div style="background:#1a1a1a;padding:20px 28px;border-bottom:3px solid #c9a961;">
+        <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+        <p style="color:#aaa;margin:4px 0 0;font-size:0.85rem;">Daily Sales Summary — {date_str}</p>
+      </div>
+
+      <div style="padding:28px;">
+        <h3 style="color:#1a1a1a;margin-top:0;">📊 End-of-Day Sales Report</h3>
+        {no_sales_banner}
+
+        <!-- KPI cards -->
+        <table style="width:100%;border-collapse:separate;border-spacing:8px;margin-bottom:8px;">
+          <tr>
+            <td style="background:#f9f5ec;border-radius:8px;padding:14px 16px;text-align:center;width:33%;">
+              <div style="font-size:1.6rem;font-weight:700;color:#c9a961;">
+                ₱{net_revenue:,.2f}
+              </div>
+              <div style="font-size:0.75rem;color:#888;margin-top:4px;">Net Revenue</div>
+            </td>
+            <td style="background:#f9f5ec;border-radius:8px;padding:14px 16px;text-align:center;width:33%;">
+              <div style="font-size:1.6rem;font-weight:700;color:#c9a961;">
+                {tx_count}
+              </div>
+              <div style="font-size:0.75rem;color:#888;margin-top:4px;">Transactions</div>
+            </td>
+            <td style="background:#f9f5ec;border-radius:8px;padding:14px 16px;text-align:center;width:33%;">
+              <div style="font-size:1.6rem;font-weight:700;color:#c9a961;">
+                ₱{avg_order:,.2f}
+              </div>
+              <div style="font-size:0.75rem;color:#888;margin-top:4px;">Avg. Order Value</div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Breakdown -->
+        <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:0.92rem;">
+          <tr style="background:#f9f5ec;">
+            <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">💰 Gross Revenue</td>
+            <td style="padding:10px 14px;text-align:right;color:#333;">₱{gross:,.2f}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">🏷️ Total Discounts</td>
+            <td style="padding:10px 14px;text-align:right;color:#dc3545;">− ₱{discounts:,.2f}</td>
+          </tr>
+          <tr style="background:#f9f5ec;">
+            <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">💵 Cash Transactions</td>
+            <td style="padding:10px 14px;text-align:right;color:#333;">{cash_count}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">💳 Digital Transactions</td>
+            <td style="padding:10px 14px;text-align:right;color:#333;">{digital_count}</td>
+          </tr>
+        </table>
+
+        <!-- Top-selling items -->
+        <h4 style="color:#1a1a1a;margin:22px 0 10px;">🏆 Top-Selling Items</h4>
+        <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+          <thead>
+            <tr style="background:#1a1a1a;color:#c9a961;">
+              <th style="padding:8px 14px;text-align:center;width:40px;">#</th>
+              <th style="padding:8px 14px;text-align:left;">Product</th>
+              <th style="padding:8px 14px;text-align:center;">Units Sold</th>
+              <th style="padding:8px 14px;text-align:center;">Revenue</th>
+            </tr>
+          </thead>
+          <tbody>{top_rows_html}</tbody>
+        </table>
+
+        <!-- CTA -->
+        <div style="margin-top:26px;text-align:center;">
+          <a href="http://127.0.0.1:5000/admin_sales"
+             style="background:#c9a961;color:#1a1a1a;padding:12px 28px;border-radius:8px;
+                    text-decoration:none;font-weight:700;font-size:0.95rem;display:inline-block;">
+            📈 View Full Sales Report
+          </a>
+        </div>
+
+        <div style="background:#f5f5f5;border-radius:8px;padding:12px 16px;margin-top:22px;
+                    font-size:0.82rem;color:#888;">
+          This summary was sent automatically by the Books &amp; Blooms Café POS system
+          at the end of {date_str}.  You can disable it under Admin Settings → Notifications.
+        </div>
+      </div>
+    </div>
+    """
+
+    # ── Send via SMTP ─────────────────────────────────────────────────────────
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"📊 Daily Sales Summary — {date_str}"
+        msg["From"] = cfg["smtp_user"]
+        msg["To"] = cfg["alert_recipient"]
+        msg.attach(MIMEText(html_body, "html"))
+
+        port = int(cfg.get("smtp_port") or 587)
+        use_tls = bool(cfg.get("smtp_use_tls", True))
+
+        if use_tls:
+            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=15)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+        else:
+            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=15)
+
+        server.login(cfg["smtp_user"], cfg["smtp_password"])
+        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
+        server.quit()
+        app.logger.info(
+            f"[daily_summary] Summary for {date_sql} sent to {cfg['alert_recipient']}"
+        )
+    except Exception as exc:
+        app.logger.error(f"[daily_summary] Failed to send email: {exc}")
+
+
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║                          DANGER ZONE ROUTES                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -3882,6 +4188,80 @@ def api_danger_clear_transactions():
 
     except Exception as exc:
         app.logger.error(f"[danger] clear_transactions failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/danger/clear_all_data", methods=["POST"])
+@csrf.exempt
+def api_danger_clear_all_data():
+    """
+    Permanently delete all sales records AND all products/inventory data
+    from the database, then re-seed the bare defaults so the app stays
+    functional.  Admin-only.
+
+    Deletion order (respects FK constraints):
+        inv_log          → references inv_items (no declared FK but safer first)
+        stock_requests   → standalone, references nothing
+        transaction_items → FK → transactions
+        transactions      → standalone after items removed
+        products          → FK → categories (ON DELETE SET NULL, but clear anyway)
+        inv_items         → standalone
+        categories        → cleared last so products FK is already gone
+
+    After clearing, _ensure_inventory_tables() and _ensure_inv_tables() are
+    called to re-seed default categories and default cup items.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        cur = mysql.connection.cursor()
+
+        # ── count totals for the response summary ──────────────────────────
+        cur.execute("SELECT COUNT(*) FROM transactions")
+        tx_count = int((cur.fetchone() or [0])[0])
+
+        cur.execute("SELECT COUNT(*) FROM products")
+        prod_count = int((cur.fetchone() or [0])[0])
+
+        cur.execute("SELECT COUNT(*) FROM inv_items")
+        inv_count = int((cur.fetchone() or [0])[0])
+
+        # ── delete in FK-safe order ────────────────────────────────────────
+        # 1. inv_log references inv_items.id (no declared FK but child logically)
+        cur.execute("DELETE FROM inv_log")
+        # 2. stock_requests is standalone
+        cur.execute("DELETE FROM stock_requests")
+        # 3. transaction_items is child of transactions
+        cur.execute("DELETE FROM transaction_items")
+        cur.execute("DELETE FROM transactions")
+        # 4. products references categories (ON DELETE SET NULL)
+        cur.execute("DELETE FROM products")
+        # 5. inv_items is standalone
+        cur.execute("DELETE FROM inv_items")
+        # 6. categories — products already gone so FK is satisfied
+        cur.execute("DELETE FROM categories")
+
+        mysql.connection.commit()
+        cur.close()
+
+        app.logger.warning(
+            f"[danger] clear_all_data executed by admin "
+            f"employee_id={session.get('employee_id')} — "
+            f"{tx_count} transactions, {prod_count} products, {inv_count} inv_items deleted"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": (
+                    f"All data cleared: {tx_count} transaction(s), "
+                    f"{prod_count} product(s), {inv_count} inventory item(s) deleted."
+                ),
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[danger] clear_all_data failed: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
@@ -4892,17 +5272,19 @@ def _ensure_payroll_tables():
         """)
         # Patch existing tables: add unique key if missing (idempotent)
         try:
-            cur.execute(
+            dict_cur = conn.cursor(DictCursor)
+            dict_cur.execute(
                 "SELECT COUNT(*) AS c FROM information_schema.STATISTICS "
                 "WHERE table_schema=DATABASE() AND table_name='payroll_periods' "
                 "AND index_name='uq_emp_period'"
             )
-            if cur.fetchone()["c"] == 0:
+            if dict_cur.fetchone()["c"] == 0:
                 cur.execute(
                     "ALTER TABLE payroll_periods "
                     "ADD UNIQUE KEY uq_emp_period (employee_id, period_start)"
                 )
                 app.logger.info("[payroll] Added uq_emp_period unique key")
+            dict_cur.close()
         except Exception as patch_exc:
             app.logger.warning(f"[payroll] uq_emp_period patch skipped: {patch_exc}")
 
@@ -10152,6 +10534,89 @@ if not getattr(app, "_midnight_thread_started", False):
     app._midnight_thread_started = True
 
 
+# ── Daily Sales Summary thread (fires every night at user-configured time) ────
+
+
+def _get_daily_summary_send_time():
+    """
+    Read daily_summary_time ('HH:MM') from the DB.
+    Falls back to '22:30' if the row is missing or the value is malformed.
+    """
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT daily_summary_time FROM email_alert_settings ORDER BY id LIMIT 1"
+        )
+        row = cur.fetchone()
+        cur.close()
+        if row and row.get("daily_summary_time"):
+            parts = row["daily_summary_time"].split(":")
+            h, m = int(parts[0]), int(parts[1])
+            if 0 <= h <= 23 and 0 <= m <= 59:
+                return h, m
+    except Exception as exc:
+        app.logger.warning(f"[daily_summary] Could not read send time from DB: {exc}")
+    return 22, 30  # safe default
+
+
+def _daily_summary_thread():
+    """
+    Background daemon thread.  Each cycle it reads the scheduled send time from
+    the DB, sleeps until that time, sends the Daily Sales Summary email, then
+    loops. This means changes saved in Settings take effect on the very next
+    night without restarting the server.
+    Runs inside the Flask app context so it can access mysql.connection.
+    """
+    import time as _time
+
+    with app.app_context():
+        while True:
+            send_hour, send_minute = _get_daily_summary_send_time()
+            now = datetime.now()
+            target = now.replace(
+                hour=send_hour, minute=send_minute, second=0, microsecond=0
+            )
+            missed_by = (now - target).total_seconds()
+            if 0 <= missed_by <= 3600:
+                # Missed the window by up to 1 hour (e.g. server just started,
+                # or schedule was saved after the target time) — send right away.
+                app.logger.info(
+                    f"[daily_summary] Missed window by {missed_by/60:.1f} min; "
+                    "sending now to catch up."
+                )
+                today = datetime.now().date()
+                try:
+                    _send_daily_sales_summary_email(target_date=today)
+                except Exception as _exc:
+                    app.logger.error(f"[daily_summary] Catch-up send error: {_exc}")
+                # After catch-up, sleep until tomorrow's window
+                target += timedelta(days=1)
+            elif now >= target:
+                # Missed by more than 1 hour — don't send a stale summary,
+                # just wait for tomorrow's window.
+                target += timedelta(days=1)
+
+            sleep_sec = (target - now).total_seconds()
+            app.logger.info(
+                f"[daily_summary] Next send at {target.strftime('%H:%M')} "
+                f"({sleep_sec/3600:.2f}h away)"
+            )
+            _time.sleep(max(sleep_sec, 1))
+            today = datetime.now().date()
+            try:
+                _send_daily_sales_summary_email(target_date=today)
+            except Exception as _exc:
+                app.logger.error(f"[daily_summary] Nightly send error: {_exc}")
+
+
+if not getattr(app, "_daily_summary_thread_started", False):
+    _dst = _threading.Thread(
+        target=_daily_summary_thread, daemon=True, name="daily-summary"
+    )
+    _dst.start()
+    app._daily_summary_thread_started = True
+
+
 # ── Admin manual clock-out override ──────────────────────────────────────────
 
 
@@ -10647,13 +11112,22 @@ def api_overtime_request_submit():
 
     def _send_email_bg(emp_name, emp_id, req_date_str, ext_h, rsn, cfg):
         try:
-            _send_overtime_request_email_with_cfg(emp_name, emp_id, req_date_str, ext_h, rsn, cfg)
+            _send_overtime_request_email_with_cfg(
+                emp_name, emp_id, req_date_str, ext_h, rsn, cfg
+            )
         except Exception as _ex:
             app.logger.error(f"[overtime_email_thread] Unhandled error: {_ex}")
 
     threading.Thread(
         target=_send_email_bg,
-        args=(employee_name, employee_id, str(req_date), extended_hours, reason, email_cfg),
+        args=(
+            employee_name,
+            employee_id,
+            str(req_date),
+            extended_hours,
+            reason,
+            email_cfg,
+        ),
         daemon=True,
     ).start()
 
@@ -11440,6 +11914,239 @@ def api_admin_stock_requests_pending_count():
     except Exception as exc:
         app.logger.error(f"[stock_request] pending_count: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                       BACKUP & DATA EXPORT ROUTES                           ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# ── Table definitions for each export type ────────────────────────────────────
+# Each entry is a list of (table_name, [columns_to_export]).
+# Using an explicit column list avoids accidentally exporting sensitive blobs
+# (e.g. face_embedding) and keeps the JSON file a reasonable size.
+_BACKUP_TABLES = {
+    "full": [
+        # Parent tables first so FK constraints are satisfied on both
+        # export (logical grouping) and import (insert order).
+        ("categories",           ["category_id", "name", "created_at"]),
+        ("products",             ["product_id", "category_id", "name", "description", "sku", "price", "cost", "stock", "reorder_point", "unit", "icon", "image_url", "is_active", "cup_eligible", "created_at"]),
+        ("transactions",         ["transaction_id", "cashier_id", "cashier_name", "subtotal", "discount_amount", "tax_amount", "total_amount", "amount_tendered", "change_amount", "payment_method", "gcash_ref", "note", "status", "discount_type", "net_sales", "vat_amount", "created_at"]),
+        ("transaction_items",    ["item_id", "transaction_id", "product_id", "product_name", "category_name", "unit_price", "quantity", "line_total"]),
+        ("inv_items",            ["id", "name", "type", "stock", "unit", "reorder_point", "note", "is_active", "created_at"]),
+        ("employees",            ["employee_id", "full_name", "role", "hourly_rate", "created_at"]),
+        ("app_settings",         ["setting_key", "setting_value"]),
+        ("email_alert_settings", ["id", "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_use_tls", "alert_recipient", "low_stock_enabled", "low_stock_threshold", "daily_summary_enabled", "daily_summary_time", "overtime_request_enabled"]),
+    ],
+    "sales": [
+        ("transactions",      ["transaction_id", "cashier_id", "cashier_name", "subtotal", "discount_amount", "tax_amount", "total_amount", "amount_tendered", "change_amount", "payment_method", "gcash_ref", "note", "status", "discount_type", "net_sales", "vat_amount", "created_at"]),
+        ("transaction_items", ["item_id", "transaction_id", "product_id", "product_name", "category_name", "unit_price", "quantity", "line_total"]),
+    ],
+    "products": [
+        # categories (parent) before products (child) so inserts succeed
+        # in FK-respecting order even without FOREIGN_KEY_CHECKS = 0.
+        ("categories", ["category_id", "name", "created_at"]),
+        ("products",   ["product_id", "category_id", "name", "description", "sku", "price", "cost", "stock", "reorder_point", "unit", "icon", "image_url", "is_active", "cup_eligible", "created_at"]),
+        ("inv_items",  ["id", "name", "type", "stock", "unit", "reorder_point", "note", "is_active", "created_at"]),
+    ],
+}
+
+
+def _serialize_row(row: dict) -> dict:
+    """Convert a MySQLdb DictCursor row to a JSON-serialisable dict."""
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, (datetime, date)):
+            out[k] = v.isoformat()
+        elif isinstance(v, Decimal):
+            out[k] = float(v)
+        elif hasattr(v, "item"):          # numpy scalar
+            out[k] = v.item()
+        elif isinstance(v, (bytes, bytearray)):
+            out[k] = base64.b64encode(v).decode()
+        else:
+            out[k] = v
+    return out
+
+
+@app.route("/api/backup/export", methods=["GET"])
+@csrf.exempt
+def api_backup_export():
+    """
+    Stream a JSON backup file for the requested export type.
+    Query param:  ?type=full|sales|products   (default: full)
+    Auth:         super-admin only
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    export_type = request.args.get("type", "full").lower()
+    if export_type not in _BACKUP_TABLES:
+        return jsonify({"success": False, "message": f"Unknown export type '{export_type}'"}), 400
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        tables_data = {}
+
+        for table_name, columns in _BACKUP_TABLES[export_type]:
+            col_list = ", ".join(f"`{c}`" for c in columns)
+            try:
+                cur.execute(f"SELECT {col_list} FROM `{table_name}`")
+                rows = cur.fetchall()
+                tables_data[table_name] = [_serialize_row(r) for r in rows]
+            except Exception as exc:
+                # Table may not exist yet (e.g. fresh install missing optional tables) —
+                # log and continue so the rest of the export is not blocked.
+                app.logger.warning(f"[backup] export: skipping table '{table_name}': {exc}")
+                tables_data[table_name] = []
+
+        cur.close()
+
+        payload = {
+            "backup_meta": {
+                "type":        export_type,
+                "exported_at": datetime.now().isoformat(timespec="seconds"),
+                "exported_by": session.get("admin_username") or f"admin#{session.get('admin_id')}",
+                "version":     1,
+            },
+            "tables": tables_data,
+        }
+
+        ts       = datetime.now().strftime("%Y%m%d-%H%M%S")
+        filename = f"books-blooms-{export_type}-backup-{ts}.json"
+
+        app.logger.info(
+            f"[backup] export '{export_type}' by admin_id={session.get('admin_id')} "
+            f"— {sum(len(v) for v in tables_data.values())} total rows"
+        )
+
+        return Response(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            mimetype="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[backup] export failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/backup/import", methods=["POST"])
+@csrf.exempt
+def api_backup_import():
+    """
+    Restore data from a previously exported JSON backup.
+    Body:  the exact JSON produced by /api/backup/export
+    Auth:  super-admin only
+
+    Strategy: for each table present in the payload, DELETE existing rows
+    then INSERT the backup rows inside a single transaction so the database
+    is never left half-restored on error.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    # ── Payload size guard (reject over ~20 MB) ───────────────────────────────
+    content_length = request.content_length or 0
+    if content_length > 20 * 1024 * 1024:
+        return jsonify({"success": False, "message": "Backup file is too large (max 20 MB)."}), 413
+
+    try:
+        payload = request.get_json(force=True, silent=True)
+    except Exception:
+        payload = None
+
+    if not payload or "backup_meta" not in payload or "tables" not in payload:
+        return jsonify({"success": False, "message": "Invalid or missing backup payload."}), 400
+
+    meta   = payload["backup_meta"]
+    tables = payload["tables"]          # { table_name: [ {col: val, …}, … ] }
+
+    # Whitelist — only allow tables we actually manage (prevents arbitrary table drops)
+    allowed_tables: set[str] = set()
+    for tbl_list in _BACKUP_TABLES.values():
+        for tbl_name, _ in tbl_list:
+            allowed_tables.add(tbl_name)
+
+    try:
+        conn = mysql.connection
+        cur  = conn.cursor()
+
+        total_inserted = 0
+        tables_restored: list[str] = []
+
+        # Disable FK checks for the duration of the restore so that table
+        # order in the backup JSON doesn't cause constraint violations
+        # (e.g. products inserted before categories, or child rows deleted
+        # before parent rows).  FK checks are always re-enabled in the
+        # finally block, even on error, so the session is never left unsafe.
+        cur.execute("SET FOREIGN_KEY_CHECKS = 0")
+
+        try:
+            for table_name, rows in tables.items():
+                if table_name not in allowed_tables:
+                    app.logger.warning(f"[backup] import: skipping non-whitelisted table '{table_name}'")
+                    continue
+                if not rows:
+                    continue
+
+                # Build INSERT from the keys present in the first row
+                columns = list(rows[0].keys())
+                col_sql = ", ".join(f"`{c}`" for c in columns)
+                ph_sql  = ", ".join(["%s"] * len(columns))
+
+                # Clear existing rows for this table
+                cur.execute(f"DELETE FROM `{table_name}`")
+
+                for row in rows:
+                    values = [row.get(c) for c in columns]
+                    cur.execute(
+                        f"INSERT INTO `{table_name}` ({col_sql}) VALUES ({ph_sql})",
+                        values,
+                    )
+                    total_inserted += 1
+
+                tables_restored.append(table_name)
+
+            conn.commit()
+
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+
+        finally:
+            # Always restore FK checks before closing the cursor
+            try:
+                cur.execute("SET FOREIGN_KEY_CHECKS = 1")
+                conn.commit()
+            except Exception:
+                pass
+            cur.close()
+
+        app.logger.warning(
+            f"[backup] import '{meta.get('type', '?')}' "
+            f"by admin_id={session.get('admin_id')} — "
+            f"{total_inserted} rows restored across {tables_restored}"
+        )
+
+        return jsonify({
+            "success": True,
+            "message": (
+                f"Restore complete — {total_inserted:,} rows imported "
+                f"across {len(tables_restored)} table(s): {', '.join(tables_restored)}."
+            ),
+            "tables_restored": tables_restored,
+            "rows_imported":   total_inserted,
+        })
+
+    except Exception as exc:
+        app.logger.error(f"[backup] import failed: {exc}")
+        return jsonify({"success": False, "message": f"Restore failed: {exc}"}), 500
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗

@@ -428,6 +428,100 @@
         .perm-text { font-size: 0.88rem; font-weight: 600; color: #555; }
         .perm-item.checked .perm-text { color: var(--dark-gold); }
 
+        /* ══ BACKUP & EXPORT ══ */
+        .backup-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .backup-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.9rem 1.1rem;
+            border-radius: 8px;
+            border: 1.5px solid #e8e8e8;
+            background: var(--light-gray);
+            transition: border-color .18s, background .18s;
+        }
+
+        .backup-row:hover {
+            border-color: rgba(201,169,97,.5);
+            background: rgba(201,169,97,.04);
+        }
+
+        .backup-row-icon {
+            font-size: 1.5rem;
+            width: 38px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .backup-row-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .backup-row-info strong {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--black);
+            margin-bottom: 2px;
+        }
+
+        .backup-row-info span {
+            font-size: 0.8rem;
+            color: #777;
+            line-height: 1.4;
+        }
+
+        .backup-dropzone {
+            border: 2px dashed #d0d0d0;
+            border-radius: 10px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .2s, background .2s;
+            background: var(--light-gray);
+            user-select: none;
+        }
+
+        .backup-dropzone:hover,
+        .backup-dropzone.drag-over {
+            border-color: var(--gold);
+            background: rgba(201,169,97,.06);
+        }
+
+        .backup-preview {
+            margin-top: 0.85rem;
+            padding: 1.1rem 1.25rem;
+            border-radius: 8px;
+            border: 1.5px solid #e0e0e0;
+            background: #fafafa;
+        }
+
+        .backup-preview-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .backup-status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: var(--light-gray);
+            border: 1.5px solid #e8e8e8;
+            font-size: 0.84rem;
+            color: #666;
+        }
+
         /* ── DANGER ZONE ── */
         .danger-list { display: flex; flex-direction: column; gap: 1rem; }
 
@@ -815,6 +909,16 @@
                 justify-content: center;
             }
 
+            /* Backup rows */
+            .backup-row {
+                flex-wrap: wrap;
+            }
+
+            .backup-row .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
             /* Toggle items */
             .toggle-item {
                 gap: 0.75rem;
@@ -920,6 +1024,10 @@
             <a class="sidebar-item" href="#security">
                 <span class="sidebar-icon">🔑</span>
                 <div>Security<div class="sidebar-item-desc">Change admin password</div></div>
+            </a>
+            <a class="sidebar-item" href="#backup">
+                <span class="sidebar-icon">💾</span>
+                <div>Backup &amp; Export<div class="sidebar-item-desc">Save, export &amp; restore data</div></div>
             </a>
             <div class="sidebar-divider"></div>
             <a class="sidebar-item" href="#danger" style="color:#c0392b;">
@@ -1102,35 +1210,32 @@
                             </div>
                         </div>
 
-                        <div class="toggle-item">
+                        <div class="toggle-item" style="flex-wrap:wrap;">
                             <div class="toggle-info">
                                 <strong>📊 Daily Sales Summary</strong>
                                 <span>Receive an end-of-day summary of total sales, transactions, and top-selling items via email.</span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" id="dailySummaryEnabled" checked>
+                                <input type="checkbox" id="dailySummaryEnabled" checked onchange="toggleDailySummaryPanel()">
                                 <span class="toggle-track"></span>
                             </label>
-                        </div>
-                        <div class="toggle-item">
-                            <div class="toggle-info">
-                                <strong>🔐 Failed Login Attempts</strong>
-                                <span>Get a security alert when repeated failed login attempts are detected on any account.</span>
+
+                            <!-- Daily Summary time sub-panel -->
+                            <div id="dailySummaryPanel" class="alert-sub-panel" style="width:100%;">
+                                <div style="display:flex;align-items:flex-end;gap:1rem;flex-wrap:wrap;">
+                                    <div class="form-group" style="max-width:160px;">
+                                        <label style="font-size:0.78rem;">Scheduled Send Time</label>
+                                        <span class="field-hint">Email sends automatically at this time every night</span>
+                                        <input type="time" id="dailySummaryTime" value="22:30" style="margin-top:4px;">
+                                    </div>
+                                    <button type="button" class="btn btn-secondary" id="sendDailySummaryNowBtn"
+                                            onclick="sendDailySummaryNow(this)"
+                                            style="margin-bottom:2px;"
+                                            title="Send today's summary right now without waiting for the scheduled time">
+                                        📤 Send Now
+                                    </button>
+                                </div>
                             </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="failedLoginEnabled" checked>
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>
-                        <div class="toggle-item">
-                            <div class="toggle-info">
-                                <strong>🛠️ Maintenance Reminders</strong>
-                                <span>Receive a reminder 1 hour before any scheduled system downtime or maintenance window.</span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="maintenanceEnabled">
-                                <span class="toggle-track"></span>
-                            </label>
                         </div>
                         <div class="toggle-item">
                             <div class="toggle-info">
@@ -1212,6 +1317,125 @@
             </div>
         </div>
 
+        <!-- ══ BACKUP & DATA EXPORT ══ -->
+        <div class="setting-card" id="backup">
+            <div class="card-head">
+                <div class="card-head-icon icon-purple">💾</div>
+                <div class="card-head-text">
+                    <h2>Backup &amp; Data Export</h2>
+                    <p>Download your full database or restore from a previous backup — move to a new device without losing a thing</p>
+                </div>
+            </div>
+            <div class="card-body">
+
+                <!-- ── EXPORT ── -->
+                <div>
+                    <p class="section-label">📤 Export &amp; Download</p>
+                    <div class="backup-grid">
+
+                        <div class="backup-row">
+                            <div class="backup-row-icon">🗄️</div>
+                            <div class="backup-row-info">
+                                <strong>Full Database</strong>
+                                <span>Everything — products, sales, inventory, employees, payroll &amp; settings — as one portable JSON file.</span>
+                            </div>
+                            <button class="btn btn-primary btn-sm" id="btnExportFull" onclick="triggerExport('full')">
+                                ⬇ Download Backup
+                            </button>
+                        </div>
+
+                        <div class="backup-row">
+                            <div class="backup-row-icon">🧾</div>
+                            <div class="backup-row-info">
+                                <strong>Sales &amp; Transactions</strong>
+                                <span>All transaction records and line items only — lightweight and fast to transfer.</span>
+                            </div>
+                            <button class="btn btn-outline btn-sm" id="btnExportSales" onclick="triggerExport('sales')">
+                                ⬇ Sales Only
+                            </button>
+                        </div>
+
+                        <div class="backup-row">
+                            <div class="backup-row-icon">📦</div>
+                            <div class="backup-row-info">
+                                <strong>Products &amp; Inventory</strong>
+                                <span>Menu items, categories, and stock levels — ideal when setting up a new POS terminal.</span>
+                            </div>
+                            <button class="btn btn-outline btn-sm" id="btnExportProducts" onclick="triggerExport('products')">
+                                ⬇ Products Only
+                            </button>
+                        </div>
+
+                    </div>
+
+                    <!-- progress bar, shown only while export is in flight -->
+                    <div id="exportProgressWrap" style="display:none; margin-top:1rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                            <span id="exportProgressLabel" style="font-size:0.83rem; font-weight:600; color:#555;">Preparing export…</span>
+                            <span id="exportProgressPct" style="font-size:0.8rem; color:#999;">0%</span>
+                        </div>
+                        <div style="height:5px; background:#e8e8e8; border-radius:4px; overflow:hidden;">
+                            <div id="exportProgressBar"
+                                 style="height:100%; width:0%; border-radius:4px;
+                                        background:linear-gradient(90deg,var(--gold),var(--dark-gold));
+                                        transition:width .25s ease;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── IMPORT / RESTORE ── -->
+                <div>
+                    <p class="section-label">📥 Restore from Backup</p>
+
+                    <!-- drop zone -->
+                    <div class="backup-dropzone" id="backupDropzone"
+                         onclick="document.getElementById('backupFileInput').click()"
+                         ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                         ondragleave="this.classList.remove('drag-over')"
+                         ondrop="handleBackupDrop(event)">
+                        <div style="font-size:2rem; line-height:1; margin-bottom:0.5rem;">📂</div>
+                        <p style="font-weight:700; font-size:0.95rem; color:var(--black); margin-bottom:4px;">Drop a backup file here</p>
+                        <p style="font-size:0.81rem; color:#888;">or click to browse — <code style="background:rgba(201,169,97,0.12);color:var(--dark-gold);padding:1px 5px;border-radius:3px;">.json</code> files only</p>
+                        <input type="file" id="backupFileInput" accept=".json" style="display:none" onchange="handleBackupFile(this.files[0])">
+                    </div>
+
+                    <!-- file preview (hidden until a valid file is chosen) -->
+                    <div id="backupFilePreview" class="backup-preview" style="display:none;">
+                        <div class="backup-preview-header">
+                            <div>
+                                <strong id="bfpName" style="display:block; font-size:0.95rem; color:var(--black); margin-bottom:3px;"></strong>
+                                <span id="bfpMeta" style="font-size:0.8rem; color:#888;"></span>
+                            </div>
+                            <button class="btn btn-outline btn-sm" onclick="clearBackupFile()">✕ Remove</button>
+                        </div>
+                        <div id="bfpDetails" style="margin-top:0.75rem; font-size:0.83rem; color:#555; line-height:1.6;"></div>
+                        <button class="btn btn-primary" id="btnRestore"
+                                style="margin-top:1rem; width:100%; justify-content:center;"
+                                onclick="openRestoreModal()">
+                            🔄 Restore This Backup
+                        </button>
+                        <p style="font-size:0.77rem; color:#e08080; margin-top:0.5rem;">
+                            ⚠️ Restoring will replace existing rows in the affected tables. This cannot be undone.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- last-action status line -->
+                <div id="backupStatusBar" class="backup-status-bar">
+                    <span>🕐</span>
+                    <span id="backupStatusText">No backup downloaded yet this session.</span>
+                </div>
+
+            </div><!-- /card-body -->
+            <div class="card-footer">
+                <p class="footer-hint">Backups are saved directly to your device — nothing is sent to a remote server.</p>
+                <div class="footer-actions">
+                    <button class="btn btn-outline" onclick="triggerExport('full')">⬇ Quick Full Backup</button>
+                </div>
+            </div>
+        </div>
+        <!-- /BACKUP & DATA EXPORT -->
+
         <div class="setting-card" id="danger" style="border-color:#ffcdd2;">
             <div class="card-head" style="border-bottom-color:#ffcdd2; background:#fffafa;">
                 <div class="card-head-icon icon-danger">⚠️</div>
@@ -1227,14 +1451,21 @@
                             <strong>Reset All Settings</strong>
                             <span>Revert all system configurations back to factory defaults. Every customization will be permanently lost.</span>
                         </div>
-                        <button class="btn btn-danger btn-sm" onclick="openDangerModal('reset_settings')">⚠️ Reset Settings</button>
+                        <button class="btn btn-danger btn-sm" onclick="openDangerModal('reset_settings')">Reset Settings</button>
                     </div>
                     <div class="danger-item">
                         <div class="danger-item-info">
                             <strong>Clear Transaction History</strong>
-                            <span>Permanently delete all sales records, receipts, and transaction logs from the database.</span>
+                            <span>Permanently delete all sales records, receipts, and transaction logs from the database. Products and inventory are kept.</span>
                         </div>
-                        <button class="btn btn-danger btn-sm" onclick="openDangerModal('clear_transactions')">🗑️ Clear History</button>
+                        <button class="btn btn-danger btn-sm" onclick="openDangerModal('clear_transactions')">Clear History</button>
+                    </div>
+                    <div class="danger-item">
+                        <div class="danger-item-info">
+                            <strong>Clear All Data</strong>
+                            <span>Permanently delete all transactions <em>and</em> all products, categories, and inventory items. Download a backup first.</span>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="openDangerModal('clear_all_data')">Clear All Data</button>
                     </div>
                 </div>
             </div>
@@ -1402,10 +1633,17 @@
         },
         clear_transactions: {
             title:       'Clear Transaction History',
-            desc:        'This will permanently delete every sales record, receipt, and transaction item from the database. There is no undo.',
+            desc:        'This will permanently delete every sales record, receipt, and transaction item from the database. Products and inventory are kept. There is no undo.',
             confirmWord: 'DELETE',
             endpoint:    '/api/danger/clear_transactions',
             icon:        '🗑️',
+        },
+        clear_all_data: {
+            title:       'Clear All Data',
+            desc:        'This will permanently delete ALL transactions, products, categories, and inventory items. All your data will be gone with nothing restored. Download a backup before proceeding. There is no undo.',
+            confirmWord: 'CLEAR ALL',
+            endpoint:    '/api/danger/clear_all_data',
+            icon:        '💣',
         },
     };
     let _activeDangerKey = null;
@@ -1539,8 +1777,8 @@
             // Alert toggles
             document.getElementById('lowStockEnabled').checked          = !!s.low_stock_enabled;
             document.getElementById('dailySummaryEnabled').checked       = !!s.daily_summary_enabled;
-            document.getElementById('failedLoginEnabled').checked        = !!s.failed_login_enabled;
-            document.getElementById('maintenanceEnabled').checked        = !!s.maintenance_enabled;
+            document.getElementById('dailySummaryTime').value             = s.daily_summary_time || '22:30';
+            toggleDailySummaryPanel();
             document.getElementById('overtimeRequestEnabled').checked    = s.overtime_request_enabled !== undefined ? !!s.overtime_request_enabled : true;
 
             // Low-stock threshold (blank = use product settings)
@@ -1761,8 +1999,7 @@
             low_stock_enabled:          document.getElementById('lowStockEnabled').checked ? 1 : 0,
             low_stock_threshold:        parseInt(document.getElementById('lowStockThreshold').value) || 0,
             daily_summary_enabled:      document.getElementById('dailySummaryEnabled').checked ? 1 : 0,
-            failed_login_enabled:       document.getElementById('failedLoginEnabled').checked ? 1 : 0,
-            maintenance_enabled:        document.getElementById('maintenanceEnabled').checked ? 1 : 0,
+            daily_summary_time:         document.getElementById('dailySummaryTime').value || '22:30',
             overtime_request_enabled:   document.getElementById('overtimeRequestEnabled').checked ? 1 : 0,
         };
         // Only include password if user typed a new one
@@ -1900,6 +2137,27 @@
         }
     }
 
+    function toggleDailySummaryPanel() {
+        const enabled = document.getElementById('dailySummaryEnabled').checked;
+        const panel   = document.getElementById('dailySummaryPanel');
+        if (panel) panel.classList.toggle('hidden', !enabled);
+    }
+
+    async function sendDailySummaryNow(btn) {
+        const original = btn.innerHTML;
+        btn.innerHTML = '⏳ Sending…'; btn.disabled = true;
+        try {
+            const r = await fetch('/api/settings/email/send-daily-summary', { method: 'POST' });
+            const d = await r.json();
+            if (!d.success) throw new Error(d.message);
+            showToast('✅ Daily Sales Summary sent! Check your inbox.');
+        } catch (e) {
+            showToast('❌ ' + e.message, 'error');
+        } finally {
+            btn.innerHTML = original; btn.disabled = false;
+        }
+    }
+
     function escHtml(str) {
         return String(str)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -2004,6 +2262,293 @@
             btn.textContent = 'Update Password'; btn.disabled = false;
         }
     }
+</script>
+
+<!-- ══ RESTORE CONFIRM MODAL ══ -->
+<div id="restoreModalOverlay"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65);
+            z-index:10000; align-items:center; justify-content:center;
+            backdrop-filter:blur(2px);">
+    <div style="background:#fff; border-radius:14px; padding:2rem 2rem 1.75rem;
+                max-width:430px; width:calc(100% - 2rem);
+                box-shadow:0 24px 70px rgba(0,0,0,0.4);
+                border-top:5px solid var(--gold); font-family:inherit;
+                animation:dangerSlideIn .22s cubic-bezier(.34,1.56,.64,1);">
+        <div style="text-align:center; margin-bottom:1rem;">
+            <div style="font-size:2.4rem; line-height:1; margin-bottom:0.6rem;">🔄</div>
+            <h3 style="color:var(--black); margin:0 0 0.5rem; font-size:1.15rem; font-weight:700;">Confirm Restore</h3>
+            <p id="restoreModalDesc" style="color:#666; font-size:0.875rem; margin:0; line-height:1.55;"></p>
+        </div>
+        <hr style="border:none; border-top:1px solid #ebebeb; margin:1.1rem 0;">
+        <p style="font-size:0.82rem; color:#888; margin:0 0 0.4rem;">
+            Type <strong style="color:var(--dark-gold); font-family:monospace; font-size:0.9rem;
+                   background:rgba(201,169,97,0.12); padding:1px 6px; border-radius:4px;">RESTORE</strong> to confirm:
+        </p>
+        <input id="restoreConfirmInput" type="text" autocomplete="off"
+               placeholder="Type here…"
+               style="width:100%; padding:0.6rem 0.8rem; border:1.5px solid #ddd;
+                      border-radius:8px; font-size:0.92rem; outline:none; margin-bottom:1.25rem;
+                      font-family:monospace; letter-spacing:1.5px; box-sizing:border-box;
+                      transition:border-color .2s;"
+               oninput="checkRestoreWord()"
+               onkeydown="if(event.key==='Enter'&&!document.getElementById('restoreConfirmBtn').disabled) executeRestore()">
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end; align-items:center;">
+            <button onclick="closeRestoreModal()"
+                    style="padding:0.55rem 1.2rem; border-radius:7px; border:1.5px solid #ddd;
+                           background:#f5f5f5; color:#555; cursor:pointer; font-size:0.88rem;
+                           font-family:inherit; font-weight:600; transition:all .18s;"
+                    onmouseover="this.style.background='#e8e8e8'"
+                    onmouseout="this.style.background='#f5f5f5'">Cancel</button>
+            <button id="restoreConfirmBtn" disabled onclick="executeRestore()"
+                    style="padding:0.55rem 1.4rem; border-radius:7px; border:none;
+                           background:#ccc; color:#fff; font-size:0.88rem; font-weight:700;
+                           font-family:inherit; transition:all .2s; display:flex;
+                           align-items:center; gap:6px; cursor:not-allowed;">
+                <span id="restoreConfirmIcon">🔄</span>
+                <span id="restoreConfirmText">Restore</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+#restoreConfirmInput:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(201,169,97,0.15); }
+#restoreConfirmBtn:not([disabled]):hover { background:var(--dark-gold)!important; transform:translateY(-1px); box-shadow:0 4px 12px rgba(168,136,80,0.4); cursor:pointer; }
+</style>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   BACKUP & DATA EXPORT — frontend logic
+════════════════════════════════════════════════════════════ */
+
+const CSRF = () => document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+/* ── helpers ── */
+function setBackupStatus(msg, ok = true) {
+    const bar = document.getElementById('backupStatusBar');
+    const txt = document.getElementById('backupStatusText');
+    txt.textContent = msg;
+    bar.style.borderColor = ok ? 'var(--gold)' : '#ffcdd2';
+}
+
+function animateExportProgress(label, cb) {
+    const wrap  = document.getElementById('exportProgressWrap');
+    const bar   = document.getElementById('exportProgressBar');
+    const pct   = document.getElementById('exportProgressPct');
+    const lbl   = document.getElementById('exportProgressLabel');
+    wrap.style.display = 'block';
+    lbl.textContent = label;
+    let v = 0;
+    const phases = [
+        { to: 40, step: 3, delay: 60 },
+        { to: 80, step: 2, delay: 40 },
+        { to: 95, step: 1, delay: 30 },
+    ];
+    function runPhase(i) {
+        if (i >= phases.length) { cb(); return; }
+        const { to, step, delay } = phases[i];
+        const id = setInterval(() => {
+            v = Math.min(v + step, to);
+            bar.style.width = v + '%';
+            pct.textContent = v + '%';
+            if (v >= to) { clearInterval(id); runPhase(i + 1); }
+        }, delay);
+    }
+    runPhase(0);
+    // finish to 100 after cb fires (called externally)
+}
+
+function finishExportProgress() {
+    const bar = document.getElementById('exportProgressBar');
+    const pct = document.getElementById('exportProgressPct');
+    const lbl = document.getElementById('exportProgressLabel');
+    bar.style.width = '100%';
+    pct.textContent = '100%';
+    lbl.textContent = 'Done!';
+    setTimeout(() => {
+        document.getElementById('exportProgressWrap').style.display = 'none';
+        bar.style.width = '0%';
+    }, 1800);
+}
+
+/* ── Export ── */
+const EXPORT_BTNS = {
+    full:     'btnExportFull',
+    sales:    'btnExportSales',
+    products: 'btnExportProducts',
+};
+const EXPORT_LABELS = {
+    full:     'Exporting full database…',
+    sales:    'Exporting sales records…',
+    products: 'Exporting products & inventory…',
+};
+
+async function triggerExport(type) {
+    const btn = document.getElementById(EXPORT_BTNS[type]);
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '⏳ Preparing…'; btn.disabled = true;
+
+    animateExportProgress(EXPORT_LABELS[type], () => {});
+
+    try {
+        const res = await fetch(`/api/backup/export?type=${encodeURIComponent(type)}`, {
+            headers: { 'X-CSRFToken': CSRF() },
+        });
+        if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.message || `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        const ts   = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
+        const name = `books-blooms-${type}-backup-${ts}.json`;
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), { href: url, download: name });
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+
+        finishExportProgress();
+        setBackupStatus(`Last export: ${type} backup — ${new Date().toLocaleString()}`);
+        showToast(`✅ Backup downloaded: ${name}`);
+    } catch (err) {
+        document.getElementById('exportProgressWrap').style.display = 'none';
+        showToast('❌ Export failed: ' + err.message, 'error');
+    } finally {
+        btn.innerHTML = origHtml; btn.disabled = false;
+    }
+}
+
+/* ── File drop / select ── */
+function handleBackupDrop(e) {
+    e.preventDefault();
+    document.getElementById('backupDropzone').classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) handleBackupFile(f);
+}
+
+let _pendingBackup = null; // holds parsed JSON once validated
+
+function handleBackupFile(file) {
+    if (!file || !file.name.endsWith('.json')) {
+        showToast('❌ Please choose a .json backup file.', 'error'); return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+        let data;
+        try { data = JSON.parse(e.target.result); }
+        catch { showToast('❌ File could not be parsed — it may be corrupted.', 'error'); return; }
+
+        // Basic shape check — must have our signature fields
+        if (!data.backup_meta || !data.tables) {
+            showToast('❌ This does not appear to be a Books & Blooms backup file.', 'error'); return;
+        }
+
+        _pendingBackup = data;
+
+        const meta       = data.backup_meta;
+        const tableNames = Object.keys(data.tables);
+        const totalRows  = tableNames.reduce((s, t) => s + (data.tables[t]?.length ?? 0), 0);
+
+        document.getElementById('bfpName').textContent = file.name;
+        document.getElementById('bfpMeta').textContent =
+            `${(file.size / 1024).toFixed(1)} KB  ·  type: ${meta.type}`;
+        document.getElementById('bfpDetails').innerHTML =
+            `<strong>Exported:</strong> ${meta.exported_at}<br>` +
+            `<strong>Tables:</strong> ${tableNames.join(', ')}<br>` +
+            `<strong>Total rows:</strong> ${totalRows.toLocaleString()}`;
+
+        document.getElementById('backupDropzone').style.display   = 'none';
+        document.getElementById('backupFilePreview').style.display = 'block';
+    };
+    reader.readAsText(file);
+}
+
+function clearBackupFile() {
+    _pendingBackup = null;
+    document.getElementById('backupFileInput').value            = '';
+    document.getElementById('backupFilePreview').style.display  = 'none';
+    document.getElementById('backupDropzone').style.display     = '';
+}
+
+/* ── Restore modal ── */
+function openRestoreModal() {
+    if (!_pendingBackup) return;
+    const meta      = _pendingBackup.backup_meta;
+    const tables    = Object.keys(_pendingBackup.tables);
+    const totalRows = tables.reduce((s, t) => s + (_pendingBackup.tables[t]?.length ?? 0), 0);
+
+    document.getElementById('restoreModalDesc').textContent =
+        `You are about to restore ${totalRows.toLocaleString()} rows across ` +
+        `${tables.length} table(s) from a "${meta.type}" backup ` +
+        `exported on ${meta.exported_at}. Existing data in those tables will be replaced.`;
+
+    const inp = document.getElementById('restoreConfirmInput');
+    inp.value = '';
+    const btn = document.getElementById('restoreConfirmBtn');
+    btn.disabled = true; btn.style.background = '#ccc'; btn.style.cursor = 'not-allowed';
+    document.getElementById('restoreConfirmIcon').textContent = '🔄';
+    document.getElementById('restoreConfirmText').textContent = 'Restore';
+
+    document.getElementById('restoreModalOverlay').style.display = 'flex';
+    setTimeout(() => inp.focus(), 80);
+}
+
+function closeRestoreModal() {
+    document.getElementById('restoreModalOverlay').style.display = 'none';
+}
+
+function checkRestoreWord() {
+    const val   = document.getElementById('restoreConfirmInput').value.trim().toUpperCase();
+    const btn   = document.getElementById('restoreConfirmBtn');
+    const match = val === 'RESTORE';
+    btn.disabled        = !match;
+    btn.style.background = match ? 'var(--dark-gold)' : '#ccc';
+    btn.style.cursor     = match ? 'pointer' : 'not-allowed';
+}
+
+async function executeRestore() {
+    if (!_pendingBackup) return;
+    const btn = document.getElementById('restoreConfirmBtn');
+    if (btn.disabled) return;
+    document.getElementById('restoreConfirmIcon').textContent = '⏳';
+    document.getElementById('restoreConfirmText').textContent = 'Restoring…';
+    btn.disabled = true; btn.style.background = '#ccc';
+
+    try {
+        const res = await fetch('/api/backup/import', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF() },
+            body:    JSON.stringify(_pendingBackup),
+        });
+        const d = await res.json();
+        closeRestoreModal();
+        if (d.success) {
+            showToast('✅ ' + d.message);
+            setBackupStatus(`Last restore: ${_pendingBackup.backup_meta.type} — ${new Date().toLocaleString()}`);
+            clearBackupFile();
+        } else {
+            showToast('❌ ' + d.message, 'error');
+            // re-enable so admin can retry
+            document.getElementById('restoreConfirmIcon').textContent = '🔄';
+            document.getElementById('restoreConfirmText').textContent = 'Restore';
+            btn.disabled = false;
+            btn.style.background = 'var(--dark-gold)';
+        }
+    } catch (err) {
+        closeRestoreModal();
+        showToast('❌ Restore failed: ' + err.message, 'error');
+    }
+}
+
+// Close restore modal on overlay click or Escape
+document.getElementById('restoreModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeRestoreModal();
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' &&
+        document.getElementById('restoreModalOverlay').style.display === 'flex') {
+        closeRestoreModal();
+    }
+});
 </script>
 
 <div class="mobile-nav-overlay" id="navOverlay"></div>
