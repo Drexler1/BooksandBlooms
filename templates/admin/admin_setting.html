@@ -285,6 +285,50 @@
             font-weight: 400; text-transform: none; letter-spacing: 0;
         }
 
+        .field-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-bottom: 1rem;
+        }
+
+        .field-label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #444;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .field-row input[type="text"],
+        .field-row input[type="email"],
+        .field-row input[type="password"] {
+            padding: 0.7rem 1rem;
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            background: var(--light-gray);
+            color: var(--black);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.92rem;
+            transition: all 0.2s;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .field-row input[type="text"]:focus,
+        .field-row input[type="email"]:focus,
+        .field-row input[type="password"]:focus {
+            outline: none;
+            border-color: var(--gold);
+            background: var(--white);
+            box-shadow: 0 0 0 3px rgba(201,169,97,0.12);
+        }
+
+        /* password inputs need right padding so text doesn't sit under the eye button */
+        .field-row input[type="password"] {
+            padding-right: 2.5rem;
+        }
+
         .form-group input,
         .form-group select,
         .form-group textarea {
@@ -1017,13 +1061,13 @@
     <aside class="sidebar">
         <div class="sidebar-header"><p>Settings Menu</p></div>
         <div class="sidebar-nav">
+            <a class="sidebar-item" href="#account">
+                <span class="sidebar-icon">👤</span>
+                <div>Account<div class="sidebar-item-desc">Profile, email &amp; password</div></div>
+            </a>
             <a class="sidebar-item" href="#notifications">
                 <span class="sidebar-icon">🔔</span>
                 <div>Notifications<div class="sidebar-item-desc">Email alerts &amp; SMTP</div></div>
-            </a>
-            <a class="sidebar-item" href="#security">
-                <span class="sidebar-icon">🔑</span>
-                <div>Security<div class="sidebar-item-desc">Change admin password</div></div>
             </a>
             <a class="sidebar-item" href="#backup">
                 <span class="sidebar-icon">💾</span>
@@ -1043,6 +1087,105 @@
         <div class="page-header">
             <h1 class="page-title">Settings</h1>
             <p class="page-subtitle">Manage your account preferences and system configuration.</p>
+        </div>
+
+        <!-- ══ ACCOUNT CARD ══ -->
+        <div class="setting-card" id="account">
+            <div class="card-head">
+                <div class="card-head-icon icon-purple">👤</div>
+                <div class="card-head-text">
+                    <h2>Account</h2>
+                    <p>Manage your admin profile, email address, and password.</p>
+                </div>
+            </div>
+            <div class="card-body">
+
+                <!-- ── UPDATE EMAIL ── -->
+                <p class="section-label">📧 Update Email Address</p>
+                <div class="field-row">
+                    <label class="field-label" for="ueEmail">New Gmail Address</label>
+                    <input type="email" id="ueEmail" placeholder="e.g. maria@gmail.com"
+                           value="{{ admin_email }}"
+                           pattern="^[^@\s]+@gmail\.com$"
+                           title="Only Gmail addresses are accepted"
+                           autocomplete="email">
+                    <span id="ueEmailHint" style="font-size:0.78rem;color:#888;"></span>
+                </div>
+                <div class="field-row">
+                    <label class="field-label" for="uePw">Current Password</label>
+                    <div style="position:relative;">
+                        <input type="password" id="uePw" placeholder="Confirm your current password" autocomplete="current-password">
+                        <button type="button" class="pw-toggle-btn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;display:flex;align-items:center;padding:2px;" onclick="togglePwVis('uePw',this)" aria-label="Toggle password visibility">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div style="font-size:0.85rem;color:#666;">Only Gmail addresses are accepted.</div>
+                <button class="btn btn-primary" id="ueSaveBtn" onclick="saveAdminEmail()">Update Email</button>
+            </div>
+
+            <div class="card-body" style="border-top:1px solid #f0f0f0;">
+
+                <!-- ── CHANGE PASSWORD ── -->
+                <p class="section-label">🔒 Change Password</p>
+                <div class="field-row">
+                    <label class="field-label" for="cpCurrent">Current Password</label>
+                    <div style="position:relative;">
+                        <input type="password" id="cpCurrent" placeholder="Enter current password" autocomplete="current-password">
+                        <button type="button" class="pw-toggle-btn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;display:flex;align-items:center;padding:2px;" onclick="togglePwVis('cpCurrent',this)" aria-label="Toggle password visibility">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="field-row">
+                    <label class="field-label" for="cpNew">New Password</label>
+                    <div style="position:relative;">
+                        <input type="password" id="cpNew" placeholder="At least 8 characters" autocomplete="new-password" oninput="updateCpStrength()">
+                        <button type="button" class="pw-toggle-btn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;display:flex;align-items:center;padding:2px;" onclick="togglePwVis('cpNew',this)" aria-label="Toggle password visibility">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
+                    </div>
+                    <div id="cpStrengthBar" style="height:4px;border-radius:2px;background:#eee;margin-top:6px;overflow:hidden;">
+                        <div id="cpStrengthFill" style="height:100%;width:0%;background:#ccc;transition:width .3s,background .3s;"></div>
+                    </div>
+                    <span id="cpStrengthLabel" style="font-size:0.78rem;color:#888;"></span>
+                </div>
+                <div class="field-row">
+                    <label class="field-label" for="cpConfirm">Confirm New Password</label>
+                    <div style="position:relative;">
+                        <input type="password" id="cpConfirm" placeholder="Repeat new password" autocomplete="new-password">
+                        <button type="button" class="pw-toggle-btn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;display:flex;align-items:center;padding:2px;" onclick="togglePwVis('cpConfirm',this)" aria-label="Toggle password visibility">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
+                    </div>
+                    <span id="cpMatchLabel" style="font-size:0.78rem;color:#888;"></span>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div>
+                    <strong>Password requirements:</strong> minimum 8 characters.
+                </div>
+                <button class="btn btn-primary" id="cpSaveBtn" onclick="saveAdminPassword()">Update Password</button>
+            </div>
+
+            <!-- ── DELETE ACCOUNT ── -->
+            <div class="card-body" style="border-top:1px solid #ffcdd2; background:#fff9f9;">
+                <p class="section-label" style="color:#c0392b;">🗑️ Delete Account</p>
+                <p style="font-size:0.88rem; color:#666; margin-bottom:0;">
+                    Permanently remove your admin account. You will be logged out immediately and this action <strong>cannot be undone</strong>.
+                    Make sure another admin account exists before proceeding.
+                </p>
+            </div>
+            <div class="card-footer" style="border-top:1px solid #ffcdd2; background:#fff9f9;">
+                <div style="font-size:0.85rem; color:#c0392b;">⚠️ This is irreversible.</div>
+                <button class="btn btn-danger" onclick="openDeleteAccountModal()">Delete Account</button>
+            </div>
         </div>
 
         <!-- ── NOTIFICATIONS & EMAIL ALERTS ── -->
@@ -1260,62 +1403,6 @@
             </div>
         </div>
 
-
-        <!-- ── DANGER ZONE ── -->
-        <!-- ══ SECURITY CARD ══ -->
-        <div class="setting-card" id="security">
-            <div class="card-head">
-                <div class="card-head-icon icon-info">🔑</div>
-                <div class="card-head-text">
-                    <h2>Security</h2>
-                    <p>Change your admin account password. You must know your current password to proceed.</p>
-                </div>
-            </div>
-            <div class="card-body">
-                <p class="section-label">🔒 Change Admin Password</p>
-                <div class="field-row">
-                    <label class="field-label" for="cpCurrent">Current Password</label>
-                    <div style="position:relative;">
-                        <input type="password" id="cpCurrent" placeholder="Enter current password" autocomplete="current-password">
-                        <button type="button" class="pw-toggle-btn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;display:flex;align-items:center;padding:2px;" onclick="togglePwVis('cpCurrent',this)" aria-label="Toggle password visibility">
-                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                            <svg class="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="field-row">
-                    <label class="field-label" for="cpNew">New Password</label>
-                    <div style="position:relative;">
-                        <input type="password" id="cpNew" placeholder="At least 8 characters" autocomplete="new-password" oninput="updateCpStrength()">
-                        <button type="button" class="pw-toggle-btn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;display:flex;align-items:center;padding:2px;" onclick="togglePwVis('cpNew',this)" aria-label="Toggle password visibility">
-                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                            <svg class="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                        </button>
-                    </div>
-                    <div id="cpStrengthBar" style="height:4px;border-radius:2px;background:#eee;margin-top:6px;overflow:hidden;">
-                        <div id="cpStrengthFill" style="height:100%;width:0%;background:#ccc;transition:width .3s,background .3s;"></div>
-                    </div>
-                    <span id="cpStrengthLabel" style="font-size:0.78rem;color:#888;"></span>
-                </div>
-                <div class="field-row">
-                    <label class="field-label" for="cpConfirm">Confirm New Password</label>
-                    <div style="position:relative;">
-                        <input type="password" id="cpConfirm" placeholder="Repeat new password" autocomplete="new-password">
-                        <button type="button" class="pw-toggle-btn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;display:flex;align-items:center;padding:2px;" onclick="togglePwVis('cpConfirm',this)" aria-label="Toggle password visibility">
-                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                            <svg class="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                        </button>
-                    </div>
-                    <span id="cpMatchLabel" style="font-size:0.78rem;color:#888;"></span>
-                </div>
-            </div>
-            <div class="card-footer">
-                <div>
-                    <strong>Password requirements:</strong> minimum 8 characters.
-                </div>
-                <button class="btn btn-primary" id="cpSaveBtn" onclick="saveAdminPassword()">Update Password</button>
-            </div>
-        </div>
 
         <!-- ══ BACKUP & DATA EXPORT ══ -->
         <div class="setting-card" id="backup">
@@ -2227,6 +2314,38 @@
         }
     });
 
+    async function saveAdminEmail() {
+        const email = document.getElementById('ueEmail').value.trim();
+        const pw    = document.getElementById('uePw').value.trim();
+        const btn   = document.getElementById('ueSaveBtn');
+        const hint  = document.getElementById('ueEmailHint');
+
+        if (!email || !pw) { showToast('❌ Please fill in both the email and your password.', 'error'); return; }
+        if (!/^[^@\s]+@gmail\.com$/i.test(email)) { showToast('❌ Only Gmail addresses are accepted.', 'error'); return; }
+
+        btn.textContent = '⏳ Saving…'; btn.disabled = true;
+        try {
+            const r = await fetch('/api/admin/update_email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ current_password: pw, new_email: email }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                showToast('✅ ' + d.message);
+                hint.textContent = 'Current: ' + d.new_email;
+                hint.style.color = '#2e7d32';
+                document.getElementById('uePw').value = '';
+            } else {
+                showToast('❌ ' + d.message, 'error');
+            }
+        } catch (e) {
+            showToast('❌ Request failed: ' + e.message, 'error');
+        } finally {
+            btn.textContent = 'Update Email'; btn.disabled = false;
+        }
+    }
+
     async function saveAdminPassword() {
         const cur     = document.getElementById('cpCurrent').value;
         const nw      = document.getElementById('cpNew').value;
@@ -2262,6 +2381,102 @@
             btn.textContent = 'Update Password'; btn.disabled = false;
         }
     }
+</script>
+
+<!-- ══ DELETE ACCOUNT MODAL ══ -->
+<div id="deleteAccountModalOverlay"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65);
+            z-index:10000; align-items:center; justify-content:center;
+            backdrop-filter:blur(2px);">
+    <div style="background:#fff; border-radius:14px; padding:2rem 2rem 1.75rem;
+                max-width:430px; width:calc(100% - 2rem);
+                box-shadow:0 24px 70px rgba(0,0,0,0.4);
+                border-top:5px solid #dc3545; font-family:inherit;
+                animation:dangerSlideIn .22s cubic-bezier(.34,1.56,.64,1);">
+        <div style="text-align:center; margin-bottom:1rem;">
+            <div style="font-size:2.4rem; line-height:1; margin-bottom:0.6rem;">🗑️</div>
+            <h3 style="color:#c0392b; margin:0 0 0.5rem; font-size:1.15rem; font-weight:700;">Delete Admin Account</h3>
+            <p style="color:#666; font-size:0.875rem; margin:0; line-height:1.55;">
+                This will <strong>permanently delete your account</strong> and log you out immediately.
+                Make sure another admin exists before proceeding. There is no undo.
+            </p>
+        </div>
+        <hr style="border:none; border-top:1px solid #ebebeb; margin:1.1rem 0;">
+        <p style="font-size:0.82rem; color:#888; margin:0 0 0.4rem;">
+            Enter your password to confirm:
+        </p>
+        <div style="position:relative; margin-bottom:1.25rem;">
+            <input id="deleteAccountPwInput" type="password" autocomplete="current-password"
+                   placeholder="Your current password"
+                   style="width:100%; padding:0.6rem 0.8rem; border:1.5px solid #ddd;
+                          border-radius:8px; font-size:0.92rem; outline:none; box-sizing:border-box;"
+                   oninput="checkDeleteAccountInput()">
+        </div>
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+            <button onclick="closeDeleteAccountModal()"
+                    style="padding:0.55rem 1.2rem; border-radius:8px; border:1.5px solid #ddd;
+                           background:#fff; color:#555; font-size:0.9rem; cursor:pointer;">
+                Cancel
+            </button>
+            <button id="deleteAccountConfirmBtn" disabled
+                    onclick="executeDeleteAccount()"
+                    style="padding:0.55rem 1.4rem; border-radius:8px; border:none;
+                           background:#ccc; color:#fff; font-size:0.9rem; font-weight:600; cursor:pointer;">
+                🗑️ Delete Account
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openDeleteAccountModal() {
+        document.getElementById('deleteAccountPwInput').value = '';
+        document.getElementById('deleteAccountConfirmBtn').disabled = true;
+        document.getElementById('deleteAccountConfirmBtn').style.background = '#ccc';
+        document.getElementById('deleteAccountModalOverlay').style.display = 'flex';
+        setTimeout(() => document.getElementById('deleteAccountPwInput').focus(), 80);
+    }
+
+    function closeDeleteAccountModal() {
+        document.getElementById('deleteAccountModalOverlay').style.display = 'none';
+    }
+
+    function checkDeleteAccountInput() {
+        const pw  = document.getElementById('deleteAccountPwInput').value.trim();
+        const btn = document.getElementById('deleteAccountConfirmBtn');
+        btn.disabled         = pw.length < 1;
+        btn.style.background = pw.length >= 1 ? '#dc3545' : '#ccc';
+    }
+
+    async function executeDeleteAccount() {
+        const pw  = document.getElementById('deleteAccountPwInput').value.trim();
+        const btn = document.getElementById('deleteAccountConfirmBtn');
+        if (!pw) return;
+        btn.textContent = '⏳ Deleting…'; btn.disabled = true; btn.style.background = '#ccc';
+        try {
+            const r = await fetch('/api/danger/delete_account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ current_password: pw }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                closeDeleteAccountModal();
+                showToast('✅ ' + d.message);
+                setTimeout(() => { window.location.href = '/login'; }, 1800);
+            } else {
+                btn.textContent = '🗑️ Delete Account'; btn.disabled = false; btn.style.background = '#dc3545';
+                showToast('❌ ' + d.message, 'error');
+            }
+        } catch (e) {
+            btn.textContent = '🗑️ Delete Account'; btn.disabled = false; btn.style.background = '#dc3545';
+            showToast('❌ Request failed: ' + e.message, 'error');
+        }
+    }
+
+    document.getElementById('deleteAccountModalOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeDeleteAccountModal();
+    });
 </script>
 
 <!-- ══ RESTORE CONFIRM MODAL ══ -->

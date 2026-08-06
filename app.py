@@ -653,7 +653,7 @@ def _dec_emp(row: dict) -> dict:
 def _dec_adm(row: dict) -> dict:
     """Decrypt all PII fields on an admins row."""
     if row:
-        for f in ("username", "full_name", "password"):
+        for f in ("username", "full_name", "password", "email"):
             if row.get(f):
                 row[f] = aes_decrypt(row[f])
     return row
@@ -2956,7 +2956,7 @@ def admin_settings():
     try:
         if session.get("role") == "admin" and "admin_id" in session:
             cur.execute(
-                "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
+                "SELECT full_name, email FROM admins WHERE admin_id=%s", (session["admin_id"],)
             )
             user = _dec_adm(cur.fetchone())
         else:
@@ -2965,13 +2965,15 @@ def admin_settings():
                 (session["employee_id"],),
             )
             user = _dec_emp(cur.fetchone())
-        full_name = user["full_name"] if user else session.get("full_name", "Admin")
+        full_name   = user["full_name"] if user else session.get("full_name", "Admin")
+        admin_email = user.get("email", "") if user else ""
     except Exception:
-        full_name = session.get("full_name", "Admin")
+        full_name   = session.get("full_name", "Admin")
+        admin_email = ""
     finally:
         cur.close()
 
-    return render_template("admin/admin_setting.html", full_name=full_name)
+    return render_template("admin/admin_setting.html", full_name=full_name, admin_email=admin_email)
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -4786,6 +4788,7 @@ def create_admin():
     if request.method == "POST":
         submitted_token = request.form.get("setup_token", "").strip()
         full_name = request.form.get("full_name", "").strip()
+        email = request.form.get("email", "").strip()
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
         confirm_password = request.form.get("confirm_password", "").strip()
@@ -4796,8 +4799,13 @@ def create_admin():
             return render_template("admin/create_admin.html")
 
         # ── 2. Validate fields ───────────────────────────────────────────────
-        if not all([full_name, username, password, confirm_password]):
+        if not all([full_name, email, username, password, confirm_password]):
             flash("All fields are required.", "error")
+            return render_template("admin/create_admin.html")
+
+        import re
+        if not re.match(r"^[^@\s]+@gmail\.com$", email, re.IGNORECASE):
+            flash("Only Gmail addresses are accepted (e.g. maria@gmail.com).", "error")
             return render_template("admin/create_admin.html")
 
         if password != confirm_password:
@@ -4824,9 +4832,10 @@ def create_admin():
         # ── 4. Insert new admin (AES-256 encrypted + bcrypt hashed) ─────────
         try:
             cur.execute(
-                "INSERT INTO admins (full_name, username, username_hash, password, password_hash) VALUES (%s, %s, %s, %s, %s)",
+                "INSERT INTO admins (full_name, email, username, username_hash, password, password_hash) VALUES (%s, %s, %s, %s, %s, %s)",
                 (
                     aes_encrypt(full_name),
+                    aes_encrypt(email),
                     aes_encrypt(username),
                     aes_username_hash(username),
                     aes_encrypt(password),
@@ -10042,6 +10051,122 @@ def api_admin_change_password():
             jsonify({"success": False, "message": "Server error — please try again."}),
             500,
         )
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║               POST /api/admin/update_email  — admin email update             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+@app.route("/api/admin/update_email", methods=["POST"])
+@csrf.exempt
+def api_admin_update_email():
+    """
+    Allow the logged-in admin to update their email address.
+    Requires JSON body: { current_password, new_email }
+    Only Gmail addresses are accepted.
+    """
+    import re
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data        = request.get_json(silent=True) or {}
+    current_pw  = (data.get("current_password") or "").strip()
+    new_email   = (data.get("new_email") or "").strip()
+
+    if not current_pw or not new_email:
+        return jsonify({"success": False, "message": "All fields are required."}), 400
+
+    if not re.match(r"^[^@\s]+@gmail\.com$", new_email, re.IGNORECASE):
+        return jsonify({"success": False, "message": "Only Gmail addresses are accepted."}), 400
+
+    role       = session.get("role")
+    admin_id   = session.get("admin_id")
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        if role == "admin" and admin_id:
+            cur.execute(
+                "SELECT admin_id, password, password_hash FROM admins WHERE admin_id=%s",
+                (admin_id,),
+            )
+            admin = cur.fetchone()
+            if not admin:
+                cur.close()
+                return jsonify({"success": False, "message": "Admin account not found."}), 404
+            if not _check_login_password(current_pw, admin):
+                cur.close()
+                return jsonify({"success": False, "message": "Current password is incorrect."}), 403
+            cur.execute(
+                "UPDATE admins SET email=%s WHERE admin_id=%s",
+                (aes_encrypt(new_email), admin_id),
+            )
+        else:
+            cur.close()
+            return jsonify({"success": False, "message": "Cannot determine account to update."}), 400
+
+        mysql.connection.commit()
+        cur.close()
+        app.logger.info(f"[admin] Email updated for admin_id={admin_id}")
+        return jsonify({"success": True, "message": "Email updated successfully.", "new_email": new_email})
+
+    except Exception as exc:
+        app.logger.error(f"[admin] update_email error: {exc}")
+        return jsonify({"success": False, "message": "Server error — please try again."}), 500
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║               POST /api/danger/delete_account  — delete admin account        ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+@app.route("/api/danger/delete_account", methods=["POST"])
+@csrf.exempt
+def api_danger_delete_account():
+    """
+    Permanently delete the currently logged-in admin account.
+    Requires the admin to type their password as final confirmation.
+    Only the admin role can delete their own account.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data       = request.get_json(silent=True) or {}
+    current_pw = (data.get("current_password") or "").strip()
+
+    if not current_pw:
+        return jsonify({"success": False, "message": "Password is required to delete your account."}), 400
+
+    role     = session.get("role")
+    admin_id = session.get("admin_id")
+
+    if role != "admin" or not admin_id:
+        return jsonify({"success": False, "message": "Only admin accounts can be deleted here."}), 403
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT admin_id, password, password_hash FROM admins WHERE admin_id=%s",
+            (admin_id,),
+        )
+        admin = cur.fetchone()
+        if not admin:
+            cur.close()
+            return jsonify({"success": False, "message": "Account not found."}), 404
+        if not _check_login_password(current_pw, admin):
+            cur.close()
+            return jsonify({"success": False, "message": "Incorrect password."}), 403
+
+        cur.execute("DELETE FROM admins WHERE admin_id=%s", (admin_id,))
+        mysql.connection.commit()
+        cur.close()
+        app.logger.warning(f"[danger] Admin account deleted: admin_id={admin_id}")
+        session.clear()
+        return jsonify({"success": True, "message": "Account deleted. You have been logged out."})
+
+    except Exception as exc:
+        app.logger.error(f"[danger] delete_account error: {exc}")
+        return jsonify({"success": False, "message": "Server error — please try again."}), 500
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
