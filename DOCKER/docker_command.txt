@@ -1,17 +1,20 @@
-# Stop everything
-docker compose down
+# DAILY USE
+docker compose up -d      # start
+docker compose down       # stop
 
-# Stop but KEEP your database data
-docker compose down --volumes
-
-# Restart after changes to app.py
+#AFTER CHANGING app.py
 docker compose restart app
 
-# Full rebuild after changing requirements.txt
+#AFTER CHANGING requirements.txt
 docker compose up --build
 
-# View live logs
-docker compose logs -f
+#DATABASE 
+# Connect to database
+docker exec -it codecrew-db-1 mysql -uroot -pyourpassword pos_system
 
-# Check running containers
-docker ps
+# Sync/export database
+docker exec codecrew-db-1 mysqldump -uroot -pyourpassword pos_system > database/pos_system.sql
+
+# Reset database with new sql file
+docker compose down -v
+docker compose up --build
