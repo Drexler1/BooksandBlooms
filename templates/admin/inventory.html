@@ -337,6 +337,25 @@
             color: var(--gold);
         }
 
+        /* Active highlight — shifts to gold fill when a panel/modal is open */
+        .header-btns .btn.action-active {
+            background: var(--gold);
+            color: var(--black);
+            border-color: var(--gold);
+            box-shadow: 0 4px 14px rgba(201, 169, 97, 0.35);
+        }
+
+        .header-btns .btn.action-active:hover {
+            background: var(--dark-gold, #a88850);
+            border-color: var(--dark-gold, #a88850);
+        }
+
+        /* Keep alert badge visible on outline + active states */
+        .btn-outline .alert-badge,
+        .header-btns .btn.action-active .alert-badge {
+            background: #dc3545;
+        }
+
         .btn-success {
             background: var(--success);
             color: white;
@@ -3271,8 +3290,8 @@
                     </div>
                     <div class="header-btns">
                         <button class="btn btn-outline" id="refreshBtn">↺ Refresh</button>
-                        <button class="btn btn-report" id="dailyReportBtn">📋 Daily Report</button>
-                        <button class="btn btn-alert" id="stockAlertBtn">
+                        <button class="btn btn-outline" id="dailyReportBtn">📋 Daily Report</button>
+                        <button class="btn btn-outline" id="stockAlertBtn">
                             🔔 Stock Alert
                             <span class="alert-badge" id="alertBadge">0</span>
                         </button>
@@ -3280,7 +3299,7 @@
                             <span class="conn-dot"></span><span id="connLabel">Online</span>
                         </div>
                         <button class="btn btn-outline" id="addIngredientBtn">Add Ingredient</button>
-                        <button class="btn btn-primary" id="addPackagingBtn">Add Packaging</button>
+                        <button class="btn btn-outline" id="addPackagingBtn">Add Packaging</button>
                     </div>
                 </div>
 
@@ -3687,7 +3706,7 @@
     <div class="modal-overlay" id="consumeModal">
         <div class="modal consume-modal">
             <div class="modal-header">
-                <h2>🧺 Consume <span>Stock</span></h2>
+                <h2>Consume <span>Stock</span></h2>
                 <button class="modal-close" id="closeConsumeModal">✕</button>
             </div>
             <div class="modal-body">
@@ -3759,7 +3778,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" id="cancelConsumeModal">Cancel</button>
-                <button class="btn btn-consume" id="saveConsumeBtn">🧺 Record Consumption</button>
+                <button class="btn btn-consume" id="saveConsumeBtn">Record Consumption</button>
             </div>
         </div>
     </div>
@@ -4437,7 +4456,7 @@
                     <input class="adj-input" type="number" id="cupAdj_${cup.unit}" value="10" min="1">
                     <button class="adj-btn" onclick="quickAdjCup('${cup.unit}', -1)">−</button>
                 </div>
-                <button class="cup-restock-btn" onclick="openAdjModal(${cup.id},'${cup.name.replace(/'/g, "\\'")}',${cup.stock},'${cup.unit}')">📊 Adjust Stock</button>
+                <button class="cup-restock-btn" onclick="openAdjModal(${cup.id},'${cup.name.replace(/'/g, "\\'")}',${cup.stock},'${cup.unit}')">Adjust Stock</button>
                 <div class="cup-reorder-note">Reorder at ≤${cup.reorder_point || 20}</div>
                 ` : `
                 <button class="cup-restock-btn" onclick="initCup('${cup.unit}')">➕ Initialize</button>
@@ -4523,7 +4542,7 @@
                 const pendingDot = isPending ? '<span class="pending-dot" title="Pending sync"></span>' : '';
                 return `<tr${isPending ? ' class="offline-pending"' : ''}>
                 <td data-label="Name"><div class="ing-name">${item.name}${pendingDot}</div>${item.note ? `<div style="font-size:0.75rem;color:#aaa;margin-top:0.1rem;">${item.note}</div>` : ''}</td>
-                <td data-label="Type"><span class="ing-type ${item.type || 'ingredient'}">${item.type === 'packaging' ? '📦 Packaging' : '🧪 Ingredient'}</span></td>
+                <td data-label="Type"><span class="ing-type ${item.type || 'ingredient'}">${item.type === 'packaging' ? 'Packaging' : 'Ingredient'}</span></td>
                 <td data-label="Stock">
                     <div class="stock-bar-wrap">
                         <div class="stock-bar"><div class="stock-bar-fill ${status}" style="width:${pct}%"></div></div>
@@ -4535,8 +4554,8 @@
                 <td data-label="Status"><span class="status-chip ${status}">${status === 'ok' ? '✓ OK' : status === 'low' ? '⚠ Low' : '✕ Out'}</span></td>
                 <td data-label="Actions">
                     <div class="action-btns">
-                        <button class="btn btn-consume btn-sm" onclick="openConsumeModal(${item.id},'${item.name.replace(/'/g, "\\'")}',${item.stock},'${item.unit}')">🧺 Consume</button>
-                        <button class="btn btn-outline btn-sm" onclick="openAdjModal(${item.id},'${item.name.replace(/'/g, "\\'")}',${item.stock},'${item.unit}')">📊 Adjust</button>
+                        <button class="btn btn-consume btn-sm" onclick="openConsumeModal(${item.id},'${item.name.replace(/'/g, "\\'")}',${item.stock},'${item.unit}')">Consume</button>
+                        <button class="btn btn-outline btn-sm" onclick="openAdjModal(${item.id},'${item.name.replace(/'/g, "\\'")}',${item.stock},'${item.unit}')">Adjust</button>
                         <button class="btn btn-outline btn-sm" onclick="openEditItem(${item.id})"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                         <button class="btn btn-ghost-danger btn-sm" onclick="openDeleteItem(${item.id},'${item.name.replace(/'/g, "\\\'")}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
                     </div>
@@ -4565,7 +4584,7 @@
                         log.innerHTML = data.log.map(entry => {
                             const delta = entry.delta > 0 ? `+${entry.delta}` : entry.delta;
                             const cls = entry.delta > 0 ? 'pos' : 'neg';
-                            const icon = entry.source === 'sale' ? '🧾' : '✏️';
+                            const icon = entry.source === 'sale' ? '↓' : '✎';
                             const iconClass = entry.source === 'sale' ? 'sale' : 'manual';
                             return `<div class="log-item">
                             <div class="log-icon ${iconClass}">${icon}</div>
@@ -4620,10 +4639,10 @@
             openModal('ingredientModal');
         }
 
-        document.getElementById('addIngredientBtn').addEventListener('click', () => openAddModal('ingredient'));
-        document.getElementById('addPackagingBtn').addEventListener('click', () => openAddModal('packaging'));
-        ['closeIngModal', 'cancelIngModal'].forEach(id => document.getElementById(id).addEventListener('click', () => closeModal('ingredientModal')));
-        document.getElementById('ingredientModal').addEventListener('click', e => { if (e.target === document.getElementById('ingredientModal')) closeModal('ingredientModal'); });
+        document.getElementById('addIngredientBtn').addEventListener('click', () => { openAddModal('ingredient'); setInvActive('addIngredientBtn'); });
+        document.getElementById('addPackagingBtn').addEventListener('click', () => { openAddModal('packaging'); setInvActive('addPackagingBtn'); });
+        ['closeIngModal', 'cancelIngModal'].forEach(id => document.getElementById(id).addEventListener('click', () => { closeModal('ingredientModal'); setInvActive(null); }));
+        document.getElementById('ingredientModal').addEventListener('click', e => { if (e.target === document.getElementById('ingredientModal')) { closeModal('ingredientModal'); setInvActive(null); } });
 
         document.getElementById('saveIngBtn').addEventListener('click', async () => {
             const name = document.getElementById('ingName').value.trim();
@@ -4755,7 +4774,7 @@
             } catch (e) {
                 showToast('❌ Network error', 'error');
             }
-            btn.disabled = false; btn.innerHTML = '🧺 Record Consumption';
+            btn.disabled = false; btn.innerHTML = 'Record Consumption';
         });
 
         /* ════════════════════════════════════════════
@@ -4948,10 +4967,24 @@
         })();
 
         // Toggle panel visibility
+        // ── Toolbar action-active highlight helpers ──
+        const _toolbarBtns = ['dailyReportBtn','stockAlertBtn','addIngredientBtn','addPackagingBtn'];
+        function setInvActive(btnId) {
+            _toolbarBtns.forEach(id => {
+                const b = document.getElementById(id);
+                if (b) b.classList.remove('action-active');
+            });
+            if (btnId) {
+                const b = document.getElementById(btnId);
+                if (b) b.classList.add('action-active');
+            }
+        }
+
         document.getElementById('dailyReportBtn').addEventListener('click', () => {
             const panel = document.getElementById('eodPanel');
             const isHidden = panel.style.display === 'none' || !panel.style.display;
             panel.style.display = isHidden ? 'block' : 'none';
+            setInvActive(isHidden ? 'dailyReportBtn' : null);
             if (isHidden) {
                 panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
@@ -4959,6 +4992,7 @@
 
         document.getElementById('closeEodPanel').addEventListener('click', () => {
             document.getElementById('eodPanel').style.display = 'none';
+            setInvActive(null);
         });
 
         document.getElementById('printReportBtn').addEventListener('click', () => window.print());
@@ -5213,9 +5247,9 @@
             }
         }
 
-        document.getElementById('stockAlertBtn').addEventListener('click', openAlertModal);
-        document.getElementById('closeAlertModal').addEventListener('click', () => closeModal('stockAlertModal'));
-        document.getElementById('cancelAlertBtn').addEventListener('click', () => closeModal('stockAlertModal'));
+        document.getElementById('stockAlertBtn').addEventListener('click', () => { openAlertModal(); setInvActive('stockAlertBtn'); });
+        document.getElementById('closeAlertModal').addEventListener('click', () => { closeModal('stockAlertModal'); setInvActive(null); });
+        document.getElementById('cancelAlertBtn').addEventListener('click', () => { closeModal('stockAlertModal'); setInvActive(null); });
         document.getElementById('stockAlertModal').addEventListener('click', e => {
             if (e.target === document.getElementById('stockAlertModal')) closeModal('stockAlertModal');
         });

@@ -971,6 +971,89 @@
       max-height: min(90vh, 820px);
     }
 
+    /* ── Salary date picker row ── */
+    .salary-date-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .salary-date-field {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .salary-date-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .salary-date-input {
+      padding: 0.5rem 0.75rem;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.88rem;
+      color: var(--black);
+      background: white;
+      transition: border-color 0.2s;
+    }
+
+    .salary-date-input:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(201, 169, 97, 0.12);
+    }
+
+    .salary-date-arrow {
+      color: #bbb;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    /* ── Payslip History status badge ── */
+    .status-badge {
+      display: inline-block;
+      padding: 0.18rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: capitalize;
+      letter-spacing: 0.3px;
+    }
+
+    .status-badge.draft {
+      background: rgba(255, 152, 0, 0.15);
+      color: #e65100;
+    }
+
+    .status-badge.finalized {
+      background: rgba(76, 175, 80, 0.15);
+      color: #2e7d32;
+    }
+
+    .status-badge.cancelled {
+      background: rgba(220, 53, 69, 0.12);
+      color: #b71c1c;
+    }
+
+    /* ── Active-highlight toggle for page-action buttons ── */
+    .page-actions .btn.action-active {
+      background: var(--gold);
+      color: var(--black);
+      border-color: var(--gold);
+      box-shadow: 0 4px 14px rgba(201, 169, 97, 0.35);
+    }
+
+    .page-actions .btn.action-active:hover {
+      background: var(--dark-gold);
+    }
+
     .salary-search-wrap {
       position: relative;
       margin-bottom: 1.25rem;
@@ -1878,7 +1961,7 @@
             <button class="btn btn-outline" id="openSalaryModal">
               🔍 View Salary
             </button>
-            <button class="btn btn-gold" id="openGenerateModal">
+            <button class="btn btn-outline" id="openGenerateModal">
               💾 Generate Payslips
             </button>
           </div>
@@ -1964,6 +2047,7 @@
           <button class="tab-btn" data-tab="daily">📅 Daily Earnings</button>
           <button class="tab-btn" data-tab="rates">⚙️ Hourly Rates</button>
           <button class="tab-btn" data-tab="deduction-config">🛡️ Deduction Config</button>
+          <button class="tab-btn" data-tab="history">🗂️ Payslip History</button>
         </div>
 
         <!-- ─── TAB: PAY PERIOD ─── -->
@@ -1977,10 +2061,6 @@
                 </div>
               </div>
               <div class="period-controls">
-                <select class="period-select" id="periodSelect">
-                  <option value="">Loading…</option>
-                </select>
-                <span style="color: #bbb; font-size: 0.82rem">or custom:</span>
                 <input type="date" class="date-input" id="customStart" />
                 <span style="color: #bbb; font-size: 0.82rem">→</span>
                 <input type="date" class="date-input" id="customEnd" />
@@ -2163,6 +2243,47 @@
         </div>
         <!-- /tabDeductionConfig -->
 
+        <!-- ─── TAB: PAYSLIP HISTORY ─── -->
+        <div class="tab-panel" id="tabHistory">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>Payslip History</h3>
+                <div class="card-sub" id="historySubLabel">All generated payslips</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;">
+                <input type="text" id="historySearch" placeholder="🔍 Filter by name or period…"
+                  style="padding:0.45rem 0.8rem;border:1.5px solid #ddd;border-radius:8px;font-family:inherit;font-size:0.83rem;width:220px;">
+                <button class="btn btn-outline btn-sm" id="refreshHistoryBtn">↺ Refresh</button>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Role</th>
+                    <th>Period</th>
+                    <th>Days Worked</th>
+                    <th>Total Hours</th>
+                    <th>Total Pay</th>
+                    <th>Status</th>
+                    <th>Generated At</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align:center;padding:2rem;color:#bbb;">
+                      Click the tab to load history…
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- /tabHistory -->
+
       </div>
       <!-- /container -->
     </div>
@@ -2183,13 +2304,6 @@
           selected pay period. Re-running the same period recalculates and
           overwrites previous data.
         </p>
-        <div class="form-group">
-          <label>Pay Period</label>
-          <select id="genPeriodSelect">
-            <option value="">— Loading periods… —</option>
-          </select>
-          <div class="form-hint">Or enter a custom range below.</div>
-        </div>
         <div class="date-row">
           <div class="form-group">
             <label>Period Start</label>
@@ -2228,9 +2342,18 @@
         <!-- Period Picker -->
         <div class="salary-period-picker">
           <label>Pay Period</label>
-          <select id="salaryPeriodSelect">
-            <option value="">— Loading… —</option>
-          </select>
+          <div class="salary-date-row">
+            <div class="salary-date-field">
+              <span class="salary-date-label">From</span>
+              <input type="date" id="salaryDateStart" class="salary-date-input" />
+            </div>
+            <span class="salary-date-arrow">→</span>
+            <div class="salary-date-field">
+              <span class="salary-date-label">To</span>
+              <input type="date" id="salaryDateEnd" class="salary-date-input" />
+            </div>
+            <button class="btn btn-outline btn-sm" id="salaryApplyPeriod">Apply</button>
+          </div>
         </div>
 
         <!-- Employee Search -->
@@ -2361,13 +2484,15 @@
           .querySelectorAll(".tab-btn, .tab-panel")
           .forEach((el) => el.classList.remove("active"));
         btn.classList.add("active");
-        const panelId = key === "deduction-config"
-          ? "tabDeductionConfig"
-          : "tab" + key.charAt(0).toUpperCase() + key.slice(1);
+        const panelId =
+          key === "deduction-config" ? "tabDeductionConfig" :
+          key === "history"          ? "tabHistory" :
+          "tab" + key.charAt(0).toUpperCase() + key.slice(1);
         document.getElementById(panelId).classList.add("active");
         if (key === "rates") loadRates();
         if (key === "daily") loadDaily();
         if (key === "deduction-config") loadDeductionConfig();
+        if (key === "history") loadHistory();
       });
     });
 
@@ -2386,23 +2511,7 @@
         }
         periods = data.periods;
 
-        // Populate every period <select> in the page
-        const fillSelect = (selId) => {
-          const sel = document.getElementById(selId);
-          if (!sel) return;
-          sel.innerHTML = '<option value="">— Select period —</option>';
-          periods.forEach((p, i) => {
-            const o = document.createElement("option");
-            o.value = `${p.start}|${p.end}`;
-            o.textContent = p.label;
-            if (i === 0) o.selected = true;
-            sel.appendChild(o);
-          });
-        };
 
-        fillSelect("periodSelect");
-        fillSelect("salaryPeriodSelect");
-        fillSelect("genPeriodSelect"); // generate modal period picker
 
         // Update summary card "Current Period"
         if (periods.length) {
@@ -2440,15 +2549,10 @@
     //  PAY PERIOD SUMMARY  — /api/payroll/period_summary
     // ══════════════════════════════════════════════════════════════════
     async function loadPeriodSummary(start, end) {
-      // Resolve dates: prefer args → select → custom inputs
+      // Resolve dates: prefer args → custom inputs
       if (!start || !end) {
-        const sel = document.getElementById("periodSelect").value;
-        if (sel) {
-          [start, end] = sel.split("|");
-        } else {
-          start = document.getElementById("customStart").value;
-          end = document.getElementById("customEnd").value;
-        }
+        start = document.getElementById("customStart").value;
+        end = document.getElementById("customEnd").value;
       }
       if (!start || !end) {
         showToast("Please select or enter a pay period", "error");
@@ -2697,17 +2801,6 @@
         )
         .join("");
     }
-
-    // Period select → sync custom inputs + reload
-    document
-      .getElementById("periodSelect")
-      .addEventListener("change", function () {
-        if (!this.value) return;
-        const [s, e] = this.value.split("|");
-        document.getElementById("customStart").value = s;
-        document.getElementById("customEnd").value = e;
-        loadPeriodSummary(s, e);
-      });
 
     document
       .getElementById("loadPeriodBtn")
@@ -2970,50 +3063,151 @@
 
 
     // ══════════════════════════════════════════════════════════════════
+    //  PAYSLIP HISTORY  — /api/payroll/history
+    // ══════════════════════════════════════════════════════════════════
+    let _historyCache = [];
+
+    async function loadHistory(forceRefresh = false) {
+      const tbody = document.getElementById("historyTableBody");
+      if (_historyCache.length && !forceRefresh) {
+        renderHistory(_historyCache);
+        return;
+      }
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#bbb;">Loading…</td></tr>';
+      try {
+        const data = await (await fetch("/api/payroll/history")).json();
+        if (!data.success) {
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#bbb;">${esc(data.message || "Failed to load history")}</td></tr>`;
+          return;
+        }
+        _historyCache = data.history;
+        renderHistory(_historyCache);
+
+        const sub = document.getElementById("historySubLabel");
+        sub.textContent = `${data.history.length} payslip record${data.history.length !== 1 ? "s" : ""} total`;
+      } catch (ex) {
+        console.error("[loadHistory]", ex);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#bbb;">Network error loading history.</td></tr>';
+      }
+    }
+
+    function renderHistory(records) {
+      const tbody = document.getElementById("historyTableBody");
+      const q = (document.getElementById("historySearch")?.value || "").toLowerCase().trim();
+
+      const filtered = q
+        ? records.filter(r =>
+            (r.full_name || "").toLowerCase().includes(q) ||
+            (r.period_start || "").includes(q) ||
+            (r.period_end || "").includes(q) ||
+            (r.status || "").toLowerCase().includes(q)
+          )
+        : records;
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="8">
+          <div class="empty-state"><div class="empty-icon">🗂️</div>
+          <p>${q ? "No records match your filter." : "No payslips have been generated yet."}</p></div></td></tr>`;
+        return;
+      }
+
+      // Group rows by period for visual separation
+      let lastPeriod = null;
+      tbody.innerHTML = filtered.map(r => {
+        const periodKey = `${r.period_start}|${r.period_end}`;
+        const isNewPeriod = periodKey !== lastPeriod;
+        lastPeriod = periodKey;
+
+        const sd = new Date(r.period_start + "T00:00:00");
+        const ed = new Date(r.period_end   + "T00:00:00");
+        const periodLabel =
+          sd.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+          " – " +
+          ed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+        const genAt = r.generated_at
+          ? new Date(r.generated_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+          : "—";
+
+        const statusClass = (r.status || "draft").toLowerCase();
+
+        return `
+          ${isNewPeriod ? `<tr style="background:#fafafa;border-top:2px solid var(--gold);">
+            <td colspan="8" style="padding:0.45rem 1rem;font-size:0.75rem;font-weight:700;color:var(--dark-gold);text-transform:uppercase;letter-spacing:0.5px;">
+              📅 ${periodLabel}
+            </td></tr>` : ""}
+          <tr>
+            <td class="td-name">${esc(r.full_name)}<div class="td-sub">ID #${r.employee_id}</div></td>
+            <td>${roleBadge(r.role)}</td>
+            <td style="font-size:0.82rem;color:#666;">${periodLabel}</td>
+            <td>${r.days_worked} day${r.days_worked !== 1 ? "s" : ""}</td>
+            <td><span class="hours-badge">${fmtH(r.total_hours)}</span></td>
+            <td class="td-pay positive">${fmt(r.total_pay)}</td>
+            <td><span class="status-badge ${statusClass}">${r.status || "draft"}</span></td>
+            <td style="font-size:0.8rem;color:#999;">${genAt}</td>
+          </tr>`;
+      }).join("");
+    }
+
+    document.getElementById("refreshHistoryBtn")?.addEventListener("click", () => {
+      _historyCache = [];
+      loadHistory(true);
+    });
+
+    document.getElementById("historySearch")?.addEventListener("input", () => {
+      renderHistory(_historyCache);
+    });
+
+    // Also auto-refresh history cache after a successful generate
+    // (injected into genConfirm success path via a hook flag)
+
+    // ══════════════════════════════════════════════════════════════════
     //  GENERATE PAYSLIPS MODAL  — /api/payroll/generate
     // ══════════════════════════════════════════════════════════════════
     const genModal = document.getElementById("generateModal");
 
     // ── Export Payroll CSV ────────────────────────────────────────────────
     document.getElementById("exportPayrollBtn")?.addEventListener("click", () => {
-      const sel = document.getElementById("periodSelect")?.value || "";
-      // periodSelect value is "YYYY-MM-DD|YYYY-MM-DD"
-      if (sel && sel.includes("|")) {
-        const [start, end] = sel.split("|");
+      const start = document.getElementById("customStart")?.value || "";
+      const end   = document.getElementById("customEnd")?.value || "";
+      if (start && end) {
         window.location.href = `/api/payroll/export?start=${start}&end=${end}`;
       } else {
         window.location.href = "/api/payroll/export";
       }
     });
 
+    // ── Active-highlight toggle between View Salary and Generate Payslips ──
+    const actionBtnSalary   = document.getElementById("openSalaryModal");
+    const actionBtnGenerate = document.getElementById("openGenerateModal");
+
+    function setActionActive(activeBtn) {
+      [actionBtnSalary, actionBtnGenerate].forEach(b => b.classList.remove("action-active"));
+      if (activeBtn) activeBtn.classList.add("action-active");
+    }
+
     document
       .getElementById("openGenerateModal")
       .addEventListener("click", () => {
+        setActionActive(actionBtnGenerate);
         genModal.classList.add("open");
         populateGenEmployeeSelect();
+        // Show preview for pre-filled dates
+        const s = document.getElementById("genStart").value;
+        const e = document.getElementById("genEnd").value;
+        if (s && e) updateGenPreview(s, e);
       });
     document
       .getElementById("closeGenerateModal")
-      .addEventListener("click", () => genModal.classList.remove("open"));
+      .addEventListener("click", () => { genModal.classList.remove("open"); setActionActive(null); });
     document
       .getElementById("genCancel")
-      .addEventListener("click", () => genModal.classList.remove("open"));
+      .addEventListener("click", () => { genModal.classList.remove("open"); setActionActive(null); });
     genModal.addEventListener("click", (e) => {
-      if (e.target === genModal) genModal.classList.remove("open");
+      if (e.target === genModal) { genModal.classList.remove("open"); setActionActive(null); }
     });
 
-    // When the period select in the generate modal changes, sync the date inputs
-    document
-      .getElementById("genPeriodSelect")
-      .addEventListener("change", function () {
-        if (!this.value) return;
-        const [s, e] = this.value.split("|");
-        document.getElementById("genStart").value = s;
-        document.getElementById("genEnd").value = e;
-        updateGenPreview(s, e);
-      });
-
-    // When dates change manually, update preview
+    // When dates change, update preview
     ["genStart", "genEnd"].forEach((id) => {
       document.getElementById(id).addEventListener("change", () => {
         const s = document.getElementById("genStart").value;
@@ -3091,14 +3285,11 @@
           if (data.success) {
             showToast(data.message, "success");
             genModal.classList.remove("open");
+            setActionActive(null);
+            _historyCache = []; // invalidate so history tab reloads fresh
             // Refresh period tab with just-generated range
             document.getElementById("customStart").value = start;
             document.getElementById("customEnd").value = end;
-            // Sync the period select if it matches a known period
-            const matchVal = `${start}|${end}`;
-            const sel = document.getElementById("periodSelect");
-            if ([...sel.options].some((o) => o.value === matchVal))
-              sel.value = matchVal;
             // Switch to period tab and reload
             document
               .querySelectorAll(".tab-btn, .tab-panel")
@@ -3130,8 +3321,9 @@
     document
       .getElementById("openSalaryModal")
       .addEventListener("click", () => {
+        setActionActive(actionBtnSalary);
         salaryModal.classList.add("open");
-        populateSalaryPeriodSelect();
+        initSalaryDatePickers();
         if (!salaryEmployees.length) fetchSalaryEmployees();
       });
     document
@@ -3149,35 +3341,40 @@
 
     function closeSalaryModal() {
       salaryModal.classList.remove("open");
+      setActionActive(null);
       clearSalaryResults();
     }
 
-    function populateSalaryPeriodSelect() {
-      const sel = document.getElementById("salaryPeriodSelect");
-      if (!periods.length) {
-        sel.innerHTML = '<option value="">— No periods loaded —</option>';
-        return;
+    function initSalaryDatePickers() {
+      const startEl = document.getElementById("salaryDateStart");
+      const endEl   = document.getElementById("salaryDateEnd");
+      // Pre-fill with the current period if available and not already set
+      if (!startEl.value && !endEl.value && periods.length) {
+        startEl.value = periods[0].start;
+        endEl.value   = periods[0].end;
+        salaryPeriodVal = `${periods[0].start}|${periods[0].end}`;
+      } else if (startEl.value && endEl.value) {
+        salaryPeriodVal = `${startEl.value}|${endEl.value}`;
       }
-      sel.innerHTML = "";
-      periods.forEach((p, i) => {
-        const o = document.createElement("option");
-        o.value = `${p.start}|${p.end}`;
-        o.textContent = p.label;
-        if (i === 0) {
-          o.selected = true;
-          salaryPeriodVal = o.value;
-        }
-        sel.appendChild(o);
-      });
-      salaryPeriodVal = sel.value;
     }
 
-    document
-      .getElementById("salaryPeriodSelect")
-      .addEventListener("change", function () {
-        salaryPeriodVal = this.value;
-        if (salarySelected) loadSalaryDetail(salarySelected);
+    document.getElementById("salaryApplyPeriod").addEventListener("click", () => {
+      const s = document.getElementById("salaryDateStart").value;
+      const e = document.getElementById("salaryDateEnd").value;
+      if (!s || !e) { showToast("Please select both start and end dates", "error"); return; }
+      if (new Date(e) < new Date(s)) { showToast("End date must be after start date", "error"); return; }
+      salaryPeriodVal = `${s}|${e}`;
+      if (salarySelected) loadSalaryDetail(salarySelected);
+    });
+
+    // Also update salaryPeriodVal live when dates change
+    ["salaryDateStart", "salaryDateEnd"].forEach(id => {
+      document.getElementById(id).addEventListener("change", () => {
+        const s = document.getElementById("salaryDateStart").value;
+        const e = document.getElementById("salaryDateEnd").value;
+        if (s && e) salaryPeriodVal = `${s}|${e}`;
       });
+    });
 
     async function fetchSalaryEmployees() {
       try {

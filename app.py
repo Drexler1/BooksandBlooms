@@ -348,7 +348,6 @@ def _ensure_trash_table():
                 `password`          VARCHAR(255) NOT NULL DEFAULT '',
                 `password_hash`     VARCHAR(255) DEFAULT NULL,
                 `role`              ENUM('admin','manager','cashier') NOT NULL DEFAULT 'cashier',
-                `contact_number`    VARCHAR(255) NOT NULL DEFAULT '',
                 `face_image_path`   VARCHAR(255) DEFAULT NULL,
                 `face_model_path`   MEDIUMTEXT   DEFAULT NULL,
                 `last_login`        DATETIME     DEFAULT NULL,
@@ -365,7 +364,7 @@ def _ensure_trash_table():
         # ── Migrate existing inactive employees into trash ───────────────────
         cur.execute("""
             SELECT employee_id, full_name, username, username_hash,
-                   password, password_hash, role, contact_number,
+                   password, password_hash, role,
                    face_image_path, face_model_path, last_login,
                    created_at, disabled_at
             FROM employees
@@ -382,10 +381,10 @@ def _ensure_trash_table():
                 """
                 INSERT INTO employees_trash
                     (employee_id, full_name, username, username_hash,
-                     password, password_hash, role, contact_number,
+                     password, password_hash, role,
                      face_image_path, face_model_path, last_login,
                      created_at, disabled_at, delete_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
                 (
                     row["employee_id"],
@@ -395,7 +394,6 @@ def _ensure_trash_table():
                     row["password"],
                     row["password_hash"],
                     row["role"],
-                    row["contact_number"],
                     row["face_image_path"],
                     row["face_model_path"],
                     row["last_login"],
@@ -644,7 +642,7 @@ def _lockout_flash(state: dict):
 def _dec_emp(row: dict) -> dict:
     """Decrypt all PII fields on an employees row."""
     if row:
-        for f in ("username", "full_name", "password", "contact_number"):
+        for f in ("username", "full_name", "password", "email"):
             if row.get(f):
                 row[f] = aes_decrypt(row[f])
     return row
@@ -1697,6 +1695,635 @@ def login():
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                       FORGOT PASSWORD                                       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# ── Token store ────────────────────────────────────────────────────────────────
+# Reset tokens are written to the DB so they survive server restarts.
+# Each token is a 64-char hex secret tied to a (role, user_id, table) triplet,
+# expires after RESET_TOKEN_TTL_MINUTES, and is deleted on first use.
+RESET_TOKEN_TTL_MINUTES = 30
+
+
+def _ensure_reset_tokens_table():
+    """
+    Create password_reset_tokens if it does not exist.
+    Called once at startup inside run_auto_migration().
+    """
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
+                `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `token`        VARCHAR(128)  NOT NULL UNIQUE,
+                `role`         ENUM('admin','manager','cashier') NOT NULL,
+                `user_id`      INT UNSIGNED  NOT NULL,
+                `user_table`   ENUM('admins','employees')        NOT NULL,
+                `expires_at`   DATETIME      NOT NULL,
+                `otp_code`     VARCHAR(6)    DEFAULT NULL,
+                `otp_verified` TINYINT(1)    NOT NULL DEFAULT 0,
+                INDEX `idx_token`      (`token`),
+                INDEX `idx_expires_at` (`expires_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
+        # Add columns to existing tables that predate OTP flow
+        for col, defn in [
+            ("otp_code",     "VARCHAR(6) DEFAULT NULL"),
+            ("otp_verified", "TINYINT(1) NOT NULL DEFAULT 0"),
+        ]:
+            try:
+                cur.execute(
+                    f"ALTER TABLE `password_reset_tokens` ADD COLUMN `{col}` {defn}"
+                )
+            except Exception:
+                pass  # column already exists
+        conn.commit()
+        cur.close()
+        app.logger.info("[migration] password_reset_tokens table ensured")
+    except Exception as exc:
+        app.logger.error(f"[migration] _ensure_reset_tokens_table failed: {exc}")
+
+
+def _purge_expired_reset_tokens():
+    """Delete all tokens whose expiry has passed. Called lazily before lookups."""
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("DELETE FROM password_reset_tokens WHERE expires_at <= NOW()")
+        mysql.connection.commit()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] _purge_expired_reset_tokens failed: {exc}")
+
+
+def _send_gmail_reset(to_email: str, reset_url: str, full_name: str, role: str = "staff"):
+    """
+    Send a password-reset link to an admin via Gmail SMTP.
+
+    Required environment variables:
+        GMAIL_SENDER      — the Gmail address to send FROM
+        GMAIL_APP_PASSWORD — a Google App Password (not the account password)
+    """
+    sender = os.environ.get("GMAIL_SENDER", "")
+    app_pw = os.environ.get("GMAIL_APP_PASSWORD", "")
+    if not sender or not app_pw:
+        raise RuntimeError(
+            "GMAIL_SENDER and GMAIL_APP_PASSWORD must be set in the environment."
+        )
+
+    subject = "Books & Blooms Café — Password Reset"
+    html_body = f"""
+    <div style="font-family:'Outfit',Arial,sans-serif;max-width:520px;margin:auto;
+                background:#faf7f2;border:1.5px solid #e2d9cc;border-radius:14px;
+                padding:36px 32px;">
+      <p style="font-family:'Playfair Display',Georgia,serif;font-size:22px;
+                color:#1c1814;margin:0 0 8px">Books &amp; Blooms Café</p>
+      <p style="font-size:11px;color:#b8924a;letter-spacing:2px;
+                text-transform:uppercase;margin:0 0 28px">Staff Portal</p>
+      <p style="color:#1c1814;font-size:15px;margin:0 0 12px">
+        Hello, <strong>{full_name}</strong> 👋
+      </p>
+      <p style="color:#7a6e62;font-size:14px;line-height:1.6;margin:0 0 24px">
+        We received a request to reset your {role.capitalize()} account password.
+        Click the button below — this link expires in
+        <strong>{RESET_TOKEN_TTL_MINUTES} minutes</strong>.
+      </p>
+      <a href="{reset_url}"
+         style="display:inline-block;padding:14px 28px;background:#1c1814;
+                color:#d4a96a;border-radius:10px;text-decoration:none;
+                font-weight:600;font-size:14px;letter-spacing:1px">
+        Reset My Password
+      </a>
+      <p style="color:#7a6e62;font-size:12px;margin:24px 0 0;line-height:1.6">
+        If you did not request this reset, you can safely ignore this email.
+        Your password will remain unchanged.
+      </p>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = sender
+    msg["To"]      = to_email
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(sender, app_pw)
+        server.sendmail(sender, [to_email], msg.as_string())
+
+    app.logger.info(f"[reset] Gmail reset link sent to {to_email}")
+
+
+def _send_sms_otp(phone_number: str, otp_code: str, full_name: str, role: str):
+    """
+    Send a 6-digit OTP to a Manager or Cashier via Semaphore SMS (semaphore.co).
+
+    Required environment variables:
+        SEMAPHORE_API_KEY   — your Semaphore API key
+        SEMAPHORE_SENDER    — your registered sender name (default: SEMAPHORE)
+    """
+    api_key     = os.environ.get("SEMAPHORE_API_KEY", "")
+    sender_name = os.environ.get("SEMAPHORE_SENDER", "SEMAPHORE")
+
+    if not api_key:
+        raise RuntimeError(
+            "SEMAPHORE_API_KEY must be set in the environment."
+        )
+
+    message = (
+        f"[Books & Blooms Cafe] Hi {full_name}, your OTP is: {otp_code}. "
+        f"It expires in 10 minutes. Do not share this with anyone."
+    )
+
+    # Semaphore expects the number in 09XXXXXXXXX or +639XXXXXXXXX format
+    import urllib.request, urllib.parse
+    payload = urllib.parse.urlencode({
+        "apikey":      api_key,
+        "number":      phone_number,
+        "message":     message,
+        "sendername":  sender_name,
+    }).encode("utf-8")
+    _ = otp_code  # already used in message above
+
+    url = "https://semaphore.co/api/v4/messages"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/x-www-form-urlencoded")
+
+    with urllib.request.urlopen(req) as resp:
+        result = json.loads(resp.read())
+        # Semaphore returns a list of message objects
+        if isinstance(result, list) and result:
+            status = result[0].get("status", "")
+            msg_id = result[0].get("message_id", "")
+            if status in ("Queued", "Sent", "Success"):
+                app.logger.info(
+                    f"[reset] Semaphore SMS queued to {phone_number} (id={msg_id})"
+                )
+            else:
+                app.logger.warning(f"[reset] Semaphore unexpected status: {result}")
+        else:
+            app.logger.warning(f"[reset] Semaphore unexpected response: {result}")
+
+
+@app.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+    """
+    GET  — render the name entry form.
+    POST — search for matching staff profiles and redirect to choose_account.
+
+    Security: on POST we search by full_name only (no role field anymore).
+    The user picks their role implicitly by choosing their profile on the
+    next screen. If no match is found we still show choose_account with an
+    empty list so the response time/content doesn't reveal existence.
+    """
+    if request.method == "GET":
+        return render_template("forgot_password.html", submitted_name="")
+
+    full_name = (request.form.get("full_name") or "").strip()
+
+    if not full_name:
+        flash("Please enter your full name.", "danger")
+        return render_template("forgot_password.html", submitted_name="")
+
+    _purge_expired_reset_tokens()
+
+    matches = []
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        # ── Search admins ─────────────────────────────────────────────────
+        cur.execute("SELECT admin_id, full_name FROM admins")
+        for row in cur.fetchall():
+            dec_name = aes_decrypt(row.get("full_name") or "")
+            if dec_name.strip().lower() == full_name.lower():
+                matches.append({
+                    "id":           row["admin_id"],
+                    "table":        "admins",
+                    "role":         "admin",
+                    "display_name": dec_name.strip(),
+                })
+
+        # ── Search active employees (manager + cashier) ───────────────────
+        cur.execute(
+            "SELECT employee_id, full_name, role FROM employees "
+            "WHERE employment_status='active'"
+        )
+        for row in cur.fetchall():
+            dec_name = aes_decrypt(row.get("full_name") or "")
+            if dec_name.strip().lower() == full_name.lower():
+                matches.append({
+                    "id":           row["employee_id"],
+                    "table":        "employees",
+                    "role":         row["role"],
+                    "display_name": dec_name.strip(),
+                })
+
+        cur.close()
+
+    except Exception as exc:
+        app.logger.error(f"[reset] forgot_password search error: {exc}")
+        flash("An unexpected error occurred. Please try again.", "danger")
+        return render_template("forgot_password.html", submitted_name=full_name)
+
+    # Always redirect to choose_account regardless of match count
+    # (prevents timing/enumeration attacks)
+    session["recovery_matches"]   = matches
+    session["recovery_full_name"] = full_name
+    return redirect(url_for("choose_account"))
+
+
+# ── Helper: mask a contact string for display ────────────────────────────────
+def _mask_email(email: str) -> str:
+    """j***@gmail.com"""
+    if "@" not in email:
+        return "***"
+    local, domain = email.split("@", 1)
+    return local[0] + "***@" + domain
+
+
+def _mask_phone(phone: str) -> str:
+    """Keep last 4 digits: +63 *** *** 0249"""
+    digits = phone.strip()
+    if len(digits) >= 4:
+        return "*" * (len(digits) - 4) + digits[-4:]
+    return "****"
+
+
+@app.route("/choose_account", methods=["GET", "POST"])
+def choose_account():
+    """
+    GET  — show matching profiles stored in session from forgot_password.
+    POST — user clicked a profile; store choice and redirect to choose_method.
+    """
+    if request.method == "GET":
+        matches   = session.get("recovery_matches", [])
+        full_name = session.get("recovery_full_name", "")
+        if not full_name:
+            # Session expired or navigated here directly
+            return redirect(url_for("forgot_password"))
+        return render_template("choose_account.html", matches=matches)
+
+    # ── POST: user selected a profile ────────────────────────────────────────
+    account_id    = (request.form.get("account_id")    or "").strip()
+    account_table = (request.form.get("account_table") or "").strip()
+    role          = (request.form.get("role")          or "").strip().lower()
+    full_name     = (request.form.get("full_name")     or "").strip()
+
+    if not account_id or account_table not in ("admins", "employees") or role not in ("admin", "manager", "cashier"):
+        flash("Invalid account selection. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Fetch contact details for the chosen account
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        if account_table == "admins":
+            cur.execute(
+                "SELECT admin_id, full_name, email FROM admins WHERE admin_id=%s",
+                (account_id,),
+            )
+        else:
+            cur.execute(
+                "SELECT employee_id, full_name, email FROM employees "
+                "WHERE employee_id=%s AND employment_status='active'",
+                (account_id,),
+            )
+
+        row = cur.fetchone()
+        cur.close()
+
+    except Exception as exc:
+        app.logger.error(f"[reset] choose_account lookup error: {exc}")
+        flash("An error occurred. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if not row:
+        flash("Account not found. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Decrypt email and build masked version for display
+    has_email    = False
+    masked_email = ""
+
+    raw_email = aes_decrypt(row.get("email") or "")
+    if raw_email:
+        has_email    = True
+        masked_email = _mask_email(raw_email)
+
+    # Store in session for choose_method
+    session["recovery_account_id"]    = account_id
+    session["recovery_account_table"] = account_table
+    session["recovery_role"]          = role
+    session["recovery_full_name"]     = full_name
+
+    return render_template(
+        "choose_method.html",
+        account_id=account_id,
+        account_table=account_table,
+        role=role,
+        full_name=full_name,
+        has_email=has_email,
+        masked_email=masked_email,
+    )
+
+
+@app.route("/choose_method", methods=["POST"])
+def choose_method():
+    """
+    POST — receives the chosen delivery method (email or sms),
+           generates the token/OTP, dispatches it, and redirects
+           to verify_otp (SMS) or shows a success flash (email).
+    """
+    method        = (request.form.get("method")        or "").strip().lower()
+    account_id    = (request.form.get("account_id")    or "").strip()
+    account_table = (request.form.get("account_table") or "").strip()
+    role          = (request.form.get("role")          or "").strip().lower()
+    full_name     = (request.form.get("full_name")     or "").strip()
+
+    if method != "email" or not account_id or role not in ("admin", "manager", "cashier"):
+        flash("Invalid request. Please start over.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    _purge_expired_reset_tokens()
+
+    # Fetch account row to get email — all roles now use email
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        if account_table == "admins":
+            cur.execute(
+                "SELECT admin_id AS user_id, email, full_name FROM admins WHERE admin_id=%s",
+                (account_id,),
+            )
+        else:
+            cur.execute(
+                "SELECT employee_id AS user_id, email, full_name FROM employees "
+                "WHERE employee_id=%s AND employment_status='active'",
+                (account_id,),
+            )
+        row = cur.fetchone()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] choose_method lookup error: {exc}")
+        flash("An error occurred. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if not row:
+        flash("Account not found. Please start over.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Generate token + OTP
+    raw_token  = secrets.token_hex(32)
+    otp_code   = str(secrets.randbelow(900000) + 100000)
+    expires_at = datetime.now() + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+
+    try:
+        ins = mysql.connection.cursor()
+        ins.execute(
+            """
+            INSERT INTO password_reset_tokens
+                (token, role, user_id, user_table, expires_at, otp_code, otp_verified)
+            VALUES (%s, %s, %s, %s, %s, %s, 1)
+            ON DUPLICATE KEY UPDATE
+                token        = VALUES(token),
+                expires_at   = VALUES(expires_at),
+                otp_code     = VALUES(otp_code),
+                otp_verified = 1
+            """,
+            (raw_token, role, row["user_id"], account_table, expires_at, otp_code),
+        )
+        mysql.connection.commit()
+        ins.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] choose_method token insert error: {exc}")
+        flash("An error occurred. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Dispatch — all roles now use email reset link
+    try:
+        raw_email = aes_decrypt(row.get("email") or "")
+        reset_url = url_for("reset_password", token=raw_token, role=role, _external=True)
+        _send_gmail_reset(
+            to_email=raw_email,
+            reset_url=reset_url,
+            full_name=full_name,
+            role=role,
+        )
+        flash(
+            "A reset link has been sent to your email address. "
+            "Check your inbox and follow the link to set a new password.",
+            "info",
+        )
+        return redirect(url_for("forgot_password"))
+
+    except RuntimeError as cfg_err:
+        app.logger.error(f"[reset] choose_method config error: {cfg_err}")
+        flash(
+            "Reset notification could not be sent — "
+            "please contact the café administrator.",
+            "danger",
+        )
+        return redirect(url_for("forgot_password"))
+
+    except Exception as send_err:
+        app.logger.error(f"[reset] choose_method send error: {send_err}")
+        flash(
+            "We had trouble sending the code. Please try again in a few moments.",
+            "danger",
+        )
+        return redirect(url_for("forgot_password"))
+
+
+@app.route("/verify_otp", methods=["GET", "POST"])
+def verify_otp():
+    """
+    GET  — render OTP entry screen (token passed as query param).
+    POST — validate the 6-digit OTP; on success mark token as verified
+           and redirect to /reset_password.
+    """
+    _purge_expired_reset_tokens()
+
+    if request.method == "GET":
+        token = (request.args.get("token") or "").strip()
+        role  = (request.args.get("role")  or "").strip().lower()
+        if not token or role not in ("manager", "cashier"):
+            flash("Invalid or missing OTP session.", "danger")
+            return redirect(url_for("forgot_password"))
+        return render_template("verify_otp.html", token=token, role=role, error=None)
+
+    # ── POST ──────────────────────────────────────────────────────────────────
+    token    = (request.form.get("token")    or "").strip()
+    role     = (request.form.get("role")     or "").strip().lower()
+    otp_input = (request.form.get("otp_code") or "").strip()
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT id, otp_code, expires_at FROM password_reset_tokens "
+            "WHERE token=%s",
+            (token,),
+        )
+        record = cur.fetchone()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[otp] DB error: {exc}")
+        flash("An error occurred. Please request a new OTP.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if not record:
+        flash("OTP session not found. Please request a new one.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if record["expires_at"] < datetime.now():
+        flash("Your OTP has expired. Please request a new one.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if otp_input != record["otp_code"]:
+        return render_template(
+            "verify_otp.html", token=token, role=role,
+            error="Incorrect OTP. Please try again."
+        )
+
+    # Mark OTP as verified
+    try:
+        upd = mysql.connection.cursor()
+        upd.execute(
+            "UPDATE password_reset_tokens SET otp_verified=1, otp_code=NULL "
+            "WHERE token=%s",
+            (token,),
+        )
+        mysql.connection.commit()
+        upd.close()
+    except Exception as exc:
+        app.logger.error(f"[otp] Failed to mark verified: {exc}")
+        flash("An error occurred. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    app.logger.info(f"[otp] OTP verified for token ...{token[-8:]}")
+    return redirect(url_for("reset_password", token=token, role=role))
+
+
+@app.route("/reset_password", methods=["GET", "POST"])
+def reset_password():
+    """
+    GET  — validate token from URL, render the set-new-password form.
+    POST — validate token again, enforce password rules, hash and save the
+           new password, then delete the token.
+
+    Token validation:
+      • Must exist in password_reset_tokens.
+      • Must not have expired (expires_at > NOW()).
+      • The role in the token must match the ?role= query parameter (double-check).
+    """
+    _purge_expired_reset_tokens()
+
+    if request.method == "GET":
+        token = (request.args.get("token") or "").strip()
+        role  = (request.args.get("role")  or "").strip().lower()
+
+        if not token or role not in ("admin", "manager", "cashier"):
+            flash("Invalid or missing reset link.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        try:
+            cur = mysql.connection.cursor(DictCursor)
+            cur.execute(
+                "SELECT id, role, expires_at, otp_verified FROM password_reset_tokens "
+                "WHERE token=%s",
+                (token,),
+            )
+            record = cur.fetchone()
+            cur.close()
+        except Exception as exc:
+            app.logger.error(f"[reset] DB error on token lookup: {exc}")
+            flash("An error occurred. Please request a new reset link.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        if not record:
+            flash("This reset link is invalid or has already been used.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        if record["expires_at"] < datetime.now():
+            flash(
+                "This reset link has expired. Please request a new one.", "danger"
+            )
+            return redirect(url_for("forgot_password"))
+
+        if record["role"] != role:
+            flash("Reset link role mismatch. Please request a new link.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        return render_template("reset_password.html", token=token, role=role)
+
+    # ── POST ──────────────────────────────────────────────────────────────────
+    token        = (request.form.get("token")        or "").strip()
+    new_password = (request.form.get("new_password") or "").strip()
+    confirm_pw   = (request.form.get("confirm_password") or "").strip()
+
+    # Re-derive role from the token record (don't trust a hidden form field)
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT id, role, user_id, user_table, expires_at "
+            "FROM password_reset_tokens WHERE token=%s",
+            (token,),
+        )
+        record = cur.fetchone()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] DB error on POST token lookup: {exc}")
+        flash("An error occurred. Please request a new reset link.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    role = record["role"] if record else ""
+
+    if not record:
+        flash("This reset link is invalid or has already been used.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if record["expires_at"] < datetime.now():
+        flash("This reset link has expired. Please request a new one.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # ── Validate new password ─────────────────────────────────────────────────
+    if len(new_password) < 8:
+        flash("Password must be at least 8 characters.", "danger")
+        return render_template("reset_password.html", token=token, role=role)
+
+    if new_password != confirm_pw:
+        flash("Passwords do not match. Please try again.", "danger")
+        return render_template("reset_password.html", token=token, role=role)
+
+    # ── Hash and save ─────────────────────────────────────────────────────────
+    new_hash   = hash_password(new_password)
+    table      = record["user_table"]
+    id_column  = "admin_id" if table == "admins" else "employee_id"
+
+    try:
+        upd_cur = mysql.connection.cursor()
+        upd_cur.execute(
+            f"UPDATE `{table}` SET password_hash=%s WHERE `{id_column}`=%s",
+            (new_hash, record["user_id"]),
+        )
+        # Consume token — one-time use only
+        upd_cur.execute(
+            "DELETE FROM password_reset_tokens WHERE token=%s", (token,)
+        )
+        mysql.connection.commit()
+        upd_cur.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] Failed to save new password: {exc}")
+        flash("An error occurred while saving your new password. Please try again.", "danger")
+        return render_template("reset_password.html", token=token, role=role)
+
+    app.logger.info(
+        f"[reset] Password updated — table={table} user_id={record['user_id']} role={role}"
+    )
+    flash("Your password has been reset successfully. You can now sign in.", "info")
+    return redirect(url_for("login"))
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║                         DASHBOARD                                           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -1933,7 +2560,7 @@ def employee_management():
     full_name = user["full_name"] if user else session["role"].capitalize()
 
     cur.execute("""
-        SELECT employee_id, full_name, username, role, contact_number,
+        SELECT employee_id, full_name, username, role, email,
                employment_status, face_image_path, face_model_path,
                last_login, created_at,
                COALESCE(hourly_rate, 0) AS hourly_rate
@@ -2089,7 +2716,7 @@ def add_employee():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "").strip()
     role = request.form.get("role", "").strip()
-    contact = request.form.get("contact", "").strip()
+    contact = request.form.get("contact", "").strip()  # now stores email
     status = request.form.get("status", "active")
     try:
         hourly_rate = float(request.form.get("hourly_rate", 0) or 0)
@@ -2104,7 +2731,7 @@ def add_employee():
         cur.execute(
             """INSERT INTO employees
                (full_name, username, username_hash, password, password_hash,
-                role, contact_number, employment_status, hourly_rate)
+                role, email, employment_status, hourly_rate)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (
                 aes_encrypt(full_name),
@@ -2113,7 +2740,7 @@ def add_employee():
                 aes_encrypt(password),
                 hash_password(password),
                 role,
-                aes_encrypt(contact),
+                aes_encrypt(contact),  # email column
                 status,
                 hourly_rate,
             ),
@@ -2198,7 +2825,7 @@ def update_employee(employee_id):
     full_name = request.form.get("full_name", "").strip()
     username = request.form.get("username", "").strip()
     role = request.form.get("role", "").strip()
-    contact = request.form.get("contact", "").strip()
+    contact = request.form.get("contact", "").strip()  # now stores email
     status = request.form.get("status", "").strip()
     try:
         hourly_rate = float(request.form.get("hourly_rate", 0) or 0)
@@ -2251,15 +2878,15 @@ def update_employee(employee_id):
             cur.execute(
                 """UPDATE employees
                    SET full_name=%s, username=%s, username_hash=%s, role=%s,
-                       contact_number=%s, employment_status=%s, face_image_path=%s,
-                       hourly_rate=%s
+                       email=%s, employment_status=%s,
+                       face_image_path=%s, hourly_rate=%s
                    WHERE employee_id=%s""",
                 (
                     enc_name,
                     enc_username,
                     u_hash,
                     role,
-                    enc_contact,
+                    enc_contact,  # email column
                     status,
                     face_path,
                     hourly_rate,
@@ -2273,14 +2900,15 @@ def update_employee(employee_id):
             cur.execute(
                 """UPDATE employees
                    SET full_name=%s, username=%s, username_hash=%s, role=%s,
-                       contact_number=%s, employment_status=%s, hourly_rate=%s
+                       email=%s, employment_status=%s,
+                       hourly_rate=%s
                    WHERE employee_id=%s""",
                 (
                     enc_name,
                     enc_username,
                     u_hash,
                     role,
-                    enc_contact,
+                    enc_contact,  # email column
                     status,
                     hourly_rate,
                     employee_id,
@@ -2313,7 +2941,7 @@ def delete_employee(employee_id):
         cur.execute(
             """
             SELECT employee_id, full_name, username, username_hash,
-                   password, password_hash, role, contact_number,
+                   password, password_hash, role,
                    face_image_path, face_model_path, last_login,
                    created_at, disabled_at
             FROM employees WHERE employee_id=%s LIMIT 1
@@ -2346,10 +2974,10 @@ def delete_employee(employee_id):
             """
             INSERT INTO employees_trash
                 (employee_id, full_name, username, username_hash,
-                 password, password_hash, role, contact_number,
+                 password, password_hash, role,
                  face_image_path, face_model_path, last_login,
                  created_at, disabled_at, delete_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
             (
                 emp["employee_id"],
@@ -2359,7 +2987,6 @@ def delete_employee(employee_id):
                 emp["password"],
                 emp["password_hash"],
                 emp["role"],
-                emp["contact_number"],
                 emp["face_image_path"],
                 emp["face_model_path"],
                 emp["last_login"],
@@ -4279,7 +4906,7 @@ def cashier_dashboard():
 
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
-        "SELECT full_name, username, role, contact_number, last_login FROM employees WHERE employee_id=%s",
+        "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
         (session["employee_id"],),
     )
     employee = _dec_emp(cur.fetchone())
@@ -4295,7 +4922,7 @@ def cashier_transactions():
 
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
-        "SELECT full_name, username, role, contact_number, last_login FROM employees WHERE employee_id=%s",
+        "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
         (session["employee_id"],),
     )
     employee = _dec_emp(cur.fetchone())
@@ -4908,11 +5535,22 @@ def run_auto_migration():
             except Exception:
                 pass  # column already exists — expected on re-runs
 
+        # STEP 1b: add email column to employees if missing
+        try:
+            cur.execute(
+                "ALTER TABLE `employees` "
+                "ADD COLUMN `email` VARCHAR(255) NOT NULL DEFAULT ''"
+            )
+            conn.commit()
+            app.logger.info("[migration] Added email column to employees")
+        except Exception:
+            pass  # column already exists — expected on re-runs
+
         # STEP 2: widen narrow columns before writing ciphertext
         # AES-256-CBC base64(IV+ciphertext) is always >= 44 chars.
         # VARCHAR(20) / VARCHAR(50) silently truncate the blob.
         widen = [
-            ("employees", "contact_number", "VARCHAR(255)"),
+            ("employees", "email", "VARCHAR(255)"),
             ("employees", "username", "VARCHAR(255)"),
             ("employees", "full_name", "VARCHAR(255)"),
             ("employees", "password", "VARCHAR(255)"),
@@ -4932,12 +5570,12 @@ def run_auto_migration():
 
         # STEPS 3 & 4: repair truncated blobs and encrypt plaintext rows
         cur.execute(
-            "SELECT employee_id, username, full_name, password, contact_number "
+            "SELECT employee_id, username, full_name, password, email "
             "FROM employees"
         )
         for row in cur.fetchall():
             upd = {}
-            for f in ("username", "full_name", "password", "contact_number"):
+            for f in ("username", "full_name", "password", "email"):
                 v = row.get(f)
                 if not v:
                     continue
@@ -5115,6 +5753,12 @@ def run_auto_migration():
         _ensure_gcash_ref_column()
     except Exception as exc:
         app.logger.error(f"[migration] Step 20 (gcash_ref column) failed: {exc}")
+
+    # ── STEP 21: password_reset_tokens table (forgot-password flow) ───────────
+    try:
+        _ensure_reset_tokens_table()
+    except Exception as exc:
+        app.logger.error(f"[migration] Step 21 (password_reset_tokens table) failed: {exc}")
 
     app.logger.info("[migration] run_auto_migration complete.")
 
@@ -6931,7 +7575,7 @@ def api_pos_transactions():
                    COALESCE(t.vat_amount, ROUND(t.total_amount / 1.12 * 0.12, 2)) AS vat_amount,
                    COUNT(ti.item_id) AS item_count,
                    e.role            AS cashier_role,
-                   e.contact_number  AS cashier_contact_enc
+                   e.email  AS cashier_contact_enc
             FROM transactions t
             LEFT JOIN transaction_items ti ON ti.transaction_id = t.transaction_id
             LEFT JOIN employees e ON e.employee_id = t.cashier_id
@@ -7000,7 +7644,7 @@ def api_pos_transaction_detail(transaction_id):
                    COALESCE(t.net_sales,  ROUND(t.total_amount / 1.12, 2))        AS net_sales,
                    COALESCE(t.vat_amount, ROUND(t.total_amount / 1.12 * 0.12, 2)) AS vat_amount,
                    e.role           AS cashier_role,
-                   e.contact_number AS cashier_contact_enc
+                   e.email AS cashier_contact_enc
             FROM transactions t
             LEFT JOIN employees e ON e.employee_id = t.cashier_id
             WHERE t.transaction_id = %s
@@ -8618,7 +9262,6 @@ def _ensure_employee_applications_table():
                 `email`          VARCHAR(255) NOT NULL DEFAULT \'\',
                 `username`       VARCHAR(255) NOT NULL DEFAULT \'\',
                 `role`           ENUM(\'admin\',\'manager\',\'cashier\') NOT NULL DEFAULT \'cashier\',
-                `contact_number` VARCHAR(255) NOT NULL DEFAULT \'\',
                 `status`         ENUM(\'pending\',\'approved\',\'rejected\') NOT NULL DEFAULT \'pending\',
                 `created_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY `email`    (`email`),

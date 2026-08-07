@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose Recovery Method | Books & Blooms Café</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --cream:   #faf7f2;
+            --warm:    #f2ece0;
+            --gold:    #b8924a;
+            --gold-lt: #d4a96a;
+            --ink:     #1c1814;
+            --muted:   #7a6e62;
+            --border:  #e2d9cc;
+            --white:   #ffffff;
+            --success: #4a7c59;
+            --radius:  14px;
+            --shadow:  0 24px 64px rgba(28,24,20,0.13);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--cream);
+            min-height: 100vh;
+            display: flex;
+            align-items: stretch;
+        }
+
+        /* ── Left decorative panel ── */
+        .panel-left {
+            flex: 0 0 42%;
+            background: var(--ink);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 56px 52px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel-left::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 60% 50% at 20% 20%, rgba(184,146,74,0.18) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 60% at 80% 80%, rgba(184,146,74,0.10) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .botanical {
+            position: absolute;
+            right: -30px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 240px;
+            opacity: 0.07;
+        }
+
+        .brand { position: relative; z-index: 1; }
+
+        .brand-mark {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+
+        .brand-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            color: var(--cream);
+            line-height: 1.25;
+        }
+
+        .brand-name span {
+            display: block;
+            font-size: 0.78rem;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 400;
+            color: var(--gold-lt);
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .hero-text { position: relative; z-index: 1; }
+
+        .hero-text h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.4rem, 3.5vw, 3.4rem);
+            color: var(--cream);
+            line-height: 1.18;
+            margin-bottom: 20px;
+        }
+
+        .hero-text h1 em { color: var(--gold-lt); font-style: italic; }
+
+        .hero-text p {
+            color: rgba(250,247,242,0.55);
+            font-size: 0.95rem;
+            font-weight: 300;
+            line-height: 1.7;
+            max-width: 300px;
+        }
+
+        .panel-left-footer { position: relative; z-index: 1; }
+
+        .divider-line {
+            width: 40px;
+            height: 2px;
+            background: var(--gold);
+            border-radius: 2px;
+            margin-bottom: 20px;
+        }
+
+        .panel-left-footer p {
+            color: rgba(250,247,242,0.35);
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Right panel ── */
+        .panel-right {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 32px;
+            background: var(--cream);
+        }
+
+        .recovery-card {
+            width: 100%;
+            max-width: 440px;
+            animation: rise 0.5s cubic-bezier(0.22,1,0.36,1) both;
+        }
+
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-title { margin-bottom: 32px; }
+
+        .card-title h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            color: var(--ink);
+            margin-bottom: 6px;
+        }
+
+        .card-title p {
+            color: var(--muted);
+            font-size: 0.92rem;
+            font-weight: 300;
+            line-height: 1.5;
+        }
+
+        /* Form card */
+        .form-card {
+            background: var(--white);
+            border: 1.5px solid var(--border);
+            border-radius: calc(var(--radius) + 2px);
+            padding: 32px;
+            box-shadow: var(--shadow);
+        }
+
+        /* Section label */
+        .form-section-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .form-section-label .label-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--gold);
+            flex-shrink: 0;
+        }
+
+        .form-section-label span {
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        /* Flash messages */
+        .flash-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            border-radius: 10px;
+            padding: 13px 16px;
+            margin-bottom: 20px;
+            font-size: 0.875rem;
+        }
+
+        .flash-box.flash-danger {
+            background: #fdecea;
+            border: 1.5px solid #dc3545;
+            color: #7a1a20;
+        }
+
+        .flash-box .flash-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+        .flash-box p { margin: 0; line-height: 1.5; color: inherit; font-size: 0.88rem; font-weight: 500; }
+
+        /* Account banner */
+        .account-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: var(--warm);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 22px;
+        }
+
+        .account-banner-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--cream);
+            border: 1.5px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .account-banner-name {
+            font-weight: 600;
+            color: var(--ink);
+            font-size: 0.93rem;
+        }
+
+        .account-banner-role {
+            font-size: 0.78rem;
+            color: var(--muted);
+            margin-top: 1px;
+        }
+
+        /* Method radio options */
+        .method-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .method-option {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            background: var(--cream);
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .method-option:has(input:checked) {
+            border-color: var(--gold);
+            background: var(--warm);
+        }
+
+        .method-option:hover {
+            border-color: var(--gold-lt);
+        }
+
+        .method-option input[type="radio"] {
+            accent-color: var(--gold);
+            width: 17px;
+            height: 17px;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .method-icon {
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .method-info { flex: 1; }
+
+        .method-label {
+            font-weight: 600;
+            color: var(--ink);
+            font-size: 0.93rem;
+        }
+
+        .method-sub {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        /* Submit button */
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--ink);
+            color: var(--gold-lt);
+            border: none;
+            border-radius: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.25s, transform 0.18s, box-shadow 0.25s;
+        }
+
+        .submit-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(184,146,74,0.12) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .submit-btn:hover {
+            background: #2d2720;
+            box-shadow: 0 8px 28px rgba(28,24,20,0.22);
+            transform: translateY(-1px);
+        }
+
+        .submit-btn:hover::after { opacity: 1; }
+        .submit-btn:active { transform: translateY(0); }
+
+        .submit-btn .btn-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Back link */
+        .back-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 20px;
+            font-size: 0.84rem;
+            font-weight: 500;
+            color: var(--muted);
+            text-decoration: none;
+            letter-spacing: 0.2px;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover { color: var(--gold); }
+
+        .back-link svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
+            transition: transform 0.2s;
+        }
+
+        .back-link:hover svg { transform: translateX(-3px); }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .panel-left { flex: none; padding: 28px 24px 32px; min-height: auto; }
+            .hero-text { display: none; }
+            .panel-left-footer { display: none; }
+            .botanical { display: none; }
+            .brand-mark { margin-bottom: 0; }
+            .panel-right { padding: 28px 16px 40px; align-items: flex-start; }
+            .recovery-card { max-width: 100%; }
+            .card-title { margin-bottom: 24px; }
+            .card-title h2 { font-size: 1.65rem; }
+            .form-card { padding: 24px 20px; }
+        }
+
+        @media (max-width: 480px) {
+            .panel-left { padding: 22px 18px 26px; }
+            .form-card { padding: 20px 16px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .recovery-card { animation: none; }
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- Left brand panel -->
+<div class="panel-left">
+    <svg class="botanical" viewBox="0 0 200 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M100 380 C100 300 60 260 40 200 C20 140 30 80 100 20" stroke="white" stroke-width="2" fill="none"/>
+        <path d="M100 280 C100 280 50 240 30 210" stroke="white" stroke-width="1.5" fill="none"/>
+        <path d="M100 240 C100 240 150 200 170 170" stroke="white" stroke-width="1.5" fill="none"/>
+        <path d="M100 190 C100 190 55 160 45 130" stroke="white" stroke-width="1.5" fill="none"/>
+        <ellipse cx="30" cy="205" rx="22" ry="14" transform="rotate(-30 30 205)" stroke="white" stroke-width="1.2" fill="none"/>
+        <ellipse cx="170" cy="165" rx="22" ry="14" transform="rotate(20 170 165)" stroke="white" stroke-width="1.2" fill="none"/>
+        <ellipse cx="45" cy="125" rx="18" ry="12" transform="rotate(-20 45 125)" stroke="white" stroke-width="1.2" fill="none"/>
+        <circle cx="100" cy="20" r="10" stroke="white" stroke-width="1.5" fill="none"/>
+        <circle cx="30" cy="205" r="4" stroke="white" stroke-width="1" fill="none"/>
+        <circle cx="170" cy="165" r="4" stroke="white" stroke-width="1" fill="none"/>
+    </svg>
+
+    <div class="brand">
+        <div class="brand-mark">
+            <div class="brand-name">
+                Books &amp; Blooms Café
+                <span>Staff Portal</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="hero-text">
+        <h1>Choose<br><em>a Way In</em></h1>
+        <p>We'll send a one-time code to your chosen contact to verify it's really you.</p>
+    </div>
+
+    <div class="panel-left-footer">
+        <div class="divider-line"></div>
+        <p>© 2025 Books &amp; Blooms Café. All rights reserved.</p>
+    </div>
+</div>
+
+<!-- Right panel -->
+<div class="panel-right">
+    <div class="recovery-card">
+
+        <div class="card-title">
+            <h2>Reset your password</h2>
+            <p>We'll send a reset link to your registered email address.</p>
+        </div>
+
+        <div class="form-card">
+
+            <!-- Account banner -->
+            <div class="account-banner">
+                <div class="account-banner-avatar">👤</div>
+                <div>
+                    <div class="account-banner-name">{{ full_name }}</div>
+                    <div class="account-banner-role">{{ role | capitalize }}</div>
+                </div>
+            </div>
+
+            <div class="form-section-label">
+                <span class="label-dot"></span>
+                <span>Reset via email</span>
+            </div>
+
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="flash-box flash-{{ category }}">
+                      <span class="flash-icon">⚠️</span>
+                      <p>{{ message }}</p>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            {% if has_email %}
+            <form method="POST" action="{{ url_for('choose_method') }}">
+                <input type="hidden" name="csrf_token"    value="{{ csrf_token() }}"/>
+                <input type="hidden" name="account_id"    value="{{ account_id }}">
+                <input type="hidden" name="account_table" value="{{ account_table }}">
+                <input type="hidden" name="role"          value="{{ role }}">
+                <input type="hidden" name="full_name"     value="{{ full_name }}">
+                <input type="hidden" name="method"        value="email">
+
+                <div class="method-list">
+                    <div class="method-option" style="cursor:default;">
+                        <span class="method-icon">✉️</span>
+                        <div class="method-info">
+                            <div class="method-label">Reset link via email</div>
+                            <div class="method-sub">{{ masked_email }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <span class="btn-inner">Send Reset Link</span>
+                </button>
+            </form>
+            {% else %}
+            <div class="flash-box flash-danger">
+                <span class="flash-icon">⚠️</span>
+                <p>No email address is registered for this account. Please contact the café administrator.</p>
+            </div>
+            {% endif %}
+
+            <a href="{{ url_for('forgot_password') }}" class="back-link">
+                <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                Return to sign in
+            </a>
+
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

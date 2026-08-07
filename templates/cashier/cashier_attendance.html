@@ -1999,8 +1999,6 @@
                     <div class="period-tabs">
                         <button class="period-tab active" data-period="today">Today</button>
                         <button class="period-tab" data-period="week">This Week</button>
-                        <button class="period-tab" data-period="period1">1st–15th</button>
-                        <button class="period-tab" data-period="period2">16th–End</button>
                         <button class="period-tab" data-period="custom">Custom</button>
                     </div>
                     <div id="customDateRange" style="display:none; gap:0.5rem; align-items:center; display:none;">
@@ -2568,16 +2566,6 @@
                 const mon = new Date(now); mon.setDate(d - dow + (dow === 0 ? -6 : 1));
                 const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
                 return { start: fmt(mon), end: fmt(sun), label: 'This Week' };
-            }
-            if (period === 'period1') {
-                const s = fmt(new Date(y, m, 1));
-                const e = fmt(new Date(y, m, 15));
-                return { start: s, end: e, label: '1st – 15th' };
-            }
-            if (period === 'period2') {
-                const s = fmt(new Date(y, m, 16));
-                const last = new Date(y, m + 1, 0);
-                return { start: s, end: fmt(last), label: '16th – End of Month' };
             }
             return null; // custom
         }
