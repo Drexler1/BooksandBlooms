@@ -1779,6 +1779,18 @@
             display: flex;
         }
 
+        .btn-alert.btn-alert-low {
+            background: #fff3e0;
+            color: #e65100;
+            border-color: #ffcc80;
+        }
+
+        .btn-alert.btn-alert-critical {
+            background: #fce4ec;
+            color: #c62828;
+            border-color: #ef9a9a;
+        }
+
         /* ── Stock Alert Modal ── */
         .alert-modal-w {
             max-width: 560px;
@@ -3291,7 +3303,7 @@
                     <div class="header-btns">
                         <button class="btn btn-outline" id="refreshBtn">↺ Refresh</button>
                         <button class="btn btn-outline" id="dailyReportBtn">📋 Daily Report</button>
-                        <button class="btn btn-outline" id="stockAlertBtn">
+                        <button class="btn btn-alert" id="stockAlertBtn">
                             🔔 Stock Alert
                             <span class="alert-badge" id="alertBadge">0</span>
                         </button>
@@ -5165,18 +5177,11 @@
             badge.textContent = total;
             badge.classList.toggle('visible', total > 0);
             // Make the button pulse red if there are out-of-stock items
+            btn.classList.remove('btn-alert-critical', 'btn-alert-low');
             if (outCount > 0) {
-                btn.style.background = '#fce4ec';
-                btn.style.color = '#c62828';
-                btn.style.borderColor = '#ef9a9a';
+                btn.classList.add('btn-alert-critical');
             } else if (lowCount > 0) {
-                btn.style.background = '#fff3e0';
-                btn.style.color = '#e65100';
-                btn.style.borderColor = '#ffcc80';
-            } else {
-                btn.style.background = '';
-                btn.style.color = '';
-                btn.style.borderColor = '';
+                btn.classList.add('btn-alert-low');
             }
         }
 
