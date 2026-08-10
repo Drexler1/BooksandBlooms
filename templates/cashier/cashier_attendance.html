@@ -1684,6 +1684,8 @@
                 transition: transform 0.3s ease;
                 overflow-y: auto;
                 padding-top: 4rem;
+                flex: none;
+                height: auto;
             }
 
             nav.mobile-open {
@@ -1693,10 +1695,12 @@
             nav ul {
                 flex-direction: column;
                 overflow-x: visible;
+                height: auto;
             }
 
             nav li {
                 flex-shrink: unset;
+                display: block;
                 border-bottom: 1px solid rgba(201,169,97,0.1);
             }
 
@@ -1911,7 +1915,6 @@
     <div class="app-shell">
 
         <!-- HEADER -->
-    <div class="mobile-nav-overlay" id="navOverlay"></div>
         <header>
             <div class="logo">
                 
@@ -1945,10 +1948,13 @@
             <ul>
                 <li><a href="{{ url_for('cashier_dashboard') }}">📠 POS</a></li>
                 <li><a href="{{ url_for('cashier_transactions') }}">📊 My Transactions</a></li>
-                <li><a href="{{ url_for('cashier_attendance') }}">📅 Attendance</a></li>
+                <li><a href="{{ url_for('cashier_attendance') }}" class="active">📅 Attendance</a></li>
                 <li><a href="{{ url_for('cashier_inventory') }}">📦 Supply Monitor</a></li>
             </ul>
         </nav>
+
+        <!-- ── Mobile Nav Overlay ── -->
+        <div class="mobile-nav-overlay" id="navOverlay"></div>
 
         <!-- CONTENT -->
         <div class="page-content">
