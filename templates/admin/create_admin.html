@@ -281,8 +281,37 @@
         .btn-secondary:hover { background: var(--black); }
 
         /* ── RESPONSIVE ── */
+        @media (max-width: 768px) {
+            .card {
+                margin: 1rem auto;
+                border-radius: 8px;
+            }
+            .card-head {
+                padding: 1.5rem 1.5rem 1.25rem;
+            }
+            .card-head h1 {
+                font-size: 1.5rem;
+            }
+            .card-body {
+                padding: 1.5rem;
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                font-size: 1rem;
+            }
+            .submit-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
         @media (max-width: 520px) {
-            .card-body { padding: 1.5rem; }
+            .card-body { padding: 1.25rem; }
+            .card-head { padding: 1.25rem; }
         }
     </style>
 </head>

@@ -797,7 +797,7 @@
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
       border-left: 4px solid var(--gold);
       animation: toastIn 0.3s ease;
-      max-width: 340px;
+      max-width: min(340px, calc(100vw - 2rem));
     }
 
     .toast.success {
@@ -1847,6 +1847,22 @@
       }
     }
 
+
+    /* ── iOS: prevent auto-zoom on input focus (font-size must be ≥ 16px) ── */
+    @media (max-width: 768px) {
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="number"],
+        input[type="search"],
+        input[type="date"],
+        input[type="time"],
+        input[type="tel"],
+        select,
+        textarea {
+            font-size: 1rem !important;
+        }
+    }
     /* ══════════════════════════════════════════
          SMALL MOBILE — max 480px
       ══════════════════════════════════════════ */

@@ -301,7 +301,7 @@
 
         .search-bar {
             position: relative;
-            max-width: 500px;
+            max-width: min(500px, calc(100vw - 2rem));
         }
 
         .search-bar input {
@@ -586,7 +586,7 @@
             background: white;
             border-radius: 12px;
             width: 90%;
-            max-width: 600px;
+            max-width: min(600px, calc(100vw - 2rem));
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -1338,6 +1338,22 @@
             .eotm-month-picker { top: 0.75rem; right: 0.75rem; }
         }
 
+
+        /* ── iOS: prevent auto-zoom on input focus (font-size must be ≥ 16px) ── */
+        @media (max-width: 768px) {
+            input[type="text"],
+            input[type="email"],
+            input[type="password"],
+            input[type="number"],
+            input[type="search"],
+            input[type="date"],
+            input[type="time"],
+            input[type="tel"],
+            select,
+            textarea {
+                font-size: 1rem !important;
+            }
+        }
         /* ══════════════════════════════════════════
            SMALL MOBILE — max 480px
         ══════════════════════════════════════════ */

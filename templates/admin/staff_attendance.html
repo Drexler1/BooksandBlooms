@@ -1123,7 +1123,7 @@
             background: white;
             border-radius: 16px;
             width: 100%;
-            max-width: 560px;
+            max-width: min(560px, calc(100vw - 2rem));
             box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
             transform: translateY(24px) scale(0.98);
             transition: transform 0.3s ease, opacity 0.3s ease;
@@ -1138,7 +1138,7 @@
         }
 
         .modal-wide {
-            max-width: 680px;
+            max-width: min(680px, calc(100vw - 2rem));
         }
 
         /* Modal Header */
@@ -1500,7 +1500,7 @@
         .camera-wrap {
             position: relative;
             width: 100%;
-            max-width: 400px;
+            max-width: min(400px, calc(100vw - 2rem));
         }
 
         .camera-viewport {
@@ -1583,7 +1583,7 @@
             font-size: 0.82rem;
             color: #999;
             text-align: center;
-            max-width: 360px;
+            max-width: min(360px, calc(100vw - 2rem));
             line-height: 1.7;
             background: #f9f9f9;
             border-radius: 8px;
@@ -2248,6 +2248,22 @@
             }
         }
 
+
+        /* ── iOS: prevent auto-zoom on input focus (font-size must be ≥ 16px) ── */
+        @media (max-width: 768px) {
+            input[type="text"],
+            input[type="email"],
+            input[type="password"],
+            input[type="number"],
+            input[type="search"],
+            input[type="date"],
+            input[type="time"],
+            input[type="tel"],
+            select,
+            textarea {
+                font-size: 1rem !important;
+            }
+        }
         /* ══════════════════════════════════════════
            SMALL MOBILE — max 480px
         ══════════════════════════════════════════ */
@@ -2659,7 +2675,7 @@
 
     <!-- ═══ OT REVIEW MODAL ═══ -->
     <div class="modal-overlay" id="otReviewModal">
-        <div class="modal" style="max-width:460px;">
+        <div class="modal" style="max-width:min(460px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2>Review <span>Overtime Request</span></h2>
                 <button class="modal-close" id="closeOTReviewModal">✕</button>
@@ -2690,7 +2706,7 @@
 
     <!-- ═══ DEDUCTION EDIT MODAL ═══ -->
     <div class="modal-overlay" id="deductionEditModal">
-        <div class="modal" style="max-width:400px;">
+        <div class="modal" style="max-width:min(400px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2>Edit <span>Late Deduction</span></h2>
                 <button class="modal-close"
@@ -2726,7 +2742,7 @@
 
     <!-- ═══ LATE DEDUCTION SETTINGS MODAL ═══ -->
     <div class="modal-overlay" id="lateDeductionSettingsModal">
-        <div class="modal" style="max-width:440px;">
+        <div class="modal" style="max-width:min(440px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2>⚙️ Late Deduction <span>Settings</span></h2>
                 <button class="modal-close"
@@ -2929,7 +2945,7 @@
 
     <!-- ═══ SHIFT MANAGER MODAL ═══ -->
     <div class="modal-overlay" id="shiftManagerModal">
-        <div class="modal" style="max-width:560px;">
+        <div class="modal" style="max-width:min(560px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <div>
                     <h2>⚙️ Shift <span>Manager</span></h2>
@@ -4092,7 +4108,7 @@
 
     <!-- ── Manual Clock-Out Override Modal ─────────────────────────────────── -->
     <div class="modal-overlay" id="overrideModal">
-        <div class="modal" style="max-width:480px;">
+        <div class="modal" style="max-width:min(480px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2>Manual <span>Clock-Out</span></h2>
                 <button class="modal-close" id="closeOverrideModal">✕</button>

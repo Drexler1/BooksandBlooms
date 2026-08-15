@@ -750,7 +750,7 @@
             font-weight: 600;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             animation: slideInRight 0.3s ease;
-            max-width: 320px;
+            max-width: min(320px, calc(100vw - 2rem));
         }
 
         .toast.error {
@@ -1437,6 +1437,22 @@
             }
         }
 
+
+        /* ── iOS: prevent auto-zoom on input focus (font-size must be ≥ 16px) ── */
+        @media (max-width: 768px) {
+            input[type="text"],
+            input[type="email"],
+            input[type="password"],
+            input[type="number"],
+            input[type="search"],
+            input[type="date"],
+            input[type="time"],
+            input[type="tel"],
+            select,
+            textarea {
+                font-size: 1rem !important;
+            }
+        }
         /* ══════════════════════════════════════════
            SMALL MOBILE — max 480px
         ══════════════════════════════════════════ */
@@ -2493,7 +2509,7 @@
     <div id="receiptModal"
         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:999;align-items:center;justify-content:center;padding:1rem;">
         <div
-            style="background:white;border-radius:16px;width:100%;max-width:440px;box-shadow:0 24px 80px rgba(0,0,0,0.4);display:flex;flex-direction:column;max-height:92vh;overflow:hidden;">
+            style="background:white;border-radius:16px;width:100%;max-width:min(440px, calc(100vw - 2rem));box-shadow:0 24px 80px rgba(0,0,0,0.4);display:flex;flex-direction:column;max-height:92vh;overflow:hidden;">
             <div
                 style="background:var(--black);padding:1.2rem 1.6rem;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid var(--gold);flex-shrink:0;">
                 <span style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;color:white;">🧾
