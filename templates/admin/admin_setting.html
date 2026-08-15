@@ -1549,6 +1549,20 @@
                     </div>
                     <div class="danger-item">
                         <div class="danger-item-info">
+                            <strong>Clear All Products</strong>
+                            <span>Permanently delete all products and their associated inventory items. Categories and transaction history are kept.</span>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="openDangerModal('clear_products')">Clear Products</button>
+                    </div>
+                    <div class="danger-item">
+                        <div class="danger-item-info">
+                            <strong>Clear All Categories</strong>
+                            <span>Permanently delete all product categories. Products will have their category unlinked. Transaction history is kept.</span>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="openDangerModal('clear_categories')">Clear Categories</button>
+                    </div>
+                    <div class="danger-item">
+                        <div class="danger-item-info">
                             <strong>Clear All Data</strong>
                             <span>Permanently delete all transactions <em>and</em> all products, categories, and inventory items. Download a backup first.</span>
                         </div>
@@ -1723,6 +1737,20 @@
             desc:        'This will permanently delete every sales record, receipt, and transaction item from the database. Products and inventory are kept. There is no undo.',
             confirmWord: 'DELETE',
             endpoint:    '/api/danger/clear_transactions',
+            icon:        '🗑️',
+        },
+        clear_products: {
+            title:       'Clear All Products',
+            desc:        'This will permanently delete every product and its associated inventory items from the database. Categories and transaction history will be preserved. There is no undo.',
+            confirmWord: 'DELETE PRODUCTS',
+            endpoint:    '/api/danger/clear_products',
+            icon:        '🗑️',
+        },
+        clear_categories: {
+            title:       'Clear All Categories',
+            desc:        'This will permanently delete all product categories. Any products referencing a category will have their category field set to NULL. Transaction history is preserved. There is no undo.',
+            confirmWord: 'DELETE CATEGORIES',
+            endpoint:    '/api/danger/clear_categories',
             icon:        '🗑️',
         },
         clear_all_data: {

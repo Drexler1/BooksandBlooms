@@ -4820,6 +4820,104 @@ def api_danger_clear_transactions():
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
+@app.route("/api/danger/clear_products", methods=["POST"])
+@csrf.exempt
+def api_danger_clear_products():
+    """
+    Permanently delete all products and their associated inventory items.
+    Categories and transaction history are preserved.
+
+    Deletion order (respects FK constraints):
+        inv_log      → references inv_items (child, logically)
+        stock_requests → standalone
+        transaction_items → FK → transactions (products FK set NULL on delete)
+        products      → FK → categories (ON DELETE SET NULL)
+        inv_items     → standalone
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        cur = mysql.connection.cursor()
+
+        cur.execute("SELECT COUNT(*) FROM products")
+        prod_count = int((cur.fetchone() or [0])[0])
+
+        cur.execute("SELECT COUNT(*) FROM inv_items")
+        inv_count = int((cur.fetchone() or [0])[0])
+
+        # Delete in FK-safe order
+        cur.execute("DELETE FROM inv_log")
+        cur.execute("DELETE FROM stock_requests")
+        cur.execute("DELETE FROM products")
+        cur.execute("DELETE FROM inv_items")
+
+        mysql.connection.commit()
+        cur.close()
+
+        app.logger.warning(
+            f"[danger] clear_products executed by admin "
+            f"employee_id={session.get('employee_id')} — "
+            f"{prod_count} products, {inv_count} inv_items deleted"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": (
+                    f"All products cleared: {prod_count} product(s) and "
+                    f"{inv_count} inventory item(s) deleted."
+                ),
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[danger] clear_products failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/danger/clear_categories", methods=["POST"])
+@csrf.exempt
+def api_danger_clear_categories():
+    """
+    Permanently delete all product categories.
+    Products referencing a category will have their category_id set to NULL
+    (assuming the FK is defined with ON DELETE SET NULL, which is standard
+    in the Books & Blooms schema). Transaction history is preserved.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        cur = mysql.connection.cursor()
+
+        cur.execute("SELECT COUNT(*) FROM categories")
+        cat_count = int((cur.fetchone() or [0])[0])
+
+        # Unlink products from categories first to avoid FK violations
+        # if the FK is not ON DELETE SET NULL
+        cur.execute("UPDATE products SET category_id = NULL")
+        cur.execute("DELETE FROM categories")
+
+        mysql.connection.commit()
+        cur.close()
+
+        app.logger.warning(
+            f"[danger] clear_categories executed by admin "
+            f"employee_id={session.get('employee_id')} — "
+            f"{cat_count} categories deleted"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": f"All categories cleared: {cat_count} category/categories deleted.",
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[danger] clear_categories failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
 @app.route("/api/danger/clear_all_data", methods=["POST"])
 @csrf.exempt
 def api_danger_clear_all_data():
