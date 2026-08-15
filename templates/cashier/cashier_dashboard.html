@@ -41,15 +41,14 @@
             color: var(--black);
         }
 
-        /* Mobile: allow the page to scroll naturally */
+        /* POS is a fixed-viewport app on all screen sizes — no body scroll */
         @media (max-width: 768px) {
             html, body {
-                overflow: auto;
-                height: auto;
+                overflow: hidden;
+                height: 100%;
             }
             .app-shell {
-                height: auto;
-                min-height: 100svh;
+                height: 100svh;
             }
         }
 
@@ -340,6 +339,8 @@
             flex-wrap: wrap;
             flex-shrink: 0;
         }
+
+
 
         .category-tab {
             padding: 0.42rem 1rem;
@@ -1554,12 +1555,9 @@
                 font-size: 0.8rem;
             }
 
-            .user-details h3 {
-                font-size: 0.8rem;
-            }
-
-            .user-details p {
-                font-size: 0.68rem;
+            /* Hide name/role text on mobile — avatar + logout is enough */
+            .user-details {
+                display: none;
             }
 
             .logout-btn {
@@ -1593,7 +1591,9 @@
 
             /* ── Page layout: full height, flex column ── */
             .page-content {
-                overflow: visible;
+                flex: 1;
+                min-height: 0;
+                overflow: hidden;
                 display: flex;
                 flex-direction: column;
             }
@@ -1602,7 +1602,8 @@
                 display: flex;
                 flex-direction: column;
                 flex: 1;
-                overflow: visible;
+                min-height: 0;
+                overflow: hidden;
             }
 
             /* ── POS tab bar ── */
@@ -1661,23 +1662,38 @@
 
             /* ── POS main grid: single column, each panel fills viewport ── */
             .main-content {
-                display: block;
+                display: flex;
+                flex-direction: column;
                 padding: 0;
                 gap: 0;
                 flex: 1;
+                min-height: 0;
                 overflow: hidden;
             }
+
+            /* Category tabs: single scrolling row — no wrapping into multiple rows */
+            .category-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 2px;
+                scrollbar-width: none;
+                margin-bottom: 0.75rem;
+            }
+            .category-tabs::-webkit-scrollbar { height: 0; }
+            .category-tab { flex-shrink: 0; }
 
             .products-section,
             .cart-section {
                 display: none;
-                flex-direction: column;  /* explicit — needed when display:flex is restored */
+                flex-direction: column;
                 border-radius: 0;
                 border: none;
                 box-shadow: none;
+                max-height: none;        /* override desktop max-height: 100% */
                 padding: 0.85rem;
-                height: calc(100svh - var(--header-h) - 46px);
-                /* 46px = tab bar height */
+                flex: 1;
+                min-height: 0;
                 overflow: hidden;
             }
 
@@ -1699,9 +1715,12 @@
                 overflow-y: auto;        /* scroll if window is very short */
             }
 
-            /* Products panel inner scroll */
+            /* Products panel — 2 equal columns; grid scrolls to fill panel */
             .products-grid {
-                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+                grid-template-columns: repeat(2, 1fr);
+                min-height: 0;
+                overflow-y: auto;
+                flex: 1;
             }
 
             /* Summary rows: slightly smaller text */
@@ -1867,8 +1886,10 @@
 
             .products-section,
             .cart-section {
-                height: calc(100svh - var(--header-h) - 44px);
+                max-height: none;
+                min-height: 0;
                 padding: 0.7rem;
+                flex: 1;
             }
 
             /* Ensure cart summary buttons remain reachable on small screens */
@@ -1878,12 +1899,15 @@
             }
 
             .products-grid {
-                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+                grid-template-columns: repeat(2, 1fr);
                 gap: 0.6rem;
+                flex: 1;
+                min-height: 0;
+                overflow-y: auto;
             }
 
             .product-image {
-                height: 75px;
+                height: 95px;
             }
 
             .product-name {
@@ -1909,6 +1933,32 @@
 
             .modal-body {
                 max-height: 70svh;
+            }
+        }
+
+        /* ══════════════════════════════════════════
+           MOBILE FOOTER / BOTTOM CLEARANCE FIX
+           Scrollable inner panels need padding so
+           content isn't hidden under the viewport edge
+        ══════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            /* The POS view's scrollable product/cart columns */
+            .products-section,
+            .cart-section {
+                padding-bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+            }
+
+            /* Any scrollable .container used in non-POS views */
+            .container {
+                padding-bottom: 2rem;
+            }
+
+            .table-footer {
+                padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+            }
+
+            #toastContainer {
+                bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
             }
         }
     </style>

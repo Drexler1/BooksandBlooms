@@ -1923,6 +1923,34 @@
                 font-size: 1.5rem;
             }
         }
+
+        /* ══════════════════════════════════════════
+           MOBILE FOOTER / BOTTOM CLEARANCE FIX
+           Ensures scrollable content isn't blocked
+           by the viewport edge or any fixed element
+        ══════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            /* Give the container breathing room at the
+               bottom so the last card / table row is
+               fully reachable after scrolling */
+            .container {
+                padding-bottom: 2rem;
+            }
+
+            /* Table-footer (pagination bar) already sits
+               inside the scrollable .page-content, so
+               just ensure it won't clip against the edge */
+            .table-footer {
+                margin-bottom: 0;
+                padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+            }
+
+            /* Toast moves to the bottom on mobile —
+               nudge it above the safe-area notch */
+            #toastContainer {
+                bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+            }
+        }
     </style>
 </head>
 

@@ -2246,6 +2246,12 @@
                 min-width: unset;
                 width: 100%;
             }
+
+            /* Pad bottom of scroll area so content isn't hidden under the
+               fixed toast bar (≈ toast height ~56px + 1rem gap) */
+            .container {
+                padding-bottom: 5rem;
+            }
         }
 
 
