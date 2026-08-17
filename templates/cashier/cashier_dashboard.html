@@ -1938,25 +1938,25 @@
 
         /* ══════════════════════════════════════════
            MOBILE FOOTER / BOTTOM CLEARANCE FIX
-           Scrollable inner panels need padding so
-           content isn't hidden under the viewport edge
+           Padding must go on the *scrollable child*,
+           not the overflow:hidden outer container.
         ══════════════════════════════════════════ */
         @media (max-width: 768px) {
-            /* The POS view's scrollable product/cart columns */
-            .products-section,
-            .cart-section {
-                padding-bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+            /* products-grid is the element that actually scrolls inside
+               products-section. Last row of cards needs clearance so the
+               toast and the home indicator don't cover them. */
+            .products-grid {
+                padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
             }
 
-            /* Any scrollable .container used in non-POS views */
-            .container {
-                padding-bottom: 2rem;
+            /* cart-summary sits at the very bottom of the cart panel.
+               Checkout / Clear buttons need to clear the home indicator. */
+            .cart-section .cart-summary {
+                padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
             }
 
-            .table-footer {
-                padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-            }
-
+            /* Toast sits at the bottom and overlaps the last product row.
+               Lift it above the safe-area inset. */
             #toastContainer {
                 bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
             }

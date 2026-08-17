@@ -1930,25 +1930,30 @@
            by the viewport edge or any fixed element
         ══════════════════════════════════════════ */
         @media (max-width: 768px) {
-            /* Give the container breathing room at the
-               bottom so the last card / table row is
-               fully reachable after scrolling */
+            /* Extra bottom padding so the last card/table row
+               clears the browser chrome and safe-area notch */
             .container {
-                padding-bottom: 2rem;
+                padding-bottom: calc(5rem + env(safe-area-inset-bottom, 20px));
             }
 
-            /* Table-footer (pagination bar) already sits
-               inside the scrollable .page-content, so
-               just ensure it won't clip against the edge */
+            /* Table-footer (pagination bar) sits inside
+               the scrollable .page-content — give it room
+               above the viewport edge and safe-area notch */
             .table-footer {
                 margin-bottom: 0;
-                padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+                padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 20px));
             }
 
             /* Toast moves to the bottom on mobile —
                nudge it above the safe-area notch */
             #toastContainer {
-                bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+                bottom: calc(1rem + env(safe-area-inset-bottom, 20px));
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding-bottom: calc(6rem + env(safe-area-inset-bottom, 20px));
             }
         }
     </style>

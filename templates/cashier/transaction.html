@@ -950,15 +950,27 @@
 
         /* ══════════════════════════════════════════
            MOBILE FOOTER / BOTTOM CLEARANCE FIX
+           .page-content scrolls; .container is its
+           child. Padding on .container creates the
+           scroll breathing room. The toast pinned to
+           the bottom needs safe-area clearance too.
         ══════════════════════════════════════════ */
         @media (max-width: 768px) {
+            /* Enough bottom padding so the last table row
+               and the pagination bar fully scroll clear of
+               the toast notification and the home indicator */
             .container {
-                padding-bottom: 2rem;
+                padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
             }
+
+            /* Pagination bar is the last element scrolled to —
+               give it safe-area inset so it clears the home bar */
             .table-footer {
-                margin-bottom: 0;
                 padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
             }
+
+            /* Toast sits fixed at the bottom and overlaps content —
+               lift it above the home indicator */
             #toastContainer {
                 bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
             }
