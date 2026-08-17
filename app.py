@@ -2803,11 +2803,19 @@ def add_employee():
         avg_emb = np.mean(embeddings, axis=0).tolist()
         persist_embedding(str(employee_id), avg_emb)
 
+        # Fetch the created_at timestamp so the frontend can build BB-YYMM-NNN
+        cur2 = mysql.connection.cursor(DictCursor)
+        cur2.execute("SELECT created_at FROM employees WHERE employee_id=%s", (employee_id,))
+        created_row = cur2.fetchone()
+        cur2.close()
+        created_at_str = created_row["created_at"].strftime("%y%m") if created_row and created_row.get("created_at") else datetime.now().strftime("%y%m")
+
         return jsonify(
             {
                 "success": True,
                 "message": "Employee registered with Face ID ✅",
                 "employee_id": employee_id,
+                "created_yymm": created_at_str,
             }
         )
 
@@ -5379,7 +5387,7 @@ def api_my_attendance():
             + " AND a.attendance_date BETWEEN %s AND %s ORDER BY a.attendance_date DESC, a.clock_in DESC",
             (employee_id, range_start, range_end),
         )
-        rows = cur.fetchall()
+        rows = [_serialize_row(r) for r in cur.fetchall()]
         cur.close()
         total_hours = round(
             sum(float(r["hours_worked"]) for r in rows if r.get("hours_worked")), 2
@@ -5408,7 +5416,7 @@ def api_my_attendance():
             BASE_SQL + " AND a.attendance_date = %s ORDER BY a.clock_in DESC",
             (employee_id, dt),
         )
-        rows = cur.fetchall()
+        rows = [_serialize_row(r) for r in cur.fetchall()]
         cur.close()
         total_hours = round(
             sum(float(r["hours_worked"]) for r in rows if r.get("hours_worked")), 2
@@ -12209,7 +12217,28 @@ def cashier_inventory():
     """Render the cashier Supply Monitor page."""
     if not _is_cashier():
         return redirect(url_for("login"))
-    return render_template("cashier/cashier_inventory.html")
+    employee = None
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT employee_id, full_name, username, role "
+            "FROM employees WHERE employee_id = %s LIMIT 1",
+            (session["employee_id"],),
+        )
+        row = cur.fetchone()
+        cur.close()
+        if row:
+            full_name = aes_decrypt(row["full_name"]) if row.get("full_name") else ""
+            username = aes_decrypt(row["username"]) if row.get("username") else ""
+            employee = {
+                "employee_id": row["employee_id"],
+                "full_name": full_name or username,
+                "username": username,
+                "role": row["role"],
+            }
+    except Exception as exc:
+        app.logger.error(f"[cashier_inventory] employee lookup: {exc}")
+    return render_template("cashier/cashier_inventory.html", employee=employee)
 
 
 @app.route("/api/cashier/me", methods=["GET"])

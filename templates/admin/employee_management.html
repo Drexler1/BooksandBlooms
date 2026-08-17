@@ -426,14 +426,17 @@
             color: #666;
         }
 
-        /* ✅ Face thumbnail */
-        .face-thumb {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid var(--gold);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        /* Face ID display */
+        .face-id-badge {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+        }
+        .face-id-badge.unregistered {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: #aaa;
         }
 
         .action-buttons {
@@ -1523,10 +1526,9 @@
 
                             <td>
                                 {% if emp.face_image_path %}
-                                <img class="face-thumb" src="{{ url_for('static', filename=emp.face_image_path) }}"
-                                    alt="Face">
+                                <span class="face-id-badge">BB-{{ emp.created_at.strftime('%y%m') }}-{{ '%03d' | format(emp.employee_id) }}</span>
                                 {% else %}
-                                ❌ Not Set
+                                <span class="face-id-badge unregistered">No Face ID</span>
                                 {% endif %}
                             </td>
 
@@ -1646,7 +1648,7 @@
                         <div class="face-capture-section">
                             <h3 style="margin-bottom:0.4rem;">🔐 Face ID Registration</h3>
                             <p style="color:#888;font-size:0.83rem;margin-bottom:1rem;">
-                                Follow the on-screen instructions to register biometric data.
+                                Scan the employee's face to generate their unique Face ID number for clock-in recognition.
                             </p>
 
                             <!-- Progress bar -->
@@ -1910,7 +1912,7 @@
                     if (capturedCount >= TARGET_FRAMES) {
                         clearCaptureLoop();
                         capturingActive = false;
-                        document.getElementById('faceInstruction').textContent = '✅ Face ID ready – fill the form and save';
+                        document.getElementById('faceInstruction').textContent = '✅ Face scan complete – an ID number will be generated on save';
                         document.getElementById('retakeBtn').style.display = 'inline-block';
                     }
                 } else {
@@ -2089,7 +2091,8 @@
                         }
 
                         updateUI('✅ Saved!');
-                        alert('✅ Employee registered with Face ID biometrics!');
+                        const _yymm = data1.created_yymm || (String(new Date().getFullYear()).slice(2) + String(new Date().getMonth() + 1).padStart(2, '0'));
+                        alert('✅ Employee registered! Face ID number assigned: BB-' + _yymm + '-' + String(newEmpId).padStart(3, '0'));
                         location.reload();
                         resolve();
                     }, 'image/jpeg', 0.92);

@@ -136,20 +136,6 @@
             border: 1px solid rgba(201, 169, 97, 0.3);
         }
 
-        .user-avatar {
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            background: var(--gold);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--black);
-            font-weight: 700;
-            font-size: 0.9rem;
-            flex-shrink: 0;
-        }
-
         .user-details h3 {
             font-size: 0.88rem;
             font-weight: 600;
@@ -1612,10 +1598,19 @@
            MOBILE — max 768px
         ══════════════════════════════════════════ */
         @media (max-width: 768px) {
+            html, body {
+                overflow: hidden;
+                height: 100%;
+            }
+
+            .app-shell {
+                height: 100svh;
+            }
+
             /* Header */
             header {
-                padding: 0.85rem 1rem;
-                gap: 0.75rem;
+                padding: 0 1rem;
+                gap: 0.6rem;
             }
 
             .logo-icon {
@@ -1642,14 +1637,13 @@
             }
 
             .user-info {
-                padding: 0.5rem 0.75rem;
-                gap: 0.5rem;
+                padding: 0.45rem 0.65rem;
+                gap: 0.45rem;
             }
 
-            .user-avatar {
-                width: 36px;
-                height: 36px;
-                font-size: 0.85rem;
+            /* Show name/role text on mobile since avatar is removed */
+            .user-details {
+                display: block;
             }
 
             .user-details h3 {
@@ -1903,10 +1897,6 @@
                 display: none;
             }
 
-            .user-details {
-                display: none;
-            }
-
             .summary-cards {
                 grid-template-columns: 1fr 1fr;
             }
@@ -1981,7 +1971,6 @@
                     <div class="time" id="currentTime"></div>
                 </div>
                 <div class="user-info">
-                    <div class="user-avatar">{{ (employee.full_name or 'C')[0] }}</div>
                     <div class="user-details">
                         <h3>{{ employee.full_name if employee else 'Cashier' }}</h3>
                         <p>{{ employee.role|capitalize if employee else 'Cashier' }}</p>
@@ -2405,9 +2394,15 @@
             setInterval(updateClock, 1000);
 
             /* ── Locked employee identity ── */
-            const LOCKED_EMP_ID = document.getElementById('lockedEmployeeId')?.value || '';
-            const LOCKED_EMP_NAME = document.getElementById('lockedEmpName')?.value || 'Cashier';
-        const LOCKED_INITIALS = LOCKED_EMP_NAME.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            // These must be on window so verifyIdentity() and saveAttendance(),
+            // which live outside the DOMContentLoaded closure, can access them.
+            window.LOCKED_EMP_ID = document.getElementById('lockedEmployeeId')?.value || '';
+            window.LOCKED_EMP_NAME = document.getElementById('lockedEmpName')?.value || 'Cashier';
+            window.LOCKED_INITIALS = window.LOCKED_EMP_NAME.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            // Keep local aliases for use inside this closure
+            const LOCKED_EMP_ID = window.LOCKED_EMP_ID;
+            const LOCKED_EMP_NAME = window.LOCKED_EMP_NAME;
+            const LOCKED_INITIALS = window.LOCKED_INITIALS;
 
         // Populate identity banner
         const bannerInitEl = document.getElementById('bannerInitial');
