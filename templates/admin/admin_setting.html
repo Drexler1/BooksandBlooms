@@ -37,6 +37,7 @@
             background: var(--black);
             border-bottom: 3px solid var(--gold);
             padding: 1.25rem 2rem;
+            min-height: 90px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -71,11 +72,11 @@
             font-weight: 400; margin-top: 2px;
         }
 
-        .header-actions { display: flex; align-items: center; gap: 1.5rem; }
+        .header-actions { display: flex; align-items: center; gap: 2rem; }
 
         .date-time { text-align: right; }
-        .date-time .date { color: var(--gold); font-size: 0.85rem; font-weight: 600; }
-        .date-time .time { color: #999; font-size: 0.8rem; margin-top: 1px; }
+        .date-time .date { color: var(--gold); font-size: 0.9rem; font-weight: 600; }
+        .date-time .time { color: #999; font-size: 0.85rem; margin-top: 2px; }
 
         .user-info {
             display: flex; align-items: center; gap: 0.85rem;
@@ -85,8 +86,8 @@
             border: 1px solid rgba(201, 169, 97, 0.3);
         }
 
-        .user-details h3 { font-size: 0.88rem; font-weight: 600; color: var(--white); margin-bottom: 1px; }
-        .user-details p  { font-size: 0.75rem; color: var(--gold); }
+        .user-details h3 { font-size: 0.95rem; font-weight: 600; color: var(--white); margin-bottom: 2px; }
+        .user-details p  { font-size: 0.8rem; color: var(--gold); }
 
         .logout-btn {
             background: var(--danger); color: white;
@@ -662,6 +663,33 @@
             to   { opacity: 1; transform: translateY(0); }
         }
 
+        /* ── Nav drawer overlay ── */
+        .nav-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 98;
+        }
+
+        /* ── Close X inside drawer (hidden by default, shown on mobile) ── */
+        .nav-close-btn {
+            display: none;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            color: var(--gold);
+            font-size: 1.1rem;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
         /* ══════════════════════════════════════════
            HAMBURGER MENU BUTTON (mobile only)
         ══════════════════════════════════════════ */
@@ -701,14 +729,6 @@
 
         .hamburger-btn.open span:nth-child(3) {
             transform: translateY(-7px) rotate(-45deg);
-        }
-
-        .mobile-nav-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 98;
         }
 
         /* ══════════════════════════════════════════
@@ -828,22 +848,7 @@
                 background: rgba(201,169,97,0.12);
             }
 
-            .nav-close-btn {
-                display: flex !important;
-                position: absolute;
-                top: 1rem;
-                right: 1rem;
-                width: 36px;
-                height: 36px;
-                background: rgba(255,255,255,0.08);
-                border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 8px;
-                color: var(--gold);
-                font-size: 1.1rem;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-            }
+            .nav-close-btn { display: flex !important; }
 
             /* Layout */
             .layout {
@@ -1012,6 +1017,8 @@
     </style>
 </head>
 <body>
+
+<div class="nav-overlay" id="navOverlay"></div>
 
 <!-- ══ HEADER ══ -->
 <header>
@@ -2796,15 +2803,27 @@ document.addEventListener('keydown', function(e) {
 });
 </script>
 
-<div class="mobile-nav-overlay" id="navOverlay"></div>
-
 <script>
-    /* ── Mobile Nav ── */
-    (function() {
-        const hamburger = document.getElementById('hamburgerBtn');
-        const nav       = document.getElementById('mainNav');
-        const overlay   = document.getElementById('navOverlay');
-        const closeBtn  = document.getElementById('navCloseBtn');
+    // ── Sync nav top to actual header height ─────────────────────────
+    (function () {
+        var hdr = document.querySelector('header');
+        var nav = document.getElementById('mainNav');
+        if (!hdr || !nav) return;
+        function syncNavTop() {
+            nav.style.top = hdr.getBoundingClientRect().height + 'px';
+        }
+        syncNavTop();
+        window.addEventListener('resize', syncNavTop);
+        document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
+    })();
+
+    // ── Mobile nav drawer ────────────────────────────────────────────
+    (function () {
+        var hamburger = document.getElementById('hamburgerBtn');
+        var nav       = document.getElementById('mainNav');
+        var overlay   = document.getElementById('navOverlay');
+        var closeBtn  = document.getElementById('navCloseBtn');
+        if (!hamburger || !nav) return;
 
         function openNav() {
             nav.classList.add('mobile-open');
@@ -2812,7 +2831,6 @@ document.addEventListener('keydown', function(e) {
             hamburger.classList.add('open');
             document.body.style.overflow = 'hidden';
         }
-
         function closeNav() {
             nav.classList.remove('mobile-open');
             overlay.style.display = 'none';
@@ -2820,14 +2838,20 @@ document.addEventListener('keydown', function(e) {
             document.body.style.overflow = '';
         }
 
-        hamburger.addEventListener('click', () => nav.classList.contains('mobile-open') ? closeNav() : openNav());
+        hamburger.addEventListener('click', function () {
+            nav.classList.contains('mobile-open') ? closeNav() : openNav();
+        });
         if (closeBtn) closeBtn.addEventListener('click', closeNav);
         overlay.addEventListener('click', closeNav);
 
-        // Close nav on link click (mobile)
-        nav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-            if (window.innerWidth <= 768) closeNav();
-        }));
+        nav.querySelectorAll('a').forEach(function (a) {
+            a.addEventListener('click', function () {
+                if (window.innerWidth <= 768) closeNav();
+            });
+        });
+        window.addEventListener('resize', function () {
+            if (window.innerWidth > 768) closeNav();
+        });
     })();
 </script>
 </body>

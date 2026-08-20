@@ -49,6 +49,7 @@
             background: var(--black);
             border-bottom: 3px solid var(--gold);
             padding: 1.25rem 2rem;
+            min-height: 90px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -1999,7 +2000,7 @@
         }
 
         /* Nav overlay */
-        .mobile-nav-overlay {
+        .nav-overlay {
             display: none;
             position: fixed;
             inset: 0;
@@ -2472,10 +2473,6 @@
             }
 
             .logo-subtitle {
-                display: none;
-            }
-
-            .user-details {
                 display: none;
             }
 
@@ -3262,6 +3259,7 @@
 </head>
 
 <body>
+    <div class="nav-overlay" id="navOverlay"></div>
     <div class="app-shell">
 
         <!-- ── OFFLINE STATUS BAR ── -->
@@ -5328,9 +5326,20 @@
             await loadDeductionLog();
         }, 15000);
     </script>
-    <div class="mobile-nav-overlay" id="navOverlay"></div>
-
     <script>
+        /* ── Sync nav top to actual header height ── */
+        (function () {
+            var hdr = document.querySelector('header');
+            var nav = document.getElementById('mainNav');
+            if (!hdr || !nav) return;
+            function syncNavTop() {
+                nav.style.top = hdr.getBoundingClientRect().height + 'px';
+            }
+            syncNavTop();
+            window.addEventListener('resize', syncNavTop);
+            document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
+        })();
+
         /* ── Mobile nav drawer ── */
         (function () {
             var hamburger = document.getElementById('hamburgerBtn');

@@ -32,33 +32,25 @@
             --info: #2196f3;
         }
 
-        html,
         body {
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
             font-family: 'DM Sans', sans-serif;
             background: #f0f0f0;
             color: var(--black);
-        }
-
-        .app-shell {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            width: 100vw;
+            overflow-x: hidden;
         }
 
         /* Header */
         header {
-            flex-shrink: 0;
             background: var(--black);
             border-bottom: 3px solid var(--gold);
             padding: 1.25rem 2rem;
+            min-height: 90px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            position: sticky;
+            top: 0;
             z-index: 100;
         }
 
@@ -106,7 +98,7 @@
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 1.5rem;
+            gap: 2rem;
         }
 
         .date-time {
@@ -115,14 +107,14 @@
 
         .date-time .date {
             color: var(--gold);
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             font-weight: 600;
         }
 
         .date-time .time {
             color: #999;
-            font-size: 0.8rem;
-            margin-top: 1px;
+            font-size: 0.85rem;
+            margin-top: 2px;
         }
 
         .user-info {
@@ -136,14 +128,14 @@
         }
 
         .user-details h3 {
-            font-size: 0.88rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--white);
-            margin-bottom: 1px;
+            margin-bottom: 2px;
         }
 
         .user-details p {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: var(--gold);
         }
 
@@ -169,12 +161,12 @@
 
         /* Nav */
         nav {
-            flex-shrink: 0;
             background: var(--dark-gray);
             border-bottom: 1px solid rgba(201, 169, 97, 0.2);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 87px;
             z-index: 99;
-            overflow: hidden;
         }
 
         nav ul {
@@ -226,22 +218,9 @@
         }
 
         /* Content */
-        .page-content {
-            flex: 1 1 0;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-
-        .page-content::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .page-content::-webkit-scrollbar-thumb {
-            background: var(--gold);
-            border-radius: 3px;
-        }
-
         .container {
+            max-width: 1600px;
+            margin: 0 auto;
             padding: 1.5rem 2rem;
         }
 
@@ -1149,7 +1128,7 @@
             transform: translateY(-7px) rotate(-45deg);
         }
 
-        .mobile-nav-overlay {
+        .nav-overlay {
             display: none;
             position: fixed;
             inset: 0;
@@ -1265,7 +1244,6 @@
                 transition: transform 0.3s ease;
                 overflow-y: auto;
                 padding-top: 4rem;
-                flex-shrink: unset;
             }
 
             nav.mobile-open {
@@ -1759,10 +1737,10 @@
 </head>
 
 <body>
-    <div class="app-shell">
+    <div class="nav-overlay" id="navOverlay"></div>
 
-        <!-- HEADER -->
-        <header>
+    <!-- HEADER -->
+    <header>
             <div class="logo">
                 <div class="logo-text">
                     <h1>Books <span>&</span> Blooms</h1>
@@ -1787,9 +1765,8 @@
             </div>
         </header>
 
-        <!-- NAV -->
-        <nav id="mainNav">
-            <button class="nav-close-btn" id="navCloseBtn" style="display:none;">✕</button>
+    <nav id="mainNav">
+        <button class="nav-close-btn" id="navCloseBtn" style="display:none;">✕</button>
             <ul>
                 <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
                 <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
@@ -1804,9 +1781,7 @@
             </ul>
         </nav>
 
-        <!-- CONTENT -->
-        <div class="page-content">
-            <div class="container">
+    <div class="container">
 
                 <!-- Page Header -->
                 <div class="page-header">
@@ -2035,7 +2010,6 @@
 
     <!-- TOAST -->
     <div id="toastContainer"></div>
-    <div class="mobile-nav-overlay" id="navOverlay"></div>
 
     <!-- PRODUCT MODAL (Add / Edit) -->
     <div class="modal-overlay" id="productModal">
@@ -2208,6 +2182,19 @@
     </div>
 
     <script>
+        /* ── Sync nav top to actual header height ── */
+        (function () {
+            var hdr = document.querySelector('header');
+            var nav = document.getElementById('mainNav');
+            if (!hdr || !nav) return;
+            function syncNavTop() {
+                nav.style.top = hdr.getBoundingClientRect().height + 'px';
+            }
+            syncNavTop();
+            window.addEventListener('resize', syncNavTop);
+            document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
+        })();
+
         /* ── Mobile Nav ── */
         (function() {
             const hamburger = document.getElementById('hamburgerBtn');

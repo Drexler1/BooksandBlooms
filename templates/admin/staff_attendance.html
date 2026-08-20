@@ -32,45 +32,25 @@
             --info: #2196f3;
         }
 
-        /* ── Full-viewport shell ── */
-        html,
         body {
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
             font-family: 'DM Sans', sans-serif;
             background: #f0f0f0;
             color: var(--black);
-        }
-
-        /* ── On mobile, release body scroll so content is reachable ── */
-        @media (max-width: 768px) {
-
-            html,
-            body {
-                overflow: auto;
-                height: auto;
-            }
-        }
-
-        /* ── App layout: header + nav fixed at top, content fills rest ── */
-        .app-shell {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            width: 100vw;
+            overflow-x: hidden;
         }
 
         /* ── Header — matches dashboard.html exactly ── */
         header {
-            flex-shrink: 0;
             background: var(--black);
             border-bottom: 3px solid var(--gold);
             padding: 1.25rem 2rem;
+            min-height: 90px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            position: sticky;
+            top: 0;
             z-index: 100;
         }
 
@@ -118,7 +98,7 @@
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 1.5rem;
+            gap: 2rem;
         }
 
         .date-time {
@@ -148,14 +128,14 @@
         }
 
         .user-details h3 {
-            font-size: 0.88rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--white);
-            margin-bottom: 1px;
+            margin-bottom: 2px;
         }
 
         .user-details p {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: var(--gold);
         }
 
@@ -181,12 +161,12 @@
 
         /* ── Nav — matches dashboard.html exactly ── */
         nav {
-            flex-shrink: 0;
             background: var(--dark-gray);
             border-bottom: 1px solid rgba(201, 169, 97, 0.2);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 87px;
             z-index: 99;
-            overflow: hidden;
         }
 
         nav ul {
@@ -235,35 +215,6 @@
             color: var(--gold);
             background: rgba(201, 169, 97, 0.15);
             border-bottom-color: var(--gold);
-        }
-
-        /* ── Scrollable content area ── */
-        .page-content {
-            flex: 1 1 0;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        @media (max-width: 768px) {
-            .page-content {
-                flex: unset;
-                overflow: visible;
-            }
-        }
-
-        .page-content::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .page-content::-webkit-scrollbar-track {
-            background: #e8e8e8;
-        }
-
-        .page-content::-webkit-scrollbar-thumb {
-            background: var(--gold);
-            border-radius: 3px;
         }
 
         /* ── Inner container: full width with padding ── */
@@ -1802,10 +1753,8 @@
             }
         }
 
-        /* ══════════════════════════════════════════
-           HAMBURGER MENU BUTTON (mobile only)
-        ══════════════════════════════════════════ */
-        .hamburger-btn {
+        /* ── Hamburger toggle ── */
+        .nav-toggle {
             display: none;
             flex-direction: column;
             justify-content: center;
@@ -1814,14 +1763,13 @@
             width: 40px;
             height: 40px;
             background: var(--dark-gray);
-            border: 1px solid rgba(201, 169, 97, 0.3);
+            border: 1px solid rgba(201,169,97,0.3);
             border-radius: 8px;
             cursor: pointer;
             padding: 0;
             flex-shrink: 0;
         }
-
-        .hamburger-btn span {
+        .nav-toggle span {
             display: block;
             width: 20px;
             height: 2px;
@@ -1829,26 +1777,36 @@
             border-radius: 2px;
             transition: all 0.3s ease;
         }
+        .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        .nav-toggle.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+        .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-        .hamburger-btn.open span:nth-child(1) {
-            transform: translateY(7px) rotate(45deg);
-        }
-
-        .hamburger-btn.open span:nth-child(2) {
-            opacity: 0;
-            transform: scaleX(0);
-        }
-
-        .hamburger-btn.open span:nth-child(3) {
-            transform: translateY(-7px) rotate(-45deg);
-        }
-
-        .mobile-nav-overlay {
+        /* ── Nav drawer overlay ── */
+        .nav-overlay {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0,0,0,0.5);
             z-index: 98;
+        }
+        .nav-overlay.open { display: block; }
+
+        /* ── Close X inside drawer ── */
+        .nav-close {
+            display: none;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            color: var(--gold);
+            font-size: 1.1rem;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
         }
 
         /* ══════════════════════════════════════════
@@ -1981,8 +1939,8 @@
 
             /* Header */
             header {
-                padding: 0.85rem 1rem;
-                gap: 0.75rem;
+                padding: 0 1rem;
+                gap: 0.6rem;
             }
 
             .logo-icon {
@@ -2030,12 +1988,11 @@
                 font-size: 0.78rem;
             }
 
-            /* Hamburger */
-            .hamburger-btn {
-                display: flex;
-            }
+            /* Show hamburger */
+            .nav-toggle { display: flex; }
+            .nav-close  { display: flex; }
 
-            /* Nav — slide-in drawer */
+            /* Full-screen slide-in nav drawer */
             nav {
                 position: fixed;
                 top: 0;
@@ -2049,52 +2006,15 @@
                 transition: transform 0.3s ease;
                 overflow-y: auto;
                 padding-top: 4rem;
-                flex-shrink: unset;
             }
+            nav.open { transform: translateX(0); }
+            nav ul { flex-direction: column; overflow-x: visible; }
+            nav li { flex-shrink: unset; border-bottom: 1px solid rgba(201,169,97,0.1); }
+            nav a { padding: 1.1rem 1.75rem; font-size: 1rem; border-bottom: none; border-left: 4px solid transparent; }
+            nav a.active { border-left-color: var(--gold); border-bottom-color: transparent; background: rgba(201,169,97,0.12); }
 
-            nav.mobile-open {
-                transform: translateX(0);
-            }
-
-            nav ul {
-                flex-direction: column;
-                overflow-x: visible;
-            }
-
-            nav li {
-                flex-shrink: unset;
-                border-bottom: 1px solid rgba(201, 169, 97, 0.1);
-            }
-
-            nav a {
-                padding: 1.1rem 1.75rem;
-                font-size: 1rem;
-                border-bottom: none;
-                border-left: 4px solid transparent;
-            }
-
-            nav a.active {
-                border-left-color: var(--gold);
-                border-bottom-color: transparent;
-                background: rgba(201, 169, 97, 0.12);
-            }
-
-            .nav-close-btn {
-                display: flex !important;
-                position: absolute;
-                top: 1rem;
-                right: 1rem;
-                width: 36px;
-                height: 36px;
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 8px;
-                color: var(--gold);
-                font-size: 1.1rem;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-            }
+            /* Header */
+            header { padding: 0 1rem; gap: 0.6rem; }
 
             /* Container & spacing */
             .container {
@@ -2267,10 +2187,6 @@
                 display: none;
             }
 
-            .user-details {
-                display: none;
-            }
-
             .summary-cards {
                 grid-template-columns: 1fr 1fr;
             }
@@ -2413,7 +2329,7 @@
 
 <body>
 
-    <div class="app-shell">
+        <div class="nav-overlay" id="navOverlay"></div>
 
         <!-- HEADER -->
         <header>
@@ -2423,7 +2339,7 @@
                     <div class="logo-subtitle">CAFÉ</div>
                 </div>
             </div>
-            <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation">
+            <button class="nav-toggle" id="navToggle" aria-label="Open navigation" aria-expanded="false">
                 <span></span><span></span><span></span>
             </button>
             <div class="header-actions">
@@ -2437,18 +2353,13 @@
                         <p>{{ session.get('role')|capitalize }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('logout') }}" style="display:inline;margin:0;"><input
-                        type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit"
-                        class="logout-btn">➜] Logout</button></form>
+                <form method="POST" action="{{ url_for('logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜] Logout</button></form>
             </div>
         </header>
 
-        <!-- Mobile nav overlay -->
-        <div class="mobile-nav-overlay" id="navOverlay"></div>
-
         <!-- NAV -->
         <nav id="mainNav">
-            <button class="nav-close-btn" id="navCloseBtn" style="display:none;">✕</button>
+            <button class="nav-close" id="navClose" aria-label="Close menu">✕</button>
             <ul>
                 <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
                 <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
@@ -2661,7 +2572,6 @@
             </div><!-- /container -->
         </div><!-- /page-content -->
 
-    </div><!-- /app-shell -->
 
     <!-- ═══ OT REVIEW MODAL ═══ -->
     <div class="modal-overlay" id="otReviewModal">
@@ -4063,35 +3973,56 @@
             }, 500);
         }
 
+        /* ── Sync nav top to actual header height ── */
+        (function () {
+            var hdr = document.querySelector('header');
+            var nav = document.getElementById('mainNav');
+            if (!hdr || !nav) return;
+            function syncNavTop() {
+                nav.style.top = hdr.getBoundingClientRect().height + 'px';
+            }
+            syncNavTop();
+            window.addEventListener('resize', syncNavTop);
+            document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
+        })();
+
         /* ── Mobile Nav ── */
         (function () {
-            const hamburger = document.getElementById('hamburgerBtn');
-            const nav = document.getElementById('mainNav');
-            const overlay = document.getElementById('navOverlay');
-            const closeBtn = document.getElementById('navCloseBtn');
+            var toggle  = document.getElementById('navToggle');
+            var nav     = document.getElementById('mainNav');
+            var overlay = document.getElementById('navOverlay');
+            var close   = document.getElementById('navClose');
+            if (!toggle || !nav) return;
 
             function openNav() {
-                nav.classList.add('mobile-open');
-                overlay.style.display = 'block';
-                hamburger.classList.add('open');
+                nav.classList.add('open');
+                overlay && overlay.classList.add('open');
+                toggle.classList.add('open');
+                toggle.setAttribute('aria-expanded', 'true');
                 document.body.style.overflow = 'hidden';
             }
-
             function closeNav() {
-                nav.classList.remove('mobile-open');
-                overlay.style.display = 'none';
-                hamburger.classList.remove('open');
+                nav.classList.remove('open');
+                overlay && overlay.classList.remove('open');
+                toggle.classList.remove('open');
+                toggle.setAttribute('aria-expanded', 'false');
                 document.body.style.overflow = '';
             }
 
-            hamburger.addEventListener('click', () => nav.classList.contains('mobile-open') ? closeNav() : openNav());
-            if (closeBtn) closeBtn.addEventListener('click', closeNav);
-            overlay.addEventListener('click', closeNav);
+            toggle.addEventListener('click', function () {
+                nav.classList.contains('open') ? closeNav() : openNav();
+            });
+            overlay && overlay.addEventListener('click', closeNav);
+            close   && close.addEventListener('click', closeNav);
 
-            // Close nav on link click (mobile)
-            nav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-                if (window.innerWidth <= 768) closeNav();
-            }));
+            nav.querySelectorAll('a').forEach(function (a) {
+                a.addEventListener('click', function () {
+                    if (window.innerWidth <= 768) closeNav();
+                });
+            });
+            window.addEventListener('resize', function () {
+                if (window.innerWidth > 768) closeNav();
+            });
         })();
 
     </script>

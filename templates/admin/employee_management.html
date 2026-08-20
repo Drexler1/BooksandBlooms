@@ -42,6 +42,7 @@
             background: var(--black);
             border-bottom: 3px solid var(--gold);
             padding: 1.25rem 2rem;
+            min-height: 90px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -125,14 +126,14 @@
         }
 
         .user-details h3 {
-            font-size: 0.88rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--white);
-            margin-bottom: 1px;
+            margin-bottom: 2px;
         }
 
         .user-details p {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: var(--gold);
         }
 
@@ -811,7 +812,7 @@
             transform: translateY(-7px) rotate(-45deg);
         }
 
-        .mobile-nav-overlay {
+        .nav-overlay {
             display: none;
             position: fixed;
             inset: 0;
@@ -821,6 +822,19 @@
 
         .nav-close-btn {
             display: none;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            color: var(--gold);
+            font-size: 1.1rem;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
         }
 
         /* ══════════════════════════════════════════
@@ -846,8 +860,8 @@
         @media (max-width: 768px) {
             /* Header */
             header {
-                padding: 0.85rem 1rem;
-                gap: 0.75rem;
+                padding: 0 1rem;
+                gap: 0.6rem;
             }
 
             .logo-icon {
@@ -866,7 +880,7 @@
             }
 
             .header-actions {
-                gap: 0.65rem;
+                gap: 0.5rem;
             }
 
             .date-time {
@@ -943,22 +957,7 @@
                 background: rgba(201,169,97,0.12);
             }
 
-            .nav-close-btn {
-                display: flex !important;
-                position: absolute;
-                top: 1rem;
-                right: 1rem;
-                width: 36px;
-                height: 36px;
-                background: rgba(255,255,255,0.08);
-                border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 8px;
-                color: var(--gold);
-                font-size: 1.1rem;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-            }
+            .nav-close-btn { display: flex !important; }
 
             /* Container & spacing */
             .container {
@@ -989,11 +988,13 @@
             /* Chart card */
             .chart-card {
                 padding: 0;
+                overflow: hidden;
             }
 
             .chart-header {
                 padding: 0.85rem 1rem;
                 margin-bottom: 0;
+                gap: 0.65rem;
             }
 
             .chart-title {
@@ -1310,7 +1311,8 @@
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 1.25rem;
-                padding: 2.5rem 1.25rem 1.25rem;
+                /* extra top padding clears the absolutely-positioned month picker */
+                padding: 3.5rem 1.25rem 1.25rem;
             }
             .eotm-inner::before { display: none; }
             .eotm-stats {
@@ -1322,8 +1324,23 @@
                 min-width: 0;
             }
             .eotm-stat-value { font-size: 1.3rem; }
+            .eotm-stat-label { font-size: 0.62rem; }
             .eotm-name { font-size: 1.5rem; white-space: normal; }
-            .eotm-month-picker { top: 0.75rem; right: 0.75rem; }
+            .eotm-month-picker {
+                top: 0.75rem;
+                right: 0.75rem;
+                /* stack selects vertically on very narrow screens */
+                flex-wrap: wrap;
+                gap: 0.35rem;
+            }
+            .eotm-month-picker select {
+                font-size: 0.72rem;
+                padding: 0.25rem 0.45rem;
+            }
+            /* crown needs room above the avatar on mobile */
+            .eotm-crown-wrap {
+                margin-top: 1rem;
+            }
         }
 
 
@@ -1375,7 +1392,7 @@
                 <div class="logo-subtitle">CAFÉ</div>
             </div>
         </div>
-        <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileNav()" aria-label="Open navigation">
+        <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation">
             <span></span>
             <span></span>
             <span></span>
@@ -1395,10 +1412,10 @@
         </div>
     </header>
 
-    <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileNav()"></div>
+    <div class="nav-overlay" id="navOverlay"></div>
 
     <nav id="mainNav">
-        <button class="nav-close-btn" id="navCloseBtn" onclick="closeMobileNav()" aria-label="Close navigation">✕</button>
+        <button class="nav-close-btn" id="navCloseBtn" aria-label="Close navigation">✕</button>
         <ul>
             <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
             <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
@@ -2360,32 +2377,62 @@
         loadEotm();
 
         // ══════════════════════════════════════════════════════════════════════════
-        //  MOBILE NAV
+        //  SYNC NAV TOP TO ACTUAL HEADER HEIGHT (prevents sticky nav shift)
         // ══════════════════════════════════════════════════════════════════════════
-        function toggleMobileNav() {
-            const nav = document.getElementById('mainNav');
-            const btn = document.getElementById('hamburgerBtn');
-            const overlay = document.getElementById('mobileNavOverlay');
-            const isOpen = nav.classList.toggle('mobile-open');
-            btn.classList.toggle('open', isOpen);
-            overlay.style.display = isOpen ? 'block' : 'none';
-            document.body.style.overflow = isOpen ? 'hidden' : '';
-        }
+        (function () {
+            var hdr = document.querySelector('header');
+            var nav = document.getElementById('mainNav');
+            if (!hdr || !nav) return;
+            function syncNavTop() {
+                nav.style.top = hdr.getBoundingClientRect().height + 'px';
+            }
+            syncNavTop();
+            window.addEventListener('resize', syncNavTop);
+            document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
+        })();
 
-        function closeMobileNav() {
-            const nav = document.getElementById('mainNav');
-            const btn = document.getElementById('hamburgerBtn');
-            const overlay = document.getElementById('mobileNavOverlay');
-            nav.classList.remove('mobile-open');
-            btn.classList.remove('open');
-            overlay.style.display = 'none';
-            document.body.style.overflow = '';
-        }
+        // ══════════════════════════════════════════════════════════════════════════
+        //  MOBILE NAV — hamburger drawer
+        // ══════════════════════════════════════════════════════════════════════════
+        (function () {
+            var hamburger = document.getElementById('hamburgerBtn');
+            var nav       = document.getElementById('mainNav');
+            var overlay   = document.getElementById('navOverlay');
+            var closeBtn  = document.getElementById('navCloseBtn');
+            if (!hamburger || !nav) return;
 
-        // Close nav on Escape key
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') closeMobileNav();
-        });
+            function openNav() {
+                nav.classList.add('mobile-open');
+                overlay.style.display = 'block';
+                hamburger.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeNav() {
+                nav.classList.remove('mobile-open');
+                overlay.style.display = 'none';
+                hamburger.classList.remove('open');
+                document.body.style.overflow = '';
+            }
+
+            hamburger.addEventListener('click', function () {
+                nav.classList.contains('mobile-open') ? closeNav() : openNav();
+            });
+            if (closeBtn) closeBtn.addEventListener('click', closeNav);
+            overlay.addEventListener('click', closeNav);
+
+            nav.querySelectorAll('a').forEach(function (a) {
+                a.addEventListener('click', function () {
+                    if (window.innerWidth <= 768) closeNav();
+                });
+            });
+            window.addEventListener('resize', function () {
+                if (window.innerWidth > 768) closeNav();
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') closeNav();
+            });
+        })();
 
         // ── UI HELPERS
         function updateUI(message) {

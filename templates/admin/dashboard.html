@@ -39,6 +39,7 @@
                 background: var(--black);
                 border-bottom: 3px solid var(--gold);
                 padding: 1.25rem 2rem;
+                min-height: 90px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
@@ -608,7 +609,7 @@
                ═══════════════════════════════════════════════════ */
 
             /* ── Hamburger toggle ── */
-            .nav-toggle {
+            .hamburger-btn {
                 display: none;
                 flex-direction: column;
                 justify-content: center;
@@ -623,7 +624,7 @@
                 padding: 0;
                 flex-shrink: 0;
             }
-            .nav-toggle span {
+            .hamburger-btn span {
                 display: block;
                 width: 20px;
                 height: 2px;
@@ -631,9 +632,9 @@
                 border-radius: 2px;
                 transition: all 0.3s ease;
             }
-            .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-            .nav-toggle.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-            .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+            .hamburger-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+            .hamburger-btn.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+            .hamburger-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
             /* ── Nav drawer overlay ── */
             .nav-overlay {
@@ -643,10 +644,9 @@
                 background: rgba(0,0,0,0.5);
                 z-index: 98;
             }
-            .nav-overlay.open { display: block; }
 
             /* ── Close X inside drawer ── */
-            .nav-close {
+            .nav-close-btn {
                 display: none;
                 position: absolute;
                 top: 1rem;
@@ -690,8 +690,8 @@
             /* ── Mobile (≤ 768px) ── */
             @media (max-width: 768px) {
                 /* Show hamburger */
-                .nav-toggle { display: flex; }
-                .nav-close  { display: flex; }
+                .hamburger-btn { display: flex; }
+                .nav-close-btn { display: flex !important; }
 
                 /* Full-screen slide-in nav drawer */
                 nav {
@@ -708,7 +708,7 @@
                     overflow-y: auto;
                     padding-top: 4rem;
                 }
-                nav.open { transform: translateX(0); }
+                nav.mobile-open { transform: translateX(0); }
                 nav ul {
                     flex-direction: column;
                     overflow-x: visible;
@@ -842,7 +842,6 @@
             @media (max-width: 480px) {
                 .logo-text h1 { font-size: 1.1rem; }
                 .logo-subtitle { display: none; }
-                .user-details { display: none; }
 
                 .summary-cards { grid-template-columns: 1fr 1fr; }
                 .card { padding: 1rem; }
@@ -885,10 +884,10 @@
                     <div class="logo-subtitle">CAFÉ</div>
                 </div>
             </div>
-            <button class="nav-toggle" id="navToggle" aria-label="Open navigation" aria-expanded="false">
+            <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation">
                 <span></span><span></span><span></span>
             </button>
-                        <div class="header-actions">
+            <div class="header-actions">
                 <div class="date-time">
                     <div class="date" id="currentDate"></div>
                     <div class="time" id="currentTime"></div>
@@ -904,7 +903,7 @@
         </header>
 
         <nav id="mainNav">
-            <button class="nav-close" id="navClose" aria-label="Close menu">✕</button>
+            <button class="nav-close-btn" id="navCloseBtn" style="display:none;">✕</button>
             <ul>
                 <li><a href="{{ url_for('dashboard') }}" class="active">Dashboard</a></li>
                 <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
@@ -1280,34 +1279,45 @@
         </script>
 
         <script>
+            // ── Sync nav top to actual header height ─────────────────────────
+            (function () {
+                var hdr = document.querySelector('header');
+                var nav = document.getElementById('mainNav');
+                if (!hdr || !nav) return;
+                function syncNavTop() {
+                    nav.style.top = hdr.getBoundingClientRect().height + 'px';
+                }
+                syncNavTop();
+                window.addEventListener('resize', syncNavTop);
+                document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
+            })();
+
             // ── Mobile nav drawer ────────────────────────────────────────────
             (function () {
-                var toggle  = document.getElementById('navToggle');
-                var nav     = document.getElementById('mainNav');
-                var overlay = document.getElementById('navOverlay');
-                var close   = document.getElementById('navClose');
-                if (!toggle || !nav) return;
+                var hamburger = document.getElementById('hamburgerBtn');
+                var nav       = document.getElementById('mainNav');
+                var overlay   = document.getElementById('navOverlay');
+                var closeBtn  = document.getElementById('navCloseBtn');
+                if (!hamburger || !nav) return;
 
                 function openNav() {
-                    nav.classList.add('open');
-                    overlay && overlay.classList.add('open');
-                    toggle.classList.add('open');
-                    toggle.setAttribute('aria-expanded', 'true');
+                    nav.classList.add('mobile-open');
+                    overlay.style.display = 'block';
+                    hamburger.classList.add('open');
                     document.body.style.overflow = 'hidden';
                 }
                 function closeNav() {
-                    nav.classList.remove('open');
-                    overlay && overlay.classList.remove('open');
-                    toggle.classList.remove('open');
-                    toggle.setAttribute('aria-expanded', 'false');
+                    nav.classList.remove('mobile-open');
+                    overlay.style.display = 'none';
+                    hamburger.classList.remove('open');
                     document.body.style.overflow = '';
                 }
 
-                toggle.addEventListener('click', function () {
-                    nav.classList.contains('open') ? closeNav() : openNav();
+                hamburger.addEventListener('click', function () {
+                    nav.classList.contains('mobile-open') ? closeNav() : openNav();
                 });
-                overlay && overlay.addEventListener('click', closeNav);
-                close   && close.addEventListener('click', closeNav);
+                if (closeBtn) closeBtn.addEventListener('click', closeNav);
+                overlay.addEventListener('click', closeNav);
 
                 nav.querySelectorAll('a').forEach(function (a) {
                     a.addEventListener('click', function () {

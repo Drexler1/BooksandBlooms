@@ -44,10 +44,11 @@
             background: var(--black);
             border-bottom: 3px solid var(--gold);
             padding: 1.25rem 2rem;
+            min-height: 90px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -147,7 +148,7 @@
             font-weight: 600;
             cursor: pointer;
             font-size: 0.85rem;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             text-decoration: none;
             display: inline-block;
         }
@@ -155,13 +156,14 @@
         .logout-btn:hover {
             background: #c82333;
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
         }
 
         /* ── Nav ── */
         nav {
             background: var(--dark-gray);
             border-bottom: 1px solid rgba(201, 169, 97, 0.2);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             position: sticky;
             top: 87px;
             z-index: 99;
@@ -170,6 +172,7 @@
         nav ul {
             list-style: none;
             display: flex;
+            gap: 0;
             margin: 0;
             padding: 0;
             overflow-x: auto;
@@ -177,6 +180,10 @@
 
         nav ul::-webkit-scrollbar {
             height: 3px;
+        }
+
+        nav ul::-webkit-scrollbar-track {
+            background: var(--black);
         }
 
         nav ul::-webkit-scrollbar-thumb {
@@ -194,7 +201,7 @@
             color: #aaa;
             font-weight: 600;
             font-size: 0.9rem;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
             border-bottom: 3px solid transparent;
             white-space: nowrap;
         }
@@ -945,6 +952,7 @@
         /* ══════════════════════════════════════════
            HAMBURGER MENU BUTTON (mobile only)
         ══════════════════════════════════════════ */
+        /* ── Hamburger toggle ── */
         .hamburger-btn {
             display: none;
             flex-direction: column;
@@ -960,7 +968,6 @@
             padding: 0;
             flex-shrink: 0;
         }
-
         .hamburger-btn span {
             display: block;
             width: 20px;
@@ -969,26 +976,35 @@
             border-radius: 2px;
             transition: all 0.3s ease;
         }
+        .hamburger-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        .hamburger-btn.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+        .hamburger-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-        .hamburger-btn.open span:nth-child(1) {
-            transform: translateY(7px) rotate(45deg);
-        }
-
-        .hamburger-btn.open span:nth-child(2) {
-            opacity: 0;
-            transform: scaleX(0);
-        }
-
-        .hamburger-btn.open span:nth-child(3) {
-            transform: translateY(-7px) rotate(-45deg);
-        }
-
-        .mobile-nav-overlay {
+        /* ── Nav drawer overlay ── */
+        .nav-overlay {
             display: none;
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.5);
             z-index: 98;
+        }
+
+        /* ── Close X inside drawer ── */
+        .nav-close-btn {
+            display: none;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            color: var(--gold);
+            font-size: 1.1rem;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
         }
 
         /* ══════════════════════════════════════════
@@ -1029,65 +1045,13 @@
         /* ══════════════════════════════════════════
            MOBILE — max 768px
         ══════════════════════════════════════════ */
+        /* ── Mobile (≤ 768px) ── */
         @media (max-width: 768px) {
-            /* Header */
-            header {
-                padding: 0.85rem 1rem;
-                gap: 0.75rem;
-            }
+            /* Show hamburger */
+            .hamburger-btn { display: flex; }
+            .nav-close-btn { display: flex !important; }
 
-            .logo-icon {
-                width: 42px;
-                height: 42px;
-                font-size: 22px;
-            }
-
-            .logo-text h1 {
-                font-size: 1.3rem;
-            }
-
-            .logo-subtitle {
-                font-size: 0.6rem;
-                letter-spacing: 3px;
-            }
-
-            .header-actions {
-                gap: 0.5rem;
-            }
-
-            .date-time {
-                display: none;
-            }
-
-            .user-info {
-                padding: 0.45rem 0.65rem;
-                gap: 0.45rem;
-            }
-
-            /* Show name/role text on mobile since avatar is removed */
-            .user-details {
-                display: block;
-            }
-
-            .user-details h3 {
-                font-size: 0.82rem;
-            }
-
-            .user-details p {
-                font-size: 0.72rem;
-            }
-
-            .logout-btn {
-                padding: 0.38rem 0.65rem;
-                font-size: 0.76rem;
-            }
-
-            /* Hamburger */
-            .hamburger-btn {
-                display: flex;
-            }
-
-            /* Nav — slide-down drawer */
+            /* Full-screen slide-in nav drawer */
             nav {
                 position: fixed;
                 top: 0;
@@ -1102,50 +1066,40 @@
                 overflow-y: auto;
                 padding-top: 4rem;
             }
-
-            nav.mobile-open {
-                transform: translateX(0);
-            }
-
+            nav.mobile-open { transform: translateX(0); }
             nav ul {
                 flex-direction: column;
                 overflow-x: visible;
             }
-
             nav li {
                 flex-shrink: unset;
                 border-bottom: 1px solid rgba(201,169,97,0.1);
             }
-
             nav a {
                 padding: 1.1rem 1.75rem;
                 font-size: 1rem;
                 border-bottom: none;
                 border-left: 4px solid transparent;
             }
-
             nav a.active {
                 border-left-color: var(--gold);
                 border-bottom-color: transparent;
                 background: rgba(201,169,97,0.12);
             }
 
-            .nav-close-btn {
-                display: flex !important;
-                position: absolute;
-                top: 1rem;
-                right: 1rem;
-                width: 36px;
-                height: 36px;
-                background: rgba(255,255,255,0.08);
-                border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 8px;
-                color: var(--gold);
-                font-size: 1.1rem;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-            }
+            /* Header */
+            header { padding: 0 1rem; gap: 0.6rem; }
+            .logo-icon { width: 42px; height: 42px; font-size: 22px; }
+            .logo-text h1 { font-size: 1.3rem; }
+            .logo-subtitle { font-size: 0.6rem; letter-spacing: 3px; }
+            .date-time { display: none; }
+            /* Show name/role text on mobile since avatar is removed */
+            .user-details { display: block; }
+            .user-details h3 { font-size: 0.82rem; }
+            .user-details p { font-size: 0.72rem; }
+            .user-info { padding: 0.45rem 0.65rem; gap: 0.45rem; }
+            .logout-btn { padding: 0.38rem 0.65rem; font-size: 0.76rem; }
+            .header-actions { gap: 0.5rem; }
 
             /* Container & spacing */
             .container {
@@ -1448,10 +1402,6 @@
             }
 
             .logo-subtitle {
-                display: none;
-            }
-
-            .user-details {
                 display: none;
             }
 
@@ -2154,7 +2104,7 @@
             </div>
             <div class="user-info">
                 <div class="user-details">
-                    <h3>{{ full_name or 'Admin' }}</h3>
+                    <h3>{{ full_name or 'Admin User' }}</h3>
                     <p>{{ session.get('role')|capitalize }}</p>
                 </div>
             </div>
@@ -2486,7 +2436,7 @@
     </div><!-- /container -->
 
     <div id="toastContainer"></div>
-    <div class="mobile-nav-overlay" id="navOverlay"></div>
+    <div class="nav-overlay" id="navOverlay"></div>
 
     <!-- ════════════════════════════════════════════
      RECEIPT DETAIL MODAL
@@ -2517,12 +2467,26 @@
     <div id="receiptPrintArea" style="display:none;"></div>
 
     <script>
-        /* ── Mobile Nav ── */
-        (function() {
-            const hamburger = document.getElementById('hamburgerBtn');
-            const nav = document.getElementById('mainNav');
-            const overlay = document.getElementById('navOverlay');
-            const closeBtn = document.getElementById('navCloseBtn');
+        // ── Sync nav top to actual header height ─────────────────────────
+        (function () {
+            var hdr = document.querySelector('header');
+            var nav = document.getElementById('mainNav');
+            if (!hdr || !nav) return;
+            function syncNavTop() {
+                nav.style.top = hdr.getBoundingClientRect().height + 'px';
+            }
+            syncNavTop();
+            window.addEventListener('resize', syncNavTop);
+            document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
+        })();
+
+        // ── Mobile nav drawer ────────────────────────────────────────────
+        (function () {
+            var hamburger = document.getElementById('hamburgerBtn');
+            var nav       = document.getElementById('mainNav');
+            var overlay   = document.getElementById('navOverlay');
+            var closeBtn  = document.getElementById('navCloseBtn');
+            if (!hamburger || !nav) return;
 
             function openNav() {
                 nav.classList.add('mobile-open');
@@ -2530,7 +2494,6 @@
                 hamburger.classList.add('open');
                 document.body.style.overflow = 'hidden';
             }
-
             function closeNav() {
                 nav.classList.remove('mobile-open');
                 overlay.style.display = 'none';
@@ -2538,14 +2501,20 @@
                 document.body.style.overflow = '';
             }
 
-            hamburger.addEventListener('click', () => nav.classList.contains('mobile-open') ? closeNav() : openNav());
+            hamburger.addEventListener('click', function () {
+                nav.classList.contains('mobile-open') ? closeNav() : openNav();
+            });
             if (closeBtn) closeBtn.addEventListener('click', closeNav);
             overlay.addEventListener('click', closeNav);
 
-            // Close nav on link click (mobile)
-            nav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-                if (window.innerWidth <= 768) closeNav();
-            }));
+            nav.querySelectorAll('a').forEach(function (a) {
+                a.addEventListener('click', function () {
+                    if (window.innerWidth <= 768) closeNav();
+                });
+            });
+            window.addEventListener('resize', function () {
+                if (window.innerWidth > 768) closeNav();
+            });
         })();
 
         /* ── Clock ── */
