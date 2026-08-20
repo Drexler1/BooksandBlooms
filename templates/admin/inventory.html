@@ -1981,24 +1981,6 @@
             transform: translateY(-7px) rotate(-45deg);
         }
 
-        /* Nav close button (inside drawer) */
-        .nav-close-btn {
-            display: none;
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            width: 36px;
-            height: 36px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 8px;
-            color: var(--gold);
-            font-size: 1.1rem;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-
         /* Nav overlay */
         .nav-overlay {
             display: none;
@@ -2114,7 +2096,7 @@
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
                 overflow-y: auto;
-                padding-top: 4rem;
+                padding-top: 1rem;
             }
 
             nav.mobile-open {
@@ -2145,10 +2127,6 @@
                 border-left-color: var(--gold);
                 border-bottom-color: transparent;
                 background: rgba(201, 169, 97, 0.12);
-            }
-
-            .nav-close-btn {
-                display: flex;
             }
 
             /* Container */
@@ -3303,7 +3281,6 @@
 
         <!-- NAV -->
         <nav id="mainNav">
-            <button class="nav-close-btn" id="navCloseBtn" aria-label="Close menu">✕</button>
             <ul>
                 <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
                 <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
@@ -5345,7 +5322,6 @@
             var hamburger = document.getElementById('hamburgerBtn');
             var nav = document.getElementById('mainNav');
             var overlay = document.getElementById('navOverlay');
-            var closeBtn = document.getElementById('navCloseBtn');
             if (!hamburger || !nav) return;
 
             function openNav() {
@@ -5368,7 +5344,6 @@
                 nav.classList.contains('mobile-open') ? closeNav() : openNav();
             });
             overlay && overlay.addEventListener('click', closeNav);
-            closeBtn && closeBtn.addEventListener('click', closeNav);
 
             nav.querySelectorAll('a').forEach(function (a) {
                 a.addEventListener('click', function () {

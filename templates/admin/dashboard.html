@@ -645,24 +645,6 @@
                 z-index: 98;
             }
 
-            /* ── Close X inside drawer ── */
-            .nav-close-btn {
-                display: none;
-                position: absolute;
-                top: 1rem;
-                right: 1rem;
-                width: 36px;
-                height: 36px;
-                background: rgba(255,255,255,0.08);
-                border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 8px;
-                color: var(--gold);
-                font-size: 1.1rem;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-            }
-
             /* ── Tablet (≤ 1024px) ── */
             @media (max-width: 1024px) {
                 .container { padding: 1.5rem; }
@@ -691,7 +673,6 @@
             @media (max-width: 768px) {
                 /* Show hamburger */
                 .hamburger-btn { display: flex; }
-                .nav-close-btn { display: flex !important; }
 
                 /* Full-screen slide-in nav drawer */
                 nav {
@@ -706,7 +687,7 @@
                     transform: translateX(-100%);
                     transition: transform 0.3s ease;
                     overflow-y: auto;
-                    padding-top: 4rem;
+                    padding-top: 1rem;
                 }
                 nav.mobile-open { transform: translateX(0); }
                 nav ul {
@@ -903,7 +884,6 @@
         </header>
 
         <nav id="mainNav">
-            <button class="nav-close-btn" id="navCloseBtn" style="display:none;">✕</button>
             <ul>
                 <li><a href="{{ url_for('dashboard') }}" class="active">Dashboard</a></li>
                 <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
@@ -1297,7 +1277,6 @@
                 var hamburger = document.getElementById('hamburgerBtn');
                 var nav       = document.getElementById('mainNav');
                 var overlay   = document.getElementById('navOverlay');
-                var closeBtn  = document.getElementById('navCloseBtn');
                 if (!hamburger || !nav) return;
 
                 function openNav() {
@@ -1316,7 +1295,6 @@
                 hamburger.addEventListener('click', function () {
                     nav.classList.contains('mobile-open') ? closeNav() : openNav();
                 });
-                if (closeBtn) closeBtn.addEventListener('click', closeNav);
                 overlay.addEventListener('click', closeNav);
 
                 nav.querySelectorAll('a').forEach(function (a) {

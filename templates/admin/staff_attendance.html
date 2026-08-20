@@ -1754,7 +1754,7 @@
         }
 
         /* ── Hamburger toggle ── */
-        .nav-toggle {
+        .hamburger-btn {
             display: none;
             flex-direction: column;
             justify-content: center;
@@ -1769,7 +1769,7 @@
             padding: 0;
             flex-shrink: 0;
         }
-        .nav-toggle span {
+        .hamburger-btn span {
             display: block;
             width: 20px;
             height: 2px;
@@ -1777,9 +1777,9 @@
             border-radius: 2px;
             transition: all 0.3s ease;
         }
-        .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-        .nav-toggle.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-        .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+        .hamburger-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        .hamburger-btn.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+        .hamburger-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
         /* ── Nav drawer overlay ── */
         .nav-overlay {
@@ -1788,25 +1788,6 @@
             inset: 0;
             background: rgba(0,0,0,0.5);
             z-index: 98;
-        }
-        .nav-overlay.open { display: block; }
-
-        /* ── Close X inside drawer ── */
-        .nav-close {
-            display: none;
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            width: 36px;
-            height: 36px;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 8px;
-            color: var(--gold);
-            font-size: 1.1rem;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
         }
 
         /* ══════════════════════════════════════════
@@ -1989,8 +1970,7 @@
             }
 
             /* Show hamburger */
-            .nav-toggle { display: flex; }
-            .nav-close  { display: flex; }
+            .hamburger-btn { display: flex; }
 
             /* Full-screen slide-in nav drawer */
             nav {
@@ -2007,7 +1987,7 @@
                 overflow-y: auto;
                 padding-top: 4rem;
             }
-            nav.open { transform: translateX(0); }
+            nav.mobile-open { transform: translateX(0); }
             nav ul { flex-direction: column; overflow-x: visible; }
             nav li { flex-shrink: unset; border-bottom: 1px solid rgba(201,169,97,0.1); }
             nav a { padding: 1.1rem 1.75rem; font-size: 1rem; border-bottom: none; border-left: 4px solid transparent; }
@@ -2339,7 +2319,7 @@
                     <div class="logo-subtitle">CAFÉ</div>
                 </div>
             </div>
-            <button class="nav-toggle" id="navToggle" aria-label="Open navigation" aria-expanded="false">
+            <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation">
                 <span></span><span></span><span></span>
             </button>
             <div class="header-actions">
@@ -2359,11 +2339,10 @@
 
         <!-- NAV -->
         <nav id="mainNav">
-            <button class="nav-close" id="navClose" aria-label="Close menu">✕</button>
             <ul>
                 <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
                 <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
-                <li><a href="{{ url_for('inventory')}}">Inventory</a></li>
+                <li><a href="{{ url_for('inventory') }}">Inventory</a></li>
                 <li><a href="{{ url_for('staff_attendance') }}" class="active">Staff Attendance</a></li>
                 <li><a href="{{ url_for('product_management') }}">Product Management</a></li>
                 {% if session.get('role') == 'admin' %}
@@ -3986,34 +3965,30 @@
             document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
         })();
 
-        /* ── Mobile Nav ── */
+        /* ── Mobile nav drawer ── */
         (function () {
-            var toggle  = document.getElementById('navToggle');
-            var nav     = document.getElementById('mainNav');
-            var overlay = document.getElementById('navOverlay');
-            var close   = document.getElementById('navClose');
-            if (!toggle || !nav) return;
+            var hamburger = document.getElementById('hamburgerBtn');
+            var nav       = document.getElementById('mainNav');
+            var overlay   = document.getElementById('navOverlay');
+            if (!hamburger || !nav) return;
 
             function openNav() {
-                nav.classList.add('open');
-                overlay && overlay.classList.add('open');
-                toggle.classList.add('open');
-                toggle.setAttribute('aria-expanded', 'true');
+                nav.classList.add('mobile-open');
+                overlay.style.display = 'block';
+                hamburger.classList.add('open');
                 document.body.style.overflow = 'hidden';
             }
             function closeNav() {
-                nav.classList.remove('open');
-                overlay && overlay.classList.remove('open');
-                toggle.classList.remove('open');
-                toggle.setAttribute('aria-expanded', 'false');
+                nav.classList.remove('mobile-open');
+                overlay.style.display = 'none';
+                hamburger.classList.remove('open');
                 document.body.style.overflow = '';
             }
 
-            toggle.addEventListener('click', function () {
-                nav.classList.contains('open') ? closeNav() : openNav();
+            hamburger.addEventListener('click', function () {
+                nav.classList.contains('mobile-open') ? closeNav() : openNav();
             });
-            overlay && overlay.addEventListener('click', closeNav);
-            close   && close.addEventListener('click', closeNav);
+            overlay.addEventListener('click', closeNav);
 
             nav.querySelectorAll('a').forEach(function (a) {
                 a.addEventListener('click', function () {
