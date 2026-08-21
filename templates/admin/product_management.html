@@ -352,6 +352,11 @@
             animation: fadeIn 0.4s ease-out backwards;
         }
 
+        .stat-card > div:not(.stat-icon) {
+            min-width: 0;
+            flex: 1;
+        }
+
         .stat-card::after {
             content: '';
             position: absolute;
@@ -1136,10 +1141,6 @@
             z-index: 98;
         }
 
-        .nav-close-btn {
-            display: none;
-        }
-
         /* ══════════════════════════════════════════
            TABLET — max 1024px
         ══════════════════════════════════════════ */
@@ -1243,51 +1244,27 @@
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
                 overflow-y: auto;
-                padding-top: 4rem;
+                padding-top: 1rem;
             }
-
-            nav.mobile-open {
-                transform: translateX(0);
-            }
-
+            nav.mobile-open { transform: translateX(0); }
             nav ul {
                 flex-direction: column;
                 overflow-x: visible;
             }
-
             nav li {
                 flex-shrink: unset;
-                border-bottom: 1px solid rgba(201, 169, 97, 0.1);
+                border-bottom: 1px solid rgba(201,169,97,0.1);
             }
-
             nav a {
                 padding: 1.1rem 1.75rem;
                 font-size: 1rem;
                 border-bottom: none;
                 border-left: 4px solid transparent;
             }
-
             nav a.active {
                 border-left-color: var(--gold);
                 border-bottom-color: transparent;
-                background: rgba(201, 169, 97, 0.12);
-            }
-
-            .nav-close-btn {
-                display: flex !important;
-                position: absolute;
-                top: 1rem;
-                right: 1rem;
-                width: 36px;
-                height: 36px;
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 8px;
-                color: var(--gold);
-                font-size: 1.1rem;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
+                background: rgba(201,169,97,0.12);
             }
 
             /* Container & spacing */
@@ -1331,25 +1308,37 @@
             }
 
             .stat-card {
-                padding: 0.9rem 1rem;
+                padding: 0.9rem 0.85rem 0.9rem 1rem;
+                gap: 0.65rem;
+                align-items: flex-start;
             }
 
             .stat-icon {
                 width: 40px;
                 height: 40px;
                 font-size: 1.2rem;
+                flex-shrink: 0;
+                margin-top: 2px;
             }
 
             .stat-value {
-                font-size: 1.5rem;
+                font-size: 1.4rem;
+                line-height: 1.1;
+                word-break: break-all;
             }
 
             .stat-label {
-                font-size: 0.68rem;
+                font-size: 0.65rem;
+                line-height: 1.3;
+                white-space: normal;
+                word-break: break-word;
             }
 
             .stat-sub {
-                font-size: 0.7rem;
+                font-size: 0.67rem;
+                line-height: 1.3;
+                white-space: normal;
+                word-break: break-word;
             }
 
             /* Tabs — full width */
@@ -1560,6 +1549,11 @@
             animation: fadeIn 0.4s ease-out backwards;
         }
 
+        .fin-summary-card > div:not(.fin-summary-icon) {
+            min-width: 0;
+            flex: 1;
+        }
+
         .fin-summary-card::after {
             content: '';
             position: absolute;
@@ -1681,12 +1675,169 @@
             .fin-table-desktop { display: none !important; }
             .fin-cards-mobile  { display: flex !important; flex-direction: column; gap: 0; }
             .fin-summary-row   { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+
+            .fin-summary-card {
+                padding: 0.85rem 0.85rem 0.85rem 1rem;
+                gap: 0.65rem;
+                align-items: flex-start;
+            }
+
+            .fin-summary-icon {
+                width: 38px;
+                height: 38px;
+                font-size: 1.1rem;
+                flex-shrink: 0;
+                margin-top: 2px;
+            }
+
+            /* Tighten stat values inside fin cards on mobile */
+            .fin-summary-card .stat-value {
+                font-size: 1.25rem;
+                line-height: 1.1;
+                word-break: break-all;
+            }
+
+            .fin-summary-card .stat-label {
+                font-size: 0.62rem;
+                line-height: 1.3;
+                white-space: normal;
+                word-break: break-word;
+            }
+
+            .fin-summary-card .stat-sub {
+                font-size: 0.63rem;
+                color: #aaa;
+                line-height: 1.3;
+                white-space: normal;
+                word-break: break-word;
+            }
         }
 
         @media (max-width: 480px) {
-            .fin-summary-row { grid-template-columns: 1fr 1fr; }
+            .fin-summary-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 0.6rem;
+            }
+
+            .fin-summary-card {
+                padding: 0.75rem 0.75rem 0.75rem 0.9rem;
+                gap: 0.5rem;
+            }
+
+            .fin-summary-card .stat-value {
+                font-size: 1.1rem;
+            }
+
+            .fin-summary-card .stat-label {
+                font-size: 0.58rem;
+            }
+
+            .fin-summary-card .stat-sub {
+                font-size: 0.6rem;
+            }
         }
 
+
+        /* ── Pagination ── */
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.85rem 1.25rem;
+            border-top: 1px solid #f0f0f0;
+            background: #fafafa;
+            border-radius: 0 0 10px 10px;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+        }
+
+        .pagination-info {
+            font-size: 0.82rem;
+            color: #888;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .page-btn {
+            min-width: 34px;
+            height: 34px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 7px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 0.5rem;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .page-btn.active {
+            background: var(--black);
+            color: var(--gold);
+            border-color: var(--black);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .page-btn.ellipsis {
+            border: none;
+            background: transparent;
+            cursor: default;
+            color: #aaa;
+            font-size: 1rem;
+        }
+
+        .page-size-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.82rem;
+            color: #888;
+            font-weight: 600;
+        }
+
+        .page-size-wrap select {
+            padding: 0.3rem 0.6rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 7px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 700;
+            background: white;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .page-size-wrap select:focus {
+            border-color: var(--gold);
+        }
+
+        @media (max-width: 600px) {
+            .pagination-bar {
+                justify-content: center;
+            }
+            .pagination-info { width: 100%; text-align: center; }
+        }
 
         /* ── iOS: prevent auto-zoom on input focus (font-size must be ≥ 16px) ── */
         @media (max-width: 768px) {
@@ -1717,6 +1868,23 @@
 
             .stats-row {
                 grid-template-columns: 1fr 1fr;
+            }
+
+            .stat-card {
+                padding: 0.75rem 0.7rem 0.75rem 0.85rem;
+                gap: 0.5rem;
+            }
+
+            .stat-value {
+                font-size: 1.25rem;
+            }
+
+            .stat-label {
+                font-size: 0.6rem;
+            }
+
+            .stat-sub {
+                font-size: 0.62rem;
             }
 
             .page-title {
@@ -1765,8 +1933,7 @@
             </div>
         </header>
 
-    <nav id="mainNav">
-        <button class="nav-close-btn" id="navCloseBtn" style="display:none;">✕</button>
+        <nav id="mainNav">
             <ul>
                 <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
                 <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
@@ -1893,6 +2060,21 @@
                         </div>
                         <!-- Mobile card layout -->
                         <div class="prod-cards-mobile" id="productsMobile" style="display:none;"></div>
+
+                        <!-- Pagination Bar -->
+                        <div class="pagination-bar" id="paginationBar" style="display:none;">
+                            <div class="pagination-info" id="paginationInfo"></div>
+                            <div class="pagination-controls" id="paginationControls"></div>
+                            <div class="page-size-wrap">
+                                <span>Rows:</span>
+                                <select id="pageSizeSelect">
+                                    <option value="10">10</option>
+                                    <option value="15" selected>15</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1951,12 +2133,12 @@
                     <!-- Toolbar -->
                     <div class="toolbar" style="flex-wrap:wrap;gap:0.5rem;">
                         <div class="search-wrap">
-                            <input type="text" id="finSearchInput" placeholder="Search products…" oninput="renderFinancials()">
+                            <input type="text" id="finSearchInput" placeholder="Search products…">
                         </div>
-                        <select class="filter-select" id="finCatFilter" onchange="renderFinancials()">
+                        <select class="filter-select" id="finCatFilter">
                             <option value="">All Categories</option>
                         </select>
-                        <select class="filter-select" id="finSortSelect" onchange="renderFinancials()">
+                        <select class="filter-select" id="finSortSelect">
                             <option value="name">Name A–Z</option>
                             <option value="margin_desc">Margin ↓ (Highest first)</option>
                             <option value="margin_asc">Margin ↑ (Lowest first)</option>
@@ -1994,6 +2176,21 @@
                         </div>
                         <!-- Mobile card layout for financials -->
                         <div class="fin-cards-mobile" id="finCardsMobile" style="display:none;"></div>
+
+                        <!-- Financials Pagination Bar -->
+                        <div class="pagination-bar" id="finPaginationBar" style="display:none;">
+                            <div class="pagination-info" id="finPaginationInfo"></div>
+                            <div class="pagination-controls" id="finPaginationControls"></div>
+                            <div class="page-size-wrap">
+                                <span>Rows:</span>
+                                <select id="finPageSizeSelect">
+                                    <option value="10" selected>10</option>
+                                    <option value="15">15</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Footer note -->
@@ -2200,7 +2397,6 @@
             const hamburger = document.getElementById('hamburgerBtn');
             const nav = document.getElementById('mainNav');
             const overlay = document.getElementById('navOverlay');
-            const closeBtn = document.getElementById('navCloseBtn');
 
             function openNav() {
                 nav.classList.add('mobile-open');
@@ -2217,7 +2413,6 @@
             }
 
             hamburger.addEventListener('click', () => nav.classList.contains('mobile-open') ? closeNav() : openNav());
-            if (closeBtn) closeBtn.addEventListener('click', closeNav);
             overlay.addEventListener('click', closeNav);
 
             nav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
@@ -2247,6 +2442,17 @@
 
         /* STATE */
         let allProducts = [], allCategories = [], deleteProdId = null, deleteCatId = null;
+
+        /* PAGINATION STATE */
+        let _pagedProducts = [];   // the filtered list currently being paginated
+        let _currentPage  = 1;
+        let _pageSize     = 15;    // matches the <select> default
+
+        document.getElementById('pageSizeSelect').addEventListener('change', function () {
+            _pageSize = parseInt(this.value, 10);
+            _currentPage = 1;
+            _renderPage();
+        });
 
         /* TABS */
         document.querySelectorAll('.main-tab').forEach(tab => {
@@ -2360,72 +2566,149 @@
             if (finTab && finTab.classList.contains('active')) renderFinancials();
         }
 
-        function renderProducts(products) {
-            const tbody = document.getElementById('productsBody');
+        /* ── Render a single row / card (extracted for reuse) ── */
+        function _buildRow(p) {
+            const thumb = p.image_url
+                ? `<img class="prod-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+                : '';
+            const fallback = `<div class="prod-thumb-placeholder" ${p.image_url ? 'style="display:none"' : ''}>${p.icon || '☕'}</div>`;
+            const catChip = p.category_name
+                ? `<span class="cat-chip">${p.category_name}</span>`
+                : `<span class="cat-chip none">Uncategorized</span>`;
+            return `<tr>
+            <td>${thumb}${fallback}</td>
+            <td>
+                <div class="prod-name">${p.name}${p.cup_eligible ? '<span style="margin-left:0.4rem;font-size:0.68rem;background:#fff3cd;color:#856404;padding:0.1rem 0.45rem;border-radius:10px;font-weight:700;vertical-align:middle;">☕ Cup</span>' : ''}</div>
+                ${p.description ? `<div class="prod-desc">${p.description}</div>` : ''}
+            </td>
+            <td>${catChip}</td>
+            <td><span class="price-badge">₱${parseFloat(p.price || 0).toFixed(2)}</span></td>
+            <td style="color:#888;">₱${parseFloat(p.cost || 0).toFixed(2)}</td>
+            <td style="color:#aaa;font-size:0.8rem;">${p.sku || '—'}</td>
+            <td>
+                <div class="action-btns">
+                    <button class="btn btn-outline btn-sm" onclick="openEditProduct(${p.product_id})" title="Edit product">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Edit
+                    </button>
+                    <button class="btn btn-delete btn-sm" onclick="openDeleteConfirm(${p.product_id},'${p.name.replace(/'/g, "\\'")}')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+        }
+
+        function _buildMobileCard(p) {
+            const thumbHtml = p.image_url
+                ? `<img class="prod-mobile-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div class="prod-mobile-placeholder" style="display:none;">${p.icon || '☕'}</div>`
+                : `<div class="prod-mobile-placeholder">${p.icon || '☕'}</div>`;
+            const catLabel = p.category_name || 'Uncategorized';
+            return `<div class="prod-card-mobile">
+                ${thumbHtml}
+                <div class="prod-mobile-info">
+                    <div class="prod-mobile-name">${p.name}${p.cup_eligible ? ' <span style="font-size:0.68rem;background:#fff3cd;color:#856404;padding:0.1rem 0.45rem;border-radius:10px;font-weight:700;">☕ Cup</span>' : ''}</div>
+                    <div class="prod-mobile-meta">
+                        <span>🏷️ ${catLabel}</span>
+                        ${p.sku ? `<span>SKU: ${p.sku}</span>` : ''}
+                        ${p.description ? `<span style="width:100%;color:#999;">${p.description.substring(0, 50)}${p.description.length > 50 ? '…' : ''}</span>` : ''}
+                    </div>
+                </div>
+                <div class="prod-mobile-price">₱${parseFloat(p.price || 0).toFixed(2)}</div>
+                <div class="prod-mobile-actions">
+                    <button class="btn btn-outline btn-sm" onclick="openEditProduct(${p.product_id})">✏️ Edit</button>
+                    <button class="btn btn-delete btn-sm" onclick="openDeleteConfirm(${p.product_id},'${p.name.replace(/'/g, "\\'")}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete</button>
+                </div>
+            </div>`;
+        }
+
+        /* ── Render the current page from _pagedProducts ── */
+        function _renderPage() {
+            const tbody       = document.getElementById('productsBody');
             const mobileCards = document.getElementById('productsMobile');
-            if (!products.length) {
+            const pagBar      = document.getElementById('paginationBar');
+            const pagInfo     = document.getElementById('paginationInfo');
+            const pagControls = document.getElementById('paginationControls');
+
+            const total = _pagedProducts.length;
+
+            if (!total) {
                 const emptyHtml = '<div class="empty-state"><div class="empty-state-icon">🛍️</div><h3>No products found</h3><p>Try adjusting filters or add a new product.</p></div>';
                 tbody.innerHTML = `<tr><td colspan="7">${emptyHtml}</td></tr>`;
                 if (mobileCards) mobileCards.innerHTML = emptyHtml;
+                pagBar.style.display = 'none';
                 return;
             }
-            tbody.innerHTML = products.map(p => {
-                const thumb = p.image_url
-                    ? `<img class="prod-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
-                    : '';
-                const fallback = `<div class="prod-thumb-placeholder" ${p.image_url ? 'style="display:none"' : ''}>${p.icon || '☕'}</div>`;
-                const catChip = p.category_name
-                    ? `<span class="cat-chip">${p.category_name}</span>`
-                    : `<span class="cat-chip none">Uncategorized</span>`;
-                return `<tr>
-                <td>${thumb}${fallback}</td>
-                <td>
-                    <div class="prod-name">${p.name}${p.cup_eligible ? '<span style="margin-left:0.4rem;font-size:0.68rem;background:#fff3cd;color:#856404;padding:0.1rem 0.45rem;border-radius:10px;font-weight:700;vertical-align:middle;">☕ Cup</span>' : ''}</div>
-                    ${p.description ? `<div class="prod-desc">${p.description}</div>` : ''}
-                </td>
-                <td>${catChip}</td>
-                <td><span class="price-badge">₱${parseFloat(p.price || 0).toFixed(2)}</span></td>
-                <td style="color:#888;">₱${parseFloat(p.cost || 0).toFixed(2)}</td>
-                <td style="color:#aaa;font-size:0.8rem;">${p.sku || '—'}</td>
-                <td>
-                    <div class="action-btns">
-                        <button class="btn btn-outline btn-sm" onclick="openEditProduct(${p.product_id})" title="Edit product">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                            Edit
-                        </button>
-                        <button class="btn btn-delete btn-sm" onclick="openDeleteConfirm(${p.product_id},'${p.name.replace(/'/g, "\\'")}')">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                        </button>
-                    </div>
-                </td>
-            </tr>`;
-            }).join('');
 
-            // Mobile card view
-            if (mobileCards) {
-                mobileCards.innerHTML = products.map(p => {
-                    const thumbHtml = p.image_url
-                        ? `<img class="prod-mobile-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div class="prod-mobile-placeholder" style="display:none;">${p.icon || '☕'}</div>`
-                        : `<div class="prod-mobile-placeholder">${p.icon || '☕'}</div>`;
-                    const catLabel = p.category_name || 'Uncategorized';
-                    return `<div class="prod-card-mobile">
-                        ${thumbHtml}
-                        <div class="prod-mobile-info">
-                            <div class="prod-mobile-name">${p.name}${p.cup_eligible ? ' <span style="font-size:0.68rem;background:#fff3cd;color:#856404;padding:0.1rem 0.45rem;border-radius:10px;font-weight:700;">☕ Cup</span>' : ''}</div>
-                            <div class="prod-mobile-meta">
-                                <span>🏷️ ${catLabel}</span>
-                                ${p.sku ? `<span>SKU: ${p.sku}</span>` : ''}
-                                ${p.description ? `<span style="width:100%;color:#999;">${p.description.substring(0, 50)}${p.description.length > 50 ? '…' : ''}</span>` : ''}
-                            </div>
-                        </div>
-                        <div class="prod-mobile-price">₱${parseFloat(p.price || 0).toFixed(2)}</div>
-                        <div class="prod-mobile-actions">
-                            <button class="btn btn-outline btn-sm" onclick="openEditProduct(${p.product_id})">✏️ Edit</button>
-                            <button class="btn btn-delete btn-sm" onclick="openDeleteConfirm(${p.product_id},'${p.name.replace(/'/g, "\\'")}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete</button>
-                        </div>
-                    </div>`;
-                }).join('');
+            const totalPages = Math.ceil(total / _pageSize);
+            // Clamp current page
+            if (_currentPage > totalPages) _currentPage = totalPages;
+            if (_currentPage < 1)          _currentPage = 1;
+
+            const start = (_currentPage - 1) * _pageSize;
+            const end   = Math.min(start + _pageSize, total);
+            const page  = _pagedProducts.slice(start, end);
+
+            // Desktop table
+            tbody.innerHTML = page.map(_buildRow).join('');
+
+            // Mobile cards
+            if (mobileCards) mobileCards.innerHTML = page.map(_buildMobileCard).join('');
+
+            // Show / hide pagination bar
+            pagBar.style.display = 'flex';
+
+            // Info text
+            pagInfo.textContent = `Showing ${start + 1}–${end} of ${total} product${total !== 1 ? 's' : ''}`;
+
+            // Page buttons
+            pagControls.innerHTML = '';
+
+            function makeBtn(label, page, isActive, isDisabled, extraClass) {
+                const btn = document.createElement('button');
+                btn.className = 'page-btn' + (isActive ? ' active' : '') + (extraClass ? ' ' + extraClass : '');
+                btn.textContent = label;
+                btn.disabled = isDisabled;
+                if (!isDisabled && !isActive) {
+                    btn.addEventListener('click', () => { _currentPage = page; _renderPage(); });
+                }
+                return btn;
             }
+
+            // Prev
+            pagControls.appendChild(makeBtn('‹', _currentPage - 1, false, _currentPage === 1));
+
+            // Smart page number range
+            const delta = 1; // pages around current
+            const range = [];
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= _currentPage - delta && i <= _currentPage + delta)) {
+                    range.push(i);
+                }
+            }
+
+            let prev = null;
+            range.forEach(page => {
+                if (prev !== null && page - prev > 1) {
+                    const dot = document.createElement('button');
+                    dot.className = 'page-btn ellipsis';
+                    dot.textContent = '…';
+                    dot.disabled = true;
+                    pagControls.appendChild(dot);
+                }
+                pagControls.appendChild(makeBtn(page, page, page === _currentPage, page === _currentPage));
+                prev = page;
+            });
+
+            // Next
+            pagControls.appendChild(makeBtn('›', _currentPage + 1, false, _currentPage === totalPages));
+        }
+
+        /* ── renderProducts: store full list and render first page ── */
+        function renderProducts(products) {
+            _pagedProducts = products;
+            _currentPage   = 1;
+            _renderPage();
         }
 
         /* IMAGE UPLOAD */
@@ -2692,12 +2975,13 @@
         let searchTimer;
         document.getElementById('searchInput').addEventListener('input', () => {
             clearTimeout(searchTimer);
+            _currentPage = 1;
             searchTimer = setTimeout(loadProducts, 350);
         });
         ['catFilter', 'sortSelect'].forEach(id =>
-            document.getElementById(id).addEventListener('change', loadProducts)
+            document.getElementById(id).addEventListener('change', () => { _currentPage = 1; loadProducts(); })
         );
-        document.getElementById('refreshBtn').addEventListener('click', () => { loadProducts(); loadCategories(); });
+        document.getElementById('refreshBtn').addEventListener('click', () => { _currentPage = 1; loadProducts(); loadCategories(); });
 
         /* ── SSE: real-time product catalogue updates ─────────────────────────── */
         let _sseAdmin = null;
@@ -2752,6 +3036,60 @@
             return { price, cost: hasCost ? cost : null, net, margin, hasCost };
         }
 
+        /* ── Financials pagination state ── */
+        let _finPage = 1;
+        let _finPageSize = 10;
+
+        function _renderFinPagination(total) {
+            const bar      = document.getElementById('finPaginationBar');
+            const info     = document.getElementById('finPaginationInfo');
+            const controls = document.getElementById('finPaginationControls');
+            const totalPages = Math.max(1, Math.ceil(total / _finPageSize));
+
+            if (total === 0) { bar.style.display = 'none'; return; }
+            bar.style.display = 'flex';
+
+            const from = (_finPage - 1) * _finPageSize + 1;
+            const to   = Math.min(_finPage * _finPageSize, total);
+            info.textContent = `Showing ${from}–${to} of ${total} product${total !== 1 ? 's' : ''}`;
+
+            // Build page buttons with ellipsis
+            const makeBtn = (label, page, isActive, isDisabled, isEllipsis) => {
+                const cls = ['page-btn', isActive ? 'active' : '', isEllipsis ? 'ellipsis' : ''].filter(Boolean).join(' ');
+                const dis = isDisabled || isEllipsis ? 'disabled' : '';
+                return `<button class="${cls}" ${dis} data-fin-page="${page}">${label}</button>`;
+            };
+
+            let btns = '';
+            btns += makeBtn('‹', _finPage - 1, false, _finPage === 1, false);
+
+            const delta = 1;
+            const pages = new Set([1, totalPages]);
+            for (let i = Math.max(2, _finPage - delta); i <= Math.min(totalPages - 1, _finPage + delta); i++) pages.add(i);
+            const sorted = [...pages].sort((a, b) => a - b);
+
+            let prev = 0;
+            for (const p of sorted) {
+                if (p - prev > 1) btns += makeBtn('…', -1, false, false, true);
+                btns += makeBtn(p, p, p === _finPage, false, false);
+                prev = p;
+            }
+
+            btns += makeBtn('›', _finPage + 1, false, _finPage === totalPages, false);
+            controls.innerHTML = btns;
+
+            controls.querySelectorAll('.page-btn:not(.ellipsis)').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pg = parseInt(btn.dataset.finPage);
+                    if (!isNaN(pg) && pg >= 1 && pg <= totalPages && pg !== _finPage) {
+                        _finPage = pg;
+                        renderFinancials();
+                        document.getElementById('tab-financials').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+        }
+
         function renderFinancials() {
             if (!allProducts.length) return;
 
@@ -2786,7 +3124,7 @@
                 return (a.name || '').localeCompare(b.name || '');
             });
 
-            // Summary stats
+            // Summary stats (always from allProducts, not filtered slice)
             const withCost = allProducts.filter(p => p.cost !== null && p.cost !== undefined && p.cost !== '');
             const margins  = withCost.map(p => calcFinancials(p).margin).filter(m => m !== null);
             const avgMargin = margins.length ? margins.reduce((s, m) => s + m, 0) / margins.length : null;
@@ -2807,15 +3145,24 @@
             document.getElementById('finBadge').textContent      = allProducts.length;
             document.getElementById('finResultCount').textContent = `${products.length} product${products.length !== 1 ? 's' : ''}`;
 
+            // Clamp page to valid range after filter changes
+            const totalPages = Math.max(1, Math.ceil(products.length / _finPageSize));
+            if (_finPage > totalPages) _finPage = totalPages;
+
+            // Slice for current page
+            const start   = (_finPage - 1) * _finPageSize;
+            const pageProd = products.slice(start, start + _finPageSize);
+
             // Desktop table
             const tbody = document.getElementById('finTableBody');
             if (!products.length) {
                 tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">💰</div><h3>No products match</h3><p>Try adjusting filters.</p></div></td></tr>`;
                 document.getElementById('finCardsMobile').innerHTML = `<div class="empty-state"><div class="empty-state-icon">💰</div><h3>No products match</h3></div>`;
+                document.getElementById('finPaginationBar').style.display = 'none';
                 return;
             }
 
-            tbody.innerHTML = products.map(p => {
+            tbody.innerHTML = pageProd.map(p => {
                 const { price, cost, net, margin, hasCost } = calcFinancials(p);
                 const mc = getMarginClass(margin);
                 const hb = getHealthBadge(margin);
@@ -2841,7 +3188,7 @@
 
             // Mobile cards
             const mobile = document.getElementById('finCardsMobile');
-            mobile.innerHTML = products.map(p => {
+            mobile.innerHTML = pageProd.map(p => {
                 const { price, cost, net, margin, hasCost } = calcFinancials(p);
                 const mc = getMarginClass(margin);
                 const hb = getHealthBadge(margin);
@@ -2877,7 +3224,32 @@
                     </div>
                 </div>`;
             }).join('');
+
+            // Render pagination bar
+            _renderFinPagination(products.length);
         }
+
+        /* ── Financials pagination wiring ── */
+        document.getElementById('finPageSizeSelect').addEventListener('change', function () {
+            _finPageSize = parseInt(this.value) || 10;
+            _finPage = 1;
+            renderFinancials();
+        });
+
+        document.getElementById('finSearchInput').addEventListener('input', () => {
+            _finPage = 1;
+            renderFinancials();
+        });
+
+        document.getElementById('finCatFilter').addEventListener('change', () => {
+            _finPage = 1;
+            renderFinancials();
+        });
+
+        document.getElementById('finSortSelect').addEventListener('change', () => {
+            _finPage = 1;
+            renderFinancials();
+        });
 
         /* ══════════════════════════════════════════ */
 

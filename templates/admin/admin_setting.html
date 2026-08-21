@@ -672,24 +672,6 @@
             z-index: 98;
         }
 
-        /* ── Close X inside drawer (hidden by default, shown on mobile) ── */
-        .nav-close-btn {
-            display: none;
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            width: 36px;
-            height: 36px;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 8px;
-            color: var(--gold);
-            font-size: 1.1rem;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-
         /* ══════════════════════════════════════════
            HAMBURGER MENU BUTTON (mobile only)
         ══════════════════════════════════════════ */
@@ -818,7 +800,7 @@
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
                 overflow-y: auto;
-                padding-top: 4rem;
+                padding-top: 1rem;
             }
 
             nav.mobile-open {
@@ -847,8 +829,6 @@
                 border-bottom-color: transparent;
                 background: rgba(201,169,97,0.12);
             }
-
-            .nav-close-btn { display: flex !important; }
 
             /* Layout */
             .layout {
@@ -1048,7 +1028,6 @@
 
 <!-- ══ NAV ══ -->
 <nav id="mainNav">
-    <button class="nav-close-btn" id="navCloseBtn" style="display:none;">✕</button>
     <ul>
         <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
         <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
@@ -2822,7 +2801,6 @@ document.addEventListener('keydown', function(e) {
         var hamburger = document.getElementById('hamburgerBtn');
         var nav       = document.getElementById('mainNav');
         var overlay   = document.getElementById('navOverlay');
-        var closeBtn  = document.getElementById('navCloseBtn');
         if (!hamburger || !nav) return;
 
         function openNav() {
@@ -2841,7 +2819,6 @@ document.addEventListener('keydown', function(e) {
         hamburger.addEventListener('click', function () {
             nav.classList.contains('mobile-open') ? closeNav() : openNav();
         });
-        if (closeBtn) closeBtn.addEventListener('click', closeNav);
         overlay.addEventListener('click', closeNav);
 
         nav.querySelectorAll('a').forEach(function (a) {
