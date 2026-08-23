@@ -132,6 +132,7 @@
             flex: 0 0 var(--nav-h);
             background: var(--dark-gray);
             border-bottom: 1px solid rgba(201,169,97,0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             z-index: 99; overflow: hidden;
         }
 
@@ -141,18 +142,16 @@
         }
 
         nav ul::-webkit-scrollbar { height: 3px; }
-        nav ul::-webkit-scrollbar-track { background: var(--black); }
         nav ul::-webkit-scrollbar-thumb { background: var(--gold); }
 
         nav li { flex-shrink: 0; display: flex; }
 
         nav a {
-            display: flex; align-items: center; gap: 0.45rem;
+            display: flex; align-items: center;
             padding: 0 1.6rem; text-decoration: none;
             color: #aaa; font-weight: 600; font-size: 0.88rem;
             transition: all 0.2s;
             border-bottom: 3px solid transparent; white-space: nowrap;
-            cursor: pointer;
         }
 
         nav a:hover { background: rgba(201,169,97,0.1); color: var(--gold); }
@@ -757,22 +756,33 @@
         }
 
         @media (max-width: 768px) {
-            :root {
-                --header-h: 60px;
+            html, body {
+                overflow: hidden;
+                height: 100%;
             }
-            header { padding: 0 1rem; height: var(--header-h); gap: 0.6rem; }
-            .logo-icon { width: 38px; height: 38px; font-size: 20px; }
-            .logo-text h1 { font-size: 1.2rem; }
-            .logo-subtitle { font-size: 0.55rem; letter-spacing: 2.5px; }
-            .header-actions { gap: 0.5rem; }
+
+            .app-shell {
+                height: 100svh;
+            }
+
+            /* Header */
+            header { padding: 0 1rem; gap: 0.6rem; }
+            .logo-icon { width: 42px; height: 42px; font-size: 22px; }
+            .logo-text h1 { font-size: 1.3rem; }
+            .logo-subtitle { font-size: 0.6rem; letter-spacing: 3px; }
+            .header-actions { gap: 0.65rem; }
             .date-time { display: none; }
             .user-info { padding: 0.45rem 0.65rem; gap: 0.45rem; }
             /* Show name/role text on mobile since avatar is removed */
             .user-details { display: block; }
             .user-details h3 { font-size: 0.82rem; }
             .user-details p { font-size: 0.72rem; }
-            .logout-btn { padding: 0.38rem 0.65rem; font-size: 0.76rem; }
+            .logout-btn { padding: 0.4rem 0.75rem; font-size: 0.78rem; }
+
+            /* Hamburger */
             .hamburger-btn { display: flex; }
+
+            /* Nav — slide-in drawer */
             nav {
                 position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                 background: var(--dark-gray); border-bottom: none;
@@ -784,8 +794,23 @@
             nav ul { flex-direction: column; overflow-x: visible; height: auto; }
             nav li { flex-shrink: unset; display: block; border-bottom: 1px solid rgba(201,169,97,0.1); }
             nav a { padding: 1.1rem 1.75rem; font-size: 1rem; border-bottom: none; border-left: 4px solid transparent; }
-            nav a.active { border-left-color: var(--gold); border-bottom-color: transparent; }
-            .nav-close-btn { display: flex; }
+            nav a.active { border-left-color: var(--gold); border-bottom-color: transparent; background: rgba(201,169,97,0.12); }
+            .nav-close-btn {
+                display: flex !important;
+                position: absolute;
+                top: 1rem;
+                right: 1rem;
+                width: 36px;
+                height: 36px;
+                background: rgba(255,255,255,0.08);
+                border: 1px solid rgba(255,255,255,0.15);
+                border-radius: 8px;
+                color: var(--gold);
+                font-size: 1.1rem;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            }
             .container { padding: 1rem; }
             .page-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.25rem; }
             .page-title { font-size: 1.75rem; }
@@ -852,12 +877,7 @@
             }
         }
         @media (max-width: 480px) {
-            :root {
-                --header-h: 56px;
-            }
-            header { padding: 0 0.75rem; }
-            .logo-icon { width: 34px; height: 34px; font-size: 18px; }
-            .logo-text h1 { font-size: 1.05rem; }
+            .logo-text h1 { font-size: 1.1rem; }
             .logo-subtitle { display: none; }
             .stats-row { grid-template-columns: 1fr 1fr; }
             .stat-card { min-height: 110px; }
@@ -1188,7 +1208,6 @@
 <body>
     <div class="app-shell">
         <!-- ── Header ── -->
-    <div class="mobile-nav-overlay" id="navOverlay"></div>
         <header>
             <div class="logo">
                 <div class="logo-text">
@@ -1224,6 +1243,9 @@
                 <li><a href="{{ url_for('cashier_inventory') }}" class="active">📦 Supply Monitor</a></li>
             </ul>
         </nav>
+
+        <!-- ── Mobile Nav Overlay ── -->
+        <div class="mobile-nav-overlay" id="navOverlay"></div>
 
         <!-- ── Page Content ── -->
         <main class="page-content">

@@ -117,8 +117,6 @@
             display: flex;
             align-items: center;
             gap: 1.5rem;
-            flex: 1;
-            justify-content: flex-end;
         }
 
         .date-time {
@@ -215,7 +213,6 @@
         nav a {
             display: flex;
             align-items: center;
-            gap: 0.45rem;
             padding: 0 1.6rem;
             text-decoration: none;
             color: #aaa;
@@ -864,11 +861,6 @@
                 height: 100svh;
             }
 
-            :root {
-                --header-h: 60px;
-                --nav-h: 0px;
-            }
-
             /* Header */
             header { padding: 0 1rem; gap: 0.6rem; }
             .logo-icon { width: 42px; height: 42px; font-size: 22px; }
@@ -898,8 +890,23 @@
             nav ul { flex-direction: column; overflow-x: visible; height: auto; }
             nav li { flex-shrink: unset; display: block; border-bottom: 1px solid rgba(201,169,97,0.1); }
             nav a { padding: 1.1rem 1.75rem; font-size: 1rem; border-bottom: none; border-left: 4px solid transparent; }
-            nav a.active { border-left-color: var(--gold); border-bottom-color: transparent; }
-            .nav-close-btn { display: flex; }
+            nav a.active { border-left-color: var(--gold); border-bottom-color: transparent; background: rgba(201,169,97,0.12); }
+            .nav-close-btn {
+                display: flex !important;
+                position: absolute;
+                top: 1rem;
+                right: 1rem;
+                width: 36px;
+                height: 36px;
+                background: rgba(255,255,255,0.08);
+                border: 1px solid rgba(255,255,255,0.15);
+                border-radius: 8px;
+                color: var(--gold);
+                font-size: 1.1rem;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            }
 
             .container { padding: 1rem; }
             .page-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.25rem; }
@@ -954,7 +961,6 @@
            SMALL MOBILE — max 480px
         ══════════════════════════════════════════ */
         @media (max-width: 480px) {
-            :root { --header-h: 56px; }
             .logo-text h1 { font-size: 1.1rem; }
             .logo-subtitle { display: none; }
             .summary-cards { grid-template-columns: 1fr 1fr; }
@@ -1093,6 +1099,9 @@
             </ul>
         </nav>
 
+        <!-- ── Mobile Nav Overlay ── -->
+        <div class="mobile-nav-overlay" id="navOverlay"></div>
+
         <!-- CONTENT -->
         <div class="page-content">
             <div class="container">
@@ -1207,9 +1216,6 @@
             </div>
         </div>
     </div>
-
-    <!-- ── Mobile Nav Overlay ── -->
-    <div class="mobile-nav-overlay" id="navOverlay"></div>
 
     <div class="toast-container" id="toastContainer"></div>
 
