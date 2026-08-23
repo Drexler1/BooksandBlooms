@@ -37,7 +37,7 @@ requests==2.32.5
 
 # PDF
 reportlab==5.0.1
-tf-keras==2.13.0
+tf-keras==2.14.1
 
 # WSGI server
 gunicorn==25.1.0
