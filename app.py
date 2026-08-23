@@ -28,7 +28,10 @@ from email.mime.text import MIMEText
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "SecretKey")
+_secret = os.environ.get("FLASK_SECRET_KEY")
+if not _secret:
+    raise RuntimeError("FLASK_SECRET_KEY is not set in .env — refusing to start.")
+app.secret_key = _secret
 
 # ── CSRF protection ─────────────────────────────────────────────────────────────
 # CSRFProtect is initialised here; individual API routes (called via fetch/XHR
@@ -43,7 +46,9 @@ app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 # If a cashier walks away with the browser open, the session expires automatically.
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
 
-_AES_RAW = os.environ.get("AES_SECRET_KEY", "change-this-aes-key-before-deploy!")
+_AES_RAW = os.environ.get("AES_SECRET_KEY")
+if not _AES_RAW:
+    raise RuntimeError("AES_SECRET_KEY is not set in .env — refusing to start.")
 AES_KEY = hashlib.sha256(_AES_RAW.encode()).digest()  # 32 bytes
 
 
@@ -667,12 +672,32 @@ MAX_PRODUCT_IMAGE_MB = 2
 os.makedirs(PRODUCT_IMAGE_FOLDER, exist_ok=True)
 
 # ── MySQL ───────────────────────────────────────────────────────────────────────
-app.config["MYSQL_HOST"] = os.environ.get("MYSQL_HOST", "localhost")
-app.config["MYSQL_USER"] = os.environ.get("MYSQL_USER", "root")
+app.config["MYSQL_HOST"]     = os.environ.get("MYSQL_HOST", "localhost")
+app.config["MYSQL_USER"]     = os.environ.get("MYSQL_USER", "root")
 app.config["MYSQL_PASSWORD"] = os.environ.get("MYSQL_PASSWORD", "")
-app.config["MYSQL_DB"] = os.environ.get("MYSQL_DB", "pos_system")
+app.config["MYSQL_DB"]       = os.environ.get("MYSQL_DB", "pos_system")
+app.config["MYSQL_PORT"]     = int(os.environ.get("MYSQL_PORT", 3306))
+
+# ── Aiven SSL (required for cloud-hosted MySQL) ──────────────────────────────
+_ssl_ca = os.environ.get("MYSQL_SSL_CA", "")  # path to ca.pem from Aiven
+if _ssl_ca:
+    app.config["MYSQL_SSL_CA"] = _ssl_ca
 
 mysql = MySQL(app)
+
+# ── Session cookie security flags ────────────────────────────────────────
+app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # CSRF mitigation
+app.config["SESSION_COOKIE_SECURE"]   = True   # HTTPS only (set False for local HTTP dev)
+
+# ── HTTP security headers ─────────────────────────────────────────────────
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Frame-Options"]        = "SAMEORIGIN"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
+    response.headers["X-XSS-Protection"]       = "1; mode=block"
+    return response
 
 # ── Performance caches ──────────────────────────────────────────────────────────
 embedding_cache = {}  # { employee_id: embedding_vector }
