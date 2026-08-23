@@ -28,7 +28,7 @@ tf-keras==2.15.1
 
 # DeepFace & Vision
 deepface==0.0.93
-opencv-python-headless==4.13.0.92
+opencv-python-headless==4.8.1.78
 numpy==1.26.4
 Pillow==10.4.0
 
