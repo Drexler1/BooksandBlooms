@@ -634,6 +634,26 @@
             border-bottom: none;
         }
 
+        /* ── Skeleton loader ── */
+        @keyframes skel-shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position:  400px 0; }
+        }
+        .skel {
+            border-radius: 6px;
+            background: linear-gradient(90deg, #ececec 25%, #f5f5f5 50%, #ececec 75%);
+            background-size: 800px 100%;
+            animation: skel-shimmer 1.4s infinite linear;
+        }
+        .skel-thumb { width: 40px; height: 40px; border-radius: 8px; }
+        .skel-name  { width: 75%; height: 13px; margin-bottom: 6px; }
+        .skel-desc  { width: 90%; height: 11px; }
+        .skel-chip  { width: 70px; height: 22px; border-radius: 10px; }
+        .skel-price { width: 55px; height: 13px; }
+        .skel-sku   { width: 45px; height: 11px; }
+        .skel-btn   { width: 60px; height: 28px; border-radius: 6px; }
+        .skeleton-row td { padding: 10px 12px; vertical-align: middle; }
+
         .prod-thumb {
             width: 44px;
             height: 44px;
@@ -2047,6 +2067,12 @@
                                     </tr>
                                 </thead>
                                 <tbody id="productsBody">
+                                    <!-- skeleton rows shown until JS loads real data -->
+                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name"></div><div class="skel skel-desc"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
+                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:55%"></div><div class="skel skel-desc" style="width:80%"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
+                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:70%"></div><div class="skel skel-desc" style="width:45%"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
+                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:40%"></div><div class="skel skel-desc"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
+                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:65%"></div><div class="skel skel-desc" style="width:30%"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
                                     <tr>
                                         <td colspan="7">
                                             <div class="empty-state">
@@ -2986,11 +3012,15 @@
         /* ── SSE: real-time product catalogue updates ─────────────────────────── */
         let _sseAdmin = null;
 
+        let _sseInitialSkip = false; // skip first SSE snapshot — REST already loaded it
         function _connectAdminSSE() {
             if (_sseAdmin) { try { _sseAdmin.close(); } catch (_) { } }
+            _sseInitialSkip = true; // the stream sends an immediate snapshot; skip it
             _sseAdmin = new EventSource('/api/products/stream');
 
             _sseAdmin.addEventListener('message', (e) => {
+                // Skip the very first snapshot — REST already loaded products on init
+                if (_sseInitialSkip) { _sseInitialSkip = false; return; }
                 try {
                     const msg = JSON.parse(e.data);
                     if (msg.type === 'products') {
@@ -3255,8 +3285,8 @@
 
         /* INIT */
         (async () => {
-            await loadCategories();
-            await loadProducts();   // initial paint via REST
+            // Run in parallel — no reason to wait for categories before products
+            await Promise.all([loadCategories(), loadProducts()]);
             _connectAdminSSE();     // then switch to SSE for live pushes
         })();
     </script>
