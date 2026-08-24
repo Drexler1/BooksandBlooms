@@ -1002,6 +1002,11 @@ def load_embedding_from_db(employee_id, cur):
 reg_locks = set()  # set of tokens currently being processed
 
 
+@app.route("/ping")
+def ping():
+    return "ok", 200
+
+
 @app.route("/register_face_frame", methods=["POST"])
 @csrf.exempt
 def register_face_frame():
