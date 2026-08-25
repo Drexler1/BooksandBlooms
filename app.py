@@ -684,6 +684,8 @@ if _ssl_ca:
     app.config["MYSQL_SSL_CA"] = _ssl_ca
 
 mysql = MySQL(app)
+from flask_compress import Compress
+Compress(app)
 
 # ── Session cookie security flags ────────────────────────────────────────
 app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
