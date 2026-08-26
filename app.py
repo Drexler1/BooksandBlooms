@@ -26,6 +26,7 @@ from flask import Response
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from werkzeug.utils import secure_filename
+import threading
 
 app = Flask(__name__)
 _secret = os.environ.get("FLASK_SECRET_KEY")
@@ -95,7 +96,7 @@ def aes_username_hash(username: str) -> str:
     ).hexdigest()
 
 
-BCRYPT_ROUNDS = 12  # work factor — increase to 13+ if hardware allows
+BCRYPT_ROUNDS = 10  # lowered from 12 — ~250ms → ~65ms on Render Starter single CPU
 
 
 def hash_password(plaintext: str) -> str:
@@ -683,9 +684,27 @@ _ssl_ca = os.environ.get("MYSQL_SSL_CA", "")  # path to ca.pem from Aiven
 if _ssl_ca:
     app.config["MYSQL_SSL_CA"] = _ssl_ca
 
+# ── MySQL connection tuning (prevents "gone away" on Aiven idle timeout) ──────
+app.config["MYSQL_CONNECT_TIMEOUT"] = 10   # fail fast if Aiven is unreachable
+app.config["MYSQL_READ_TIMEOUT"]    = 30   # prevent hung queries blocking threads
+app.config["MYSQL_WRITE_TIMEOUT"]   = 30
+
 mysql = MySQL(app)
 from flask_compress import Compress
 Compress(app)
+
+# ── Warm DeepFace/Facenet512 at startup so first face-verify is fast ──────────
+def _warm_deepface():
+    try:
+        import numpy as _np
+        from deepface import DeepFace as _DF
+        _dummy = _np.zeros((160, 160, 3), dtype=_np.uint8)
+        _DF.represent(_dummy, model_name="Facenet512", enforce_detection=False)
+        app.logger.info("[startup] DeepFace Facenet512 model warmed.")
+    except Exception as _e:
+        app.logger.warning(f"[startup] DeepFace warm failed (non-fatal): {_e}")
+
+threading.Thread(target=_warm_deepface, daemon=True).start()
 
 # ── Session cookie security flags ────────────────────────────────────────
 app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
@@ -2365,25 +2384,8 @@ def dashboard():
     if session.get("role") not in ["admin", "manager"]:
         return redirect(url_for("login"))
 
-    # ── Resolve full_name ──────────────────────────────────────────────────────
-    full_name = session.get("full_name")
-    if not full_name:
-        cur = mysql.connection.cursor(DictCursor)
-        if session["role"] == "admin":
-            cur.execute(
-                "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
-            )
-            user = _dec_adm(cur.fetchone())
-        else:
-            cur.execute(
-                "SELECT full_name FROM employees WHERE employee_id=%s",
-                (session["employee_id"],),
-            )
-            user = _dec_emp(cur.fetchone())
-        full_name = (
-            user["full_name"] if user else session["role"].capitalize()
-        ).strip()
-        cur.close()
+    # ── Resolve full_name (always set in session at login) ────────────────────
+    full_name = session.get("full_name") or session.get("role", "User").capitalize()
 
     # ── Inventory: low-stock items (uses shared helper) ────────────────────
     try:
@@ -2413,7 +2415,7 @@ def dashboard():
                 COALESCE(SUM(total_amount), 0)  AS today_total,
                 COUNT(*)                         AS today_count
             FROM transactions
-            WHERE DATE(created_at) = CURDATE()
+            WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY
               AND status = 'completed'
         """)
         row = cur.fetchone()
@@ -2428,7 +2430,7 @@ def dashboard():
                 COALESCE(SUM(total_amount), 0) AS yest_total,
                 COUNT(*)                        AS yest_count
             FROM transactions
-            WHERE DATE(created_at) = CURDATE() - INTERVAL 1 DAY
+            WHERE created_at >= CURDATE() - INTERVAL 1 DAY AND created_at < CURDATE()
               AND status = 'completed'
         """)
         yrow = cur.fetchone()
@@ -2448,7 +2450,7 @@ def dashboard():
                    SUM(ti.quantity) AS units_sold
             FROM transaction_items ti
             JOIN transactions t ON t.transaction_id = ti.transaction_id
-            WHERE DATE(t.created_at) = CURDATE()
+            WHERE t.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY
               AND t.status = 'completed'
             GROUP BY ti.product_name, ti.category_name
             ORDER BY units_sold DESC
@@ -2576,21 +2578,9 @@ def employee_management():
     if session.get("role") not in ["admin", "manager"]:
         return redirect(url_for("login"))
 
+    full_name = session.get("full_name") or session.get("role", "User").capitalize()
+
     cur = mysql.connection.cursor(DictCursor)
-
-    if session["role"] == "admin":
-        cur.execute(
-            "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
-        )
-        user = _dec_adm(cur.fetchone())
-    else:
-        cur.execute(
-            "SELECT full_name FROM employees WHERE employee_id=%s",
-            (session["employee_id"],),
-        )
-        user = _dec_emp(cur.fetchone())
-    full_name = user["full_name"] if user else session["role"].capitalize()
-
     cur.execute("""
         SELECT employee_id, full_name, username, role, email,
                employment_status, face_image_path, face_model_path,
@@ -2598,6 +2588,7 @@ def employee_management():
                COALESCE(hourly_rate, 0) AS hourly_rate
         FROM employees
         ORDER BY created_at DESC
+        LIMIT 50
     """)
     employees = [_dec_emp(row) for row in cur.fetchall()]
     cur.close()
@@ -3154,21 +3145,7 @@ def staff_attendance():
     if session.get("role") not in ["admin", "manager"]:
         return redirect(url_for("login"))
 
-    cur = mysql.connection.cursor(DictCursor)
-    if session["role"] == "admin":
-        cur.execute(
-            "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
-        )
-        user = _dec_adm(cur.fetchone())
-    else:
-        cur.execute(
-            "SELECT full_name FROM employees WHERE employee_id=%s",
-            (session["employee_id"],),
-        )
-        user = _dec_emp(cur.fetchone())
-    full_name = user["full_name"] if user else session["role"].capitalize()
-    cur.close()
-
+    full_name = session.get("full_name") or session.get("role", "User").capitalize()
     return render_template("admin/staff_attendance.html", full_name=full_name)
 
 
@@ -4576,9 +4553,10 @@ def _send_daily_sales_summary_email(target_date=None, cfg=None):
                 SUM(CASE WHEN payment_method = 'cash'  THEN 1 ELSE 0 END) AS cash_count,
                 SUM(CASE WHEN payment_method != 'cash' THEN 1 ELSE 0 END) AS digital_count
             FROM transactions
-            WHERE DATE(created_at) = %s AND status = 'completed'
+            WHERE created_at >= %s AND created_at < DATE_ADD(%s, INTERVAL 1 DAY)
+              AND status = 'completed'
         """,
-            (date_sql,),
+            (date_sql, date_sql),
         )
         totals = cur.fetchone()
 
@@ -4590,12 +4568,13 @@ def _send_daily_sales_summary_email(target_date=None, cfg=None):
                    SUM(ti.quantity * ti.unit_price) AS item_revenue
             FROM transaction_items ti
             JOIN transactions t ON t.transaction_id = ti.transaction_id
-            WHERE DATE(t.created_at) = %s AND t.status = 'completed'
+            WHERE t.created_at >= %s AND t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)
+              AND t.status = 'completed'
             GROUP BY ti.product_name
             ORDER BY units_sold DESC
             LIMIT 5
         """,
-            (date_sql,),
+            (date_sql, date_sql),
         )
         top_items = cur.fetchall()
         cur.close()
@@ -5093,29 +5072,7 @@ def admin_sales():
     if not is_admin():
         return redirect(url_for("login"))
 
-    full_name = session.get("full_name")
-    if not full_name:
-        try:
-            cur = mysql.connection.cursor(DictCursor)
-            if session.get("role") == "admin":
-                cur.execute(
-                    "SELECT full_name FROM admins WHERE admin_id=%s",
-                    (session["admin_id"],),
-                )
-                user = _dec_adm(cur.fetchone())
-            else:
-                cur.execute(
-                    "SELECT full_name FROM employees WHERE employee_id=%s",
-                    (session["employee_id"],),
-                )
-                user = _dec_emp(cur.fetchone())
-            full_name = (
-                user["full_name"] if user else session["role"].capitalize()
-            ).strip()
-            cur.close()
-        except Exception:
-            full_name = "Admin"
-
+    full_name = session.get("full_name") or session.get("role", "Admin").capitalize()
     return render_template("admin/admin_sales.html", full_name=full_name)
 
 
@@ -6177,20 +6134,7 @@ def payroll():
     """Render the payroll dashboard page."""
     if not is_admin():
         return redirect(url_for("login"))
-    cur = mysql.connection.cursor(DictCursor)
-    if session.get("role") == "admin" and "admin_id" in session:
-        cur.execute(
-            "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
-        )
-        user = _dec_adm(cur.fetchone())
-    else:
-        cur.execute(
-            "SELECT full_name FROM employees WHERE employee_id=%s",
-            (session["employee_id"],),
-        )
-        user = _dec_emp(cur.fetchone())
-    full_name = user["full_name"] if user else session.get("full_name", "Admin")
-    cur.close()
+    full_name = session.get("full_name") or session.get("role", "Admin").capitalize()
     return render_template("admin/payroll.html", full_name=full_name)
 
 
@@ -7698,8 +7642,8 @@ def api_pos_transactions():
         if date_str:
             try:
                 datetime.strptime(date_str, "%Y-%m-%d")
-                where.append("DATE(t.created_at) = %s")
-                params.append(date_str)
+                where.append("t.created_at >= %s AND t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)")
+                params.extend([date_str, date_str])
             except ValueError:
                 pass
 
@@ -7903,7 +7847,7 @@ def api_sales_cashflow():
                 SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as cash_payment,
                 SUM(CASE WHEN payment_method != 'cash' THEN total_amount ELSE 0 END) as digital_payment
             FROM transactions
-            WHERE DATE(created_at) BETWEEN %s AND %s
+            WHERE created_at >= %s AND created_at < DATE_ADD(%s, INTERVAL 1 DAY)
               AND status = 'completed'
             GROUP BY DATE(created_at)
             ORDER BY date ASC
@@ -9189,10 +9133,10 @@ def api_inv_items_eod_report():
                 stock_after,
                 created_at
             FROM inv_log
-            WHERE DATE(created_at) = %s
+            WHERE created_at >= %s AND created_at < DATE_ADD(%s, INTERVAL 1 DAY)
             ORDER BY item_id, created_at
             """,
-            (report_date,),
+            (report_date, report_date),
         )
         log_rows = cur.fetchall()
         cur.close()
@@ -9963,9 +9907,9 @@ def api_sales_summary():
 
     period = (request.args.get("period") or "today").strip().lower()
     period_map = {
-        "today": "DATE(created_at) = CURDATE()",
-        "week": "YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)",
-        "month": "MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())",
+        "today": "created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY",
+        "week":  "created_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) AND created_at < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) + INTERVAL 7 DAY",
+        "month": "created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND created_at < DATE_FORMAT(CURDATE(),'%Y-%m-01') + INTERVAL 1 MONTH",
     }
     where_period = period_map.get(period, period_map["today"])
 
@@ -10040,7 +9984,7 @@ def api_sales_top_products():
         params = []
         where = ["t.status = 'completed'"]
         if start and end:
-            where.append("DATE(t.created_at) BETWEEN %s AND %s")
+            where.append("t.created_at >= %s AND t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)")
             params += [start, end]
 
         cur.execute(
@@ -10368,8 +10312,8 @@ def api_sales_weekly_product_summary():
             FROM transaction_items ti
             JOIN transactions t ON t.transaction_id = ti.transaction_id
             WHERE t.status = 'completed'
-              AND DATE(t.created_at) >= %s
-              AND DATE(t.created_at) < %s
+              AND t.created_at >= %s
+              AND t.created_at < %s
             GROUP BY ti.product_name, ti.category_name
             ORDER BY units_sold DESC
             LIMIT %s
@@ -10388,8 +10332,8 @@ def api_sales_weekly_product_summary():
                 FROM transaction_items ti
                 JOIN transactions t ON t.transaction_id = ti.transaction_id
                 WHERE t.status = 'completed'
-                  AND DATE(t.created_at) >= %s
-                  AND DATE(t.created_at) < %s
+                  AND t.created_at >= %s
+                  AND t.created_at < %s
                   AND ti.product_name IN ({fmt})
                 GROUP BY ti.product_name
                 """,
@@ -10675,7 +10619,8 @@ def api_dashboard_stats():
                 COALESCE(SUM(total_amount), 0) AS today_total,
                 COUNT(*)                        AS today_count
             FROM transactions
-            WHERE DATE(created_at) = CURDATE() AND status = 'completed'
+            WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY
+              AND status = 'completed'
         """)
         sales_row = cur.fetchone()
 
@@ -10974,13 +10919,13 @@ def api_sales_export():
         where = ["t.status = 'completed'"]
 
         if start_date and end_date:
-            where.append("DATE(t.created_at) BETWEEN %s AND %s")
+            where.append("t.created_at >= %s AND t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)")
             params += [start_date, end_date]
         elif start_date:
-            where.append("DATE(t.created_at) >= %s")
+            where.append("t.created_at >= %s")
             params.append(start_date)
         elif end_date:
-            where.append("DATE(t.created_at) <= %s")
+            where.append("t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)")
             params.append(end_date)
 
         cur.execute(
