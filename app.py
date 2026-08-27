@@ -691,7 +691,6 @@ if _ssl_ca:
 app.config["MYSQL_CONNECT_TIMEOUT"] = 10   # fail fast if Aiven is unreachable
 app.config["MYSQL_READ_TIMEOUT"]    = 30   # prevent hung queries blocking threads
 app.config["MYSQL_WRITE_TIMEOUT"]   = 30
-app.config["MYSQL_INIT_COMMAND"]    = "SET time_zone='+08:00'"  # Philippine Standard Time
 
 mysql = MySQL(app)
 from flask_compress import Compress
@@ -2390,6 +2389,8 @@ def dashboard():
 
     # ── Resolve full_name (always set in session at login) ────────────────────
     full_name = session.get("full_name") or session.get("role", "User").capitalize()
+
+
 
     # ── Inventory: low-stock items (uses shared helper) ────────────────────
     try:

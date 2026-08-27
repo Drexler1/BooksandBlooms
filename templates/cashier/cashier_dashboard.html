@@ -2822,7 +2822,17 @@
         loadProducts();             // immediate REST fetch on page load
         _refreshCupStock();         // warm the cup-stock cache before first modal open
         _connectCashierSSE();       // then stream live updates via SSE
-        setInterval(loadProducts, 10000); // 10 s safety-net poll (covers SSE gaps)
+        // Removed 10s poll — SSE handles live updates; polling + SSE was double-hitting server
+
+        // Close SSE when navigating away — frees the server thread immediately
+        window.addEventListener('beforeunload', () => {
+            if (_sseCashier) { try { _sseCashier.close(); } catch (_) {} _sseCashier = null; }
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                if (_sseCashier) { try { _sseCashier.close(); } catch (_) {} _sseCashier = null; }
+            }
+        });
 
         /* ═══════════════════════════════════════
            MOBILE NAV
