@@ -24,12 +24,39 @@ from datetime import datetime, timedelta, date
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import base64, cv2, numpy as np, time, hashlib, bcrypt, json, secrets, re
-import smtplib, csv, io
+import resend, csv, io
 from flask import Response
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from werkzeug.utils import secure_filename
 import threading
+
+def _send_email_resend(
+    to_email: str,
+    subject: str,
+    html_body: str,
+    from_name: str = "Books & Blooms Café",
+    from_address: str = "onboarding@resend.dev",
+):
+    """
+    Send email via Resend API (HTTPS port 443 — works on Render free tier).
+    Set RESEND_API_KEY in your environment / Render dashboard.
+    After verifying your domain in Resend, replace from_address with your
+    own address (e.g. 'noreply@yourdomain.com').
+    """
+    api_key = os.environ.get("RESEND_API_KEY", "")
+    if not api_key:
+        raise RuntimeError(
+            "RESEND_API_KEY is not set in the environment. "
+            "Add it in your Render dashboard → Environment."
+        )
+    resend.api_key = api_key
+    params: resend.Emails.SendParams = {
+        "from": f"{from_name} <{from_address}>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html_body,
+    }
+    resend.Emails.send(params)
+
 
 app = Flask(__name__)
 _secret = os.environ.get("FLASK_SECRET_KEY")
@@ -1855,17 +1882,12 @@ def _send_gmail_reset(to_email: str, reset_url: str, full_name: str, role: str =
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"]    = sender
-    msg["To"]      = to_email
-    msg.attach(MIMEText(html_body, "html"))
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(sender, app_pw)
-        server.sendmail(sender, [to_email], msg.as_string())
-
-    app.logger.info(f"[reset] Gmail reset link sent to {to_email}")
+    _send_email_resend(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
+    app.logger.info(f"[reset] Reset link sent to {to_email}")
 
 
 def _send_sms_otp(phone_number: str, otp_code: str, full_name: str, role: str):
@@ -3713,26 +3735,11 @@ def _send_overtime_request_email_with_cfg(
         </div>
         """
 
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"⏱️ Overtime Request — {employee_name} ({request_date})"
-        msg["From"] = cfg["smtp_user"]
-        msg["To"] = cfg["alert_recipient"]
-        msg.attach(MIMEText(html_body, "html"))
-
-        port = int(cfg.get("smtp_port") or 587)
-        use_tls = bool(cfg.get("smtp_use_tls", True))
-
-        if use_tls:
-            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=15)
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-        else:
-            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=15)
-
-        server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
-        server.quit()
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject=f"⏱️ Overtime Request — {employee_name} ({request_date})",
+            html_body=html_body,
+        )
         app.logger.info(
             f"[overtime_email] Notification sent to {cfg['alert_recipient']} "
             f"for employee {employee_id} ({request_date})"
@@ -3837,25 +3844,11 @@ def _send_overtime_request_email(
         </div>
         """
 
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"⏱️ Overtime Request — {employee_name} ({request_date})"
-        msg["From"] = cfg["smtp_user"]
-        msg["To"] = cfg["alert_recipient"]
-        msg.attach(MIMEText(html_body, "html"))
-
-        port = int(cfg.get("smtp_port") or 587)
-        use_tls = bool(cfg.get("smtp_use_tls", True))
-
-        if use_tls:
-            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=10)
-            server.ehlo()
-            server.starttls()
-        else:
-            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=10)
-
-        server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
-        server.quit()
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject=f"⏱️ Overtime Request — {employee_name} ({request_date})",
+            html_body=html_body,
+        )
         app.logger.info(
             f"[overtime_email] Notification sent to {cfg['alert_recipient']} "
             f"for employee {employee_id} ({request_date})"
@@ -4181,11 +4174,6 @@ def api_test_email():
 
     # Build and send the test message
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "📧 Books & Blooms Café — Test Email"
-        msg["From"] = cfg["smtp_user"]
-        msg["To"] = cfg["alert_recipient"]
-
         html_body = """
         <div style="font-family:DM Sans,Arial,sans-serif;max-width:520px;margin:0 auto;
                     border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
@@ -4196,7 +4184,7 @@ def api_test_email():
           <div style="padding:28px;">
             <h3 style="color:#1a1a1a;margin-top:0;">✅ Test Email Successful</h3>
             <p style="color:#555;line-height:1.6;">
-              Your SMTP configuration is working correctly.<br>
+              Your email configuration is working correctly.<br>
               Low-stock alerts and other notifications will be delivered to this address.
             </p>
             <div style="background:#f5f5f5;border-radius:8px;padding:14px 18px;margin-top:18px;
@@ -4206,46 +4194,15 @@ def api_test_email():
           </div>
         </div>
         """
-        msg.attach(MIMEText(html_body, "html"))
-
-        port = int(cfg.get("smtp_port") or 587)
-        use_tls = bool(cfg.get("smtp_use_tls", True))
-
-        if use_tls:
-            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=10)
-            server.ehlo()
-            server.starttls()
-        else:
-            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=10)
-
-        server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
-        server.quit()
-
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject="📧 Books & Blooms Café — Test Email",
+            html_body=html_body,
+        )
         return jsonify(
             {"success": True, "message": f"Test email sent to {cfg['alert_recipient']}"}
         )
 
-    except smtplib.SMTPAuthenticationError:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": "Authentication failed — check your SMTP username and password (use an App Password for Gmail)",
-                }
-            ),
-            400,
-        )
-    except smtplib.SMTPConnectError:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": f"Cannot connect to {cfg['smtp_host']}:{cfg.get('smtp_port', 587)} — verify host and port",
-                }
-            ),
-            400,
-        )
     except Exception as exc:
         app.logger.error(f"[email_settings] test send failed: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
@@ -4446,28 +4403,11 @@ def api_send_low_stock_alert():
     </div>"""
 
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = (
-            f"📦 Low-Stock Alert — {len(supplies)} ingredient/supply item(s) need restocking"
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject=f"📦 Low-Stock Alert — {len(supplies)} ingredient/supply item(s) need restocking",
+            html_body=html_body,
         )
-        msg["From"] = cfg["smtp_user"]
-        msg["To"] = cfg["alert_recipient"]
-        msg.attach(MIMEText(html_body, "html"))
-
-        port = int(cfg.get("smtp_port") or 587)
-        use_tls = bool(cfg.get("smtp_use_tls", True))
-
-        if use_tls:
-            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=10)
-            server.ehlo()
-            server.starttls()
-        else:
-            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=10)
-
-        server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
-        server.quit()
-
         return jsonify(
             {
                 "success": True,
@@ -4480,16 +4420,6 @@ def api_send_low_stock_alert():
             }
         )
 
-    except smtplib.SMTPAuthenticationError:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": "SMTP authentication failed — check username/password (use an App Password for Gmail)",
-                }
-            ),
-            400,
-        )
     except Exception as exc:
         app.logger.error(f"[email_settings] low-stock send failed: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
@@ -4716,28 +4646,13 @@ def _send_daily_sales_summary_email(target_date=None, cfg=None):
     </div>
     """
 
-    # ── Send via SMTP ─────────────────────────────────────────────────────────
+    # ── Send via Resend API ───────────────────────────────────────────────────
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"📊 Daily Sales Summary — {date_str}"
-        msg["From"] = cfg["smtp_user"]
-        msg["To"] = cfg["alert_recipient"]
-        msg.attach(MIMEText(html_body, "html"))
-
-        port = int(cfg.get("smtp_port") or 587)
-        use_tls = bool(cfg.get("smtp_use_tls", True))
-
-        if use_tls:
-            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=15)
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-        else:
-            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=15)
-
-        server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
-        server.quit()
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject=f"📊 Daily Sales Summary — {date_str}",
+            html_body=html_body,
+        )
         app.logger.info(
             f"[daily_summary] Summary for {date_sql} sent to {cfg['alert_recipient']}"
         )

@@ -56,3 +56,5 @@ urllib3==2.6.3
 
 # Compression
 Flask-Compress==1.15
+# Email (Resend — HTTPS, works on Render free tier)
+resend==2.42.0
