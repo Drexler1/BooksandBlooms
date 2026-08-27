@@ -5,7 +5,7 @@ services:
     region: singapore
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --worker-class gevent --workers 1 --worker-connections 100 --timeout 120 --preload
+    startCommand: gunicorn app:app --workers 1 --threads 2 --timeout 120 --preload  
     envVars:
       - key: FLASK_SECRET_KEY
         sync: false
@@ -14,7 +14,7 @@ services:
       - key: MYSQL_HOST
         sync: false
       - key: MYSQL_PORT
-        value: "3306"
+        sync: false
       - key: MYSQL_USER
         sync: false
       - key: MYSQL_PASSWORD
