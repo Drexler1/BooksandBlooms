@@ -1,3 +1,6 @@
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress TensorFlow CPU warnings
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,7 +23,7 @@ from deepface import DeepFace
 from datetime import datetime, timedelta, date
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-import base64, cv2, os, numpy as np, time, hashlib, bcrypt, json, secrets, re
+import base64, cv2, numpy as np, time, hashlib, bcrypt, json, secrets, re
 import smtplib, csv, io
 from flask import Response
 from email.mime.multipart import MIMEMultipart
