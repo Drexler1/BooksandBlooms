@@ -3288,6 +3288,16 @@
             // Run in parallel — no reason to wait for categories before products
             await Promise.all([loadCategories(), loadProducts()]);
             _connectAdminSSE();     // then switch to SSE for live pushes
+
+            // Close SSE when navigating away — frees the server thread immediately
+            window.addEventListener("beforeunload", () => {
+                if (_sseAdmin) { try { _sseAdmin.close(); } catch (_) {} _sseAdmin = null; }
+            });
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "hidden") {
+                    if (_sseAdmin) { try { _sseAdmin.close(); } catch (_) {} _sseAdmin = null; }
+                }
+            });
         })();
     </script>
 </body>
