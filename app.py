@@ -34,7 +34,7 @@ def _send_email_resend(
     subject: str,
     html_body: str,
     from_name: str = "Books & Blooms Café",
-    from_address: str = "onboarding@resend.dev",
+    from_address: str = "bloomsbooks2@gmail.com",
 ):
     """
     Send email via Resend API (HTTPS port 443 — works on Render free tier).
