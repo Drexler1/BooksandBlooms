@@ -691,6 +691,7 @@ if _ssl_ca:
 app.config["MYSQL_CONNECT_TIMEOUT"] = 10   # fail fast if Aiven is unreachable
 app.config["MYSQL_READ_TIMEOUT"]    = 30   # prevent hung queries blocking threads
 app.config["MYSQL_WRITE_TIMEOUT"]   = 30
+app.config["MYSQL_INIT_COMMAND"]    = "SET time_zone='+08:00'"  # Philippine Standard Time
 
 mysql = MySQL(app)
 from flask_compress import Compress
