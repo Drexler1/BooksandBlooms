@@ -21,6 +21,9 @@ from MySQLdb.cursors import DictCursor
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from deepface import DeepFace
 from datetime import datetime, timedelta, date
+import pytz
+
+PHT = pytz.timezone("Asia/Manila")
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import base64, cv2, numpy as np, time, hashlib, bcrypt, json, secrets, re
@@ -423,7 +426,7 @@ def _ensure_trash_table():
         rows = cur.fetchall()
         migrated = 0
         for row in rows:
-            disabled_at = row["disabled_at"] or datetime.now()
+            disabled_at = row["disabled_at"] or datetime.now(PHT)
             delete_at = disabled_at + timedelta(hours=24)
             cur.execute(
                 """
@@ -473,7 +476,7 @@ def _purge_expired_trash():
     Called lazily on requests, at most every _PURGE_INTERVAL_SECONDS.
     """
     global _last_purge_check
-    now = datetime.now()
+    now = datetime.now(PHT)
     if (
         _last_purge_check
         and (now - _last_purge_check).total_seconds() < _PURGE_INTERVAL_SECONDS
@@ -563,7 +566,7 @@ def check_lockout(username_hash: str, role: str) -> dict:
             "attempts_left": MAX_ATTEMPTS,
         }
 
-    now = datetime.now()
+    now = datetime.now(PHT)
     locked_until = row.get("locked_until")
 
     if locked_until and locked_until > now:
@@ -597,7 +600,7 @@ def record_failed_attempt(username_hash: str, role: str) -> dict:
     Returns the same dict shape as check_lockout() reflecting the new state.
     """
     key = _lockout_key(username_hash, role)
-    now = datetime.now()
+    now = datetime.now(PHT)
     try:
         conn = mysql.connection
         cur = conn.cursor(DictCursor)
@@ -753,6 +756,16 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # CSRF mitigation
 app.config["SESSION_COOKIE_SECURE"]   = True   # HTTPS only (set False for local HTTP dev)
 
+# ── Force MySQL session timezone to Philippine Time (UTC+8) ──────────────
+@app.before_request
+def set_db_timezone():
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SET time_zone = '+08:00'")
+        cur.close()
+    except Exception:
+        pass
+
 # ── HTTP security headers ─────────────────────────────────────────────────
 @app.after_request
 def set_security_headers(response):
@@ -807,7 +820,7 @@ def reset_liveness(emp_id):
         "step": "center",  # center → up → down (nod)
         "last_y": None,
         "passed": False,
-        "start_time": datetime.now(),
+        "start_time": datetime.now(PHT),
         "stable": 0,  # frames without movement (photo-detection)
     }
 
@@ -1341,7 +1354,7 @@ def verify_face():
     else:
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
-    now = datetime.now()
+    now = datetime.now(PHT)
 
     # ── Rate-limit per employee (anti-spam) ─────────────────────────────────
     if employee_id in last_frame_time:
@@ -1513,7 +1526,7 @@ def verify_face():
             app.logger.error(f"[face_mismatch_log] write failed: {log_err}")
 
         if fm["count"] >= MAX_FACE_MISMATCHES:
-            fm["locked_until"] = datetime.now() + timedelta(
+            fm["locked_until"] = datetime.now(PHT) + timedelta(
                 seconds=FACE_LOCKOUT_SECONDS
             )
             fm["count"] = 0
@@ -1546,10 +1559,10 @@ def verify_face():
     verify_token = secrets.token_urlsafe(32)
     verified_tokens[verify_token] = {
         "employee_id": employee_id,
-        "expires": datetime.now() + timedelta(seconds=VERIFY_TOKEN_TTL),
+        "expires": datetime.now(PHT) + timedelta(seconds=VERIFY_TOKEN_TTL),
     }
     # Purge expired tokens to prevent unbounded memory growth
-    _now = datetime.now()
+    _now = datetime.now(PHT)
     for _t in [t for t, v in list(verified_tokens.items()) if v["expires"] < _now]:
         verified_tokens.pop(_t, None)
 
@@ -2163,7 +2176,7 @@ def choose_method():
     # Generate token + OTP
     raw_token  = secrets.token_hex(32)
     otp_code   = str(secrets.randbelow(900000) + 100000)
-    expires_at = datetime.now() + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+    expires_at = datetime.now(PHT) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
 
     try:
         ins = mysql.connection.cursor()
@@ -2262,7 +2275,7 @@ def verify_otp():
         flash("OTP session not found. Please request a new one.", "danger")
         return redirect(url_for("forgot_password"))
 
-    if record["expires_at"] < datetime.now():
+    if record["expires_at"] < datetime.now(PHT):
         flash("Your OTP has expired. Please request a new one.", "danger")
         return redirect(url_for("forgot_password"))
 
@@ -2331,7 +2344,7 @@ def reset_password():
             flash("This reset link is invalid or has already been used.", "danger")
             return redirect(url_for("forgot_password"))
 
-        if record["expires_at"] < datetime.now():
+        if record["expires_at"] < datetime.now(PHT):
             flash(
                 "This reset link has expired. Please request a new one.", "danger"
             )
@@ -2369,7 +2382,7 @@ def reset_password():
         flash("This reset link is invalid or has already been used.", "danger")
         return redirect(url_for("forgot_password"))
 
-    if record["expires_at"] < datetime.now():
+    if record["expires_at"] < datetime.now(PHT):
         flash("This reset link has expired. Please request a new one.", "danger")
         return redirect(url_for("forgot_password"))
 
@@ -2513,7 +2526,7 @@ def dashboard():
             ORDER BY t.created_at DESC
             LIMIT 10
         """)
-        now_dt = datetime.now()
+        now_dt = datetime.now(PHT)
         for r in cur.fetchall():
             diff = now_dt - r["created_at"]
             secs = int(diff.total_seconds())
@@ -2870,7 +2883,7 @@ def add_employee():
         cur2.execute("SELECT created_at FROM employees WHERE employee_id=%s", (employee_id,))
         created_row = cur2.fetchone()
         cur2.close()
-        created_at_str = created_row["created_at"].strftime("%y%m") if created_row and created_row.get("created_at") else datetime.now().strftime("%y%m")
+        created_at_str = created_row["created_at"].strftime("%y%m") if created_row and created_row.get("created_at") else datetime.now(PHT).strftime("%y%m")
 
         return jsonify(
             {
@@ -3036,7 +3049,7 @@ def delete_employee(employee_id):
                 400,
             )
 
-        now = datetime.now()
+        now = datetime.now(PHT)
         delete_at = now + timedelta(hours=24)
 
         # Insert snapshot into trash
@@ -3277,7 +3290,7 @@ def log_attendance():
             403,
         )
 
-    if datetime.now() > token_data["expires"]:
+    if datetime.now(PHT) > token_data["expires"]:
         verified_tokens.pop(verify_token, None)
         app.logger.warning(
             f"[log_attendance] EXPIRED TOKEN — employee {employee_id_str} ip={request.remote_addr}"
@@ -3344,7 +3357,7 @@ def log_attendance():
             shift_row = cur.fetchone()
             cfg = _get_late_deduction_settings()
             if shift_row and shift_row.get("start_time"):
-                now_time = datetime.now()
+                now_time = datetime.now(PHT)
                 # Build shift-start datetime using today's date
                 start_str = shift_row["start_time"]  # "HH:MM"
                 sh, sm = map(int, start_str.split(":"))
@@ -3550,7 +3563,7 @@ def api_attendance():
         except ValueError:
             return jsonify({"success": False, "message": "Invalid date format"}), 400
     else:
-        dt = datetime.now().date()
+        dt = datetime.now(PHT).date()
 
     cur = mysql.connection.cursor(DictCursor)
 
@@ -3561,8 +3574,8 @@ def api_attendance():
             e.full_name,
             e.role,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i:%%s') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i:%%s') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i:%%s %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i:%%s %%p') AS clock_out,
             CASE
                 WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out) / 60, 2)
@@ -4378,7 +4391,7 @@ def api_send_low_stock_alert():
 
     table_html = table_head + rows_html + "</tbody></table>"
 
-    now_str = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+    now_str = datetime.now(PHT).strftime("%B %d, %Y at %I:%M %p")
     out_count = sum(1 for i in supplies if i["status"] == "out")
     low_count = sum(1 for i in supplies if i["status"] == "low")
 
@@ -5265,8 +5278,8 @@ def api_my_attendance():
             a.attendance_id,
             DATE_FORMAT(a.attendance_date, '%%Y-%%m-%%d') AS attendance_date,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i:%%s') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i:%%s') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i:%%s %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i:%%s %%p') AS clock_out,
             CASE WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL
                  THEN ROUND(TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out)/60, 2)
                  ELSE NULL END AS hours_worked,
@@ -5316,7 +5329,7 @@ def api_my_attendance():
             }
         )
     else:
-        dt = datetime.now().date()
+        dt = datetime.now(PHT).date()
         if date_str:
             try:
                 dt = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -5746,7 +5759,7 @@ def run_auto_migration():
 
     # ── STEP 16: close any missed clock-outs from yesterday (server restart catch) ─
     try:
-        _auto_clockout_missed((datetime.now() - timedelta(days=1)).date())
+        _auto_clockout_missed((datetime.now(PHT) - timedelta(days=1)).date())
     except Exception as exc:
         app.logger.error(f"[migration] Step 16 (startup auto-clockout) failed: {exc}")
 
@@ -6134,8 +6147,8 @@ def api_payroll_daily():
             e.full_name,
             e.role,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i %%p') AS clock_out,
             COALESCE(NULLIF(a.hours_worked,0),
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE,a.clock_in,a.clock_out)/60.0,4)
@@ -6311,8 +6324,8 @@ def api_payroll_period_detail():
         SELECT
             a.attendance_date,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i %%p') AS clock_out,
             COALESCE(NULLIF(a.hours_worked,0),
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE,a.clock_in,a.clock_out)/60.0,2)
@@ -6394,8 +6407,8 @@ def api_payroll_salary_detail():
         SELECT
             a.attendance_date,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i %%p') AS clock_out,
             COALESCE(NULLIF(a.hours_worked, 0),
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out) / 60.0, 2)
@@ -7322,7 +7335,7 @@ def api_pos_checkout():
             "payment_method": payment_method,
             "gcash_ref": gcash_ref,
             "note": note,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "created_at": datetime.now(PHT).strftime("%Y-%m-%d %H:%M:%S"),
         }
         app.logger.info(
             f"[sales] Transaction #{transaction_id} — "
@@ -8829,7 +8842,7 @@ def api_inv_items_eod_report():
         if date_str:
             report_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         else:
-            report_date = datetime.now().date()
+            report_date = datetime.now(PHT).date()
     except ValueError:
         return (
             jsonify(
@@ -9806,7 +9819,7 @@ def api_sales_monthly_product_summary():
         if month_str:
             month_dt = datetime.strptime(month_str, "%Y-%m")
         else:
-            month_dt = datetime.now().replace(day=1)
+            month_dt = datetime.now(PHT).replace(day=1)
     except ValueError:
         return (
             jsonify(
@@ -10002,7 +10015,7 @@ def api_sales_weekly_product_summary():
             # Parse "YYYY-Www" → Monday of that ISO week
             week_dt = datetime.strptime(week_str + "-1", "%G-W%V-%u")
         else:
-            today = datetime.now().date()
+            today = datetime.now(PHT).date()
             iso = today.isocalendar()
             week_dt = datetime.strptime(f"{iso[0]}-W{iso[1]:02d}-1", "%G-W%V-%u")
     except ValueError:
@@ -10175,7 +10188,7 @@ def api_sales_yearly_product_summary():
         limit = 100
 
     try:
-        year = int(year_str) if year_str else datetime.now().year
+        year = int(year_str) if year_str else datetime.now(PHT).year
         if not (2000 <= year <= 2099):
             raise ValueError
     except ValueError:
@@ -10778,8 +10791,8 @@ def api_attendance_export():
                 e.full_name,
                 e.role,
                 a.shift_type,
-                DATE_FORMAT(a.clock_in,  '%H:%i:%s') AS clock_in,
-                DATE_FORMAT(a.clock_out, '%H:%i:%s') AS clock_out,
+                DATE_FORMAT(a.clock_in,  '%h:%i:%s %p') AS clock_in,
+                DATE_FORMAT(a.clock_out, '%h:%i:%s %p') AS clock_out,
                 CASE
                     WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL
                     THEN ROUND(TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out) / 60, 2)
@@ -10998,7 +11011,7 @@ def _auto_clockout_missed(target_date=None):
     import calendar as _cal
 
     if target_date is None:
-        target_date = (datetime.now() - timedelta(days=1)).date()
+        target_date = (datetime.now(PHT) - timedelta(days=1)).date()
 
     midnight_cutoff = datetime.combine(target_date, datetime.min.time()).replace(
         hour=23, minute=59, second=59
@@ -11088,7 +11101,7 @@ def _midnight_clockout_thread():
 
     with app.app_context():
         while True:
-            now = datetime.now()
+            now = datetime.now(PHT)
             # Next midnight = start of tomorrow
             next_midnight = datetime.combine(
                 now.date() + timedelta(days=1), datetime.min.time()
@@ -11100,7 +11113,7 @@ def _midnight_clockout_thread():
                 f"[auto-clockout] Thread sleeping {sleep_sec/3600:.2f}h until {next_midnight}"
             )
             _time.sleep(max(sleep_sec, 1))
-            yesterday = (datetime.now() - timedelta(days=1)).date()
+            yesterday = (datetime.now(PHT) - timedelta(days=1)).date()
             _auto_clockout_missed(yesterday)
 
 
@@ -11151,7 +11164,7 @@ def _daily_summary_thread():
     with app.app_context():
         while True:
             send_hour, send_minute = _get_daily_summary_send_time()
-            now = datetime.now()
+            now = datetime.now(PHT)
             target = now.replace(
                 hour=send_hour, minute=send_minute, second=0, microsecond=0
             )
@@ -11163,7 +11176,7 @@ def _daily_summary_thread():
                     f"[daily_summary] Missed window by {missed_by/60:.1f} min; "
                     "sending now to catch up."
                 )
-                today = datetime.now().date()
+                today = datetime.now(PHT).date()
                 try:
                     _send_daily_sales_summary_email(target_date=today)
                 except Exception as _exc:
@@ -11181,7 +11194,7 @@ def _daily_summary_thread():
                 f"({sleep_sec/3600:.2f}h away)"
             )
             _time.sleep(max(sleep_sec, 1))
-            today = datetime.now().date()
+            today = datetime.now(PHT).date()
             try:
                 _send_daily_sales_summary_email(target_date=today)
             except Exception as _exc:
@@ -11612,7 +11625,7 @@ def api_overtime_request_submit():
         req_date = (
             datetime.strptime(request_date_str, "%Y-%m-%d").date()
             if request_date_str
-            else datetime.now().date()
+            else datetime.now(PHT).date()
         )
     except ValueError:
         return (
@@ -12604,14 +12617,14 @@ def api_backup_export():
         payload = {
             "backup_meta": {
                 "type":        export_type,
-                "exported_at": datetime.now().isoformat(timespec="seconds"),
+                "exported_at": datetime.now(PHT).isoformat(timespec="seconds"),
                 "exported_by": session.get("admin_username") or f"admin#{session.get('admin_id')}",
                 "version":     1,
             },
             "tables": tables_data,
         }
 
-        ts       = datetime.now().strftime("%Y%m%d-%H%M%S")
+        ts       = datetime.now(PHT).strftime("%Y%m%d-%H%M%S")
         filename = f"books-blooms-{export_type}-backup-{ts}.json"
 
         app.logger.info(
