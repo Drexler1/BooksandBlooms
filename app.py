@@ -24,10 +24,11 @@ from datetime import datetime, timedelta, date
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import base64, cv2, numpy as np, time, hashlib, bcrypt, json, secrets, re
-import resend, csv, io
+import csv, io
 from flask import Response
 from werkzeug.utils import secure_filename
 import threading
+import requests as http_requests
 
 def _send_email_resend(
     to_email: str,
@@ -37,25 +38,36 @@ def _send_email_resend(
     from_address: str = "bloomsbooks2@gmail.com",
 ):
     """
-    Send email via Resend API (HTTPS port 443 — works on Render free tier).
-    Set RESEND_API_KEY in your environment / Render dashboard.
-    After verifying your domain in Resend, replace from_address with your
-    own address (e.g. 'noreply@yourdomain.com').
+    Send email via Brevo (formerly Sendinblue) API — HTTPS port 443,
+    works on Render free tier. Sends to ANY recipient email address.
+    Set BREVO_API_KEY in your Render dashboard → Environment.
+    Get your free API key at: https://app.brevo.com/settings/keys/api
     """
-    api_key = os.environ.get("RESEND_API_KEY", "")
+    api_key = os.environ.get("BREVO_API_KEY", "")
     if not api_key:
         raise RuntimeError(
-            "RESEND_API_KEY is not set in the environment. "
+            "BREVO_API_KEY is not set in the environment. "
             "Add it in your Render dashboard → Environment."
         )
-    resend.api_key = api_key
-    params: resend.Emails.SendParams = {
-        "from": f"{from_name} <{from_address}>",
-        "to": [to_email],
+    payload = {
+        "sender": {"name": from_name, "email": from_address},
+        "to": [{"email": to_email}],
         "subject": subject,
-        "html": html_body,
+        "htmlContent": html_body,
     }
-    resend.Emails.send(params)
+    response = http_requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=10,
+    )
+    if response.status_code not in (200, 201):
+        raise RuntimeError(
+            f"Brevo API error {response.status_code}: {response.text}"
+        )
 
 
 app = Flask(__name__)
@@ -3687,7 +3699,7 @@ def _send_overtime_request_email_with_cfg(
         return
 
     try:
-        review_url = "http://127.0.0.1:5000/admin_settings"
+        review_url = "https://books-and-blooms.onrender.com/admin_settings"
 
         html_body = f"""
         <div style="font-family:DM Sans,Arial,sans-serif;max-width:560px;margin:0 auto;
@@ -3795,7 +3807,7 @@ def _send_overtime_request_email(
 
     try:
         review_url = (
-            "http://127.0.0.1:5000/admin_settings"  # adjust to production URL if needed
+            "https://books-and-blooms.onrender.com/admin_settings"
         )
 
         html_body = f"""
@@ -4462,15 +4474,8 @@ def _send_daily_sales_summary_email(target_date=None, cfg=None):
         app.logger.info("[daily_summary] daily_summary_enabled is OFF; skipping.")
         return
 
-    missing = [
-        f
-        for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient")
-        if not cfg.get(f)
-    ]
-    if missing:
-        app.logger.warning(
-            f"[daily_summary] Missing SMTP fields {missing}; cannot send."
-        )
+    if not cfg.get("alert_recipient"):
+        app.logger.warning("[daily_summary] No alert_recipient set; cannot send.")
         return
 
     # ── Query yesterday's sales data ──────────────────────────────────────────
@@ -4630,7 +4635,7 @@ def _send_daily_sales_summary_email(target_date=None, cfg=None):
 
         <!-- CTA -->
         <div style="margin-top:26px;text-align:center;">
-          <a href="http://127.0.0.1:5000/admin_sales"
+          <a href="https://books-and-blooms.onrender.com/admin_sales"
              style="background:#c9a961;color:#1a1a1a;padding:12px 28px;border-radius:8px;
                     text-decoration:none;font-weight:700;font-size:0.95rem;display:inline-block;">
             📈 View Full Sales Report

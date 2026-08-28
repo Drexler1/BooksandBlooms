@@ -56,5 +56,5 @@ urllib3==2.6.3
 
 # Compression
 Flask-Compress==1.15
-# Email (Resend — HTTPS, works on Render free tier)
-resend==2.42.0
+# Email (Brevo — HTTPS, works on Render free tier, sends to any recipient)
+# No extra package needed — uses requests (already listed above)
