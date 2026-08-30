@@ -2304,7 +2304,8 @@
             margin-top: 1rem;
             line-height: 1.5;
         }
-    </style>
+
+</style>
 </head>
 
 <body>
@@ -4002,60 +4003,8 @@
 
     </script>
 
-    <!-- ── Manual Clock-Out Override Modal ─────────────────────────────────── -->
-    <div class="modal-overlay" id="overrideModal">
-        <div class="modal" style="max-width:min(480px, calc(100vw - 2rem));">
-            <div class="modal-header">
-                <h2>Manual <span>Clock-Out</span></h2>
-                <button class="modal-close" id="closeOverrideModal">✕</button>
-            </div>
-            <div class="modal-body">
-                <p style="font-size:0.9rem;color:#888;margin-bottom:1.25rem;">
-                    Override the clock-out time for an employee who forgot to clock out.
-                    Hours and pay are recalculated automatically.
-                </p>
-                <div style="margin-bottom:1rem;">
-                    <label
-                        style="font-size:0.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#666;display:block;margin-bottom:.4rem;">Employee</label>
-                    <div id="overrideEmpName"
-                        style="font-size:1rem;font-weight:600;padding:.6rem .9rem;background:#f8f6f0;border-radius:8px;border:1px solid #e8e0cf;">
-                    </div>
-                    <input type="hidden" id="overrideAttId">
-                    <input type="hidden" id="overrideClockIn">
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
-                    <div>
-                        <label
-                            style="font-size:0.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#666;display:block;margin-bottom:.4rem;">Clock-In</label>
-                        <div id="overrideClockInDisplay"
-                            style="font-size:1rem;padding:.6rem .9rem;background:#f8f6f0;border-radius:8px;border:1px solid #e8e0cf;">
-                        </div>
-                    </div>
-                    <div>
-                        <label
-                            style="font-size:0.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#666;display:block;margin-bottom:.4rem;">Set
-                            Clock-Out</label>
-                        <input type="time" id="overrideTimeInput"
-                            style="width:100%;padding:.6rem .9rem;border:1px solid #c9a961;border-radius:8px;font-size:1rem;background:#fff;">
-                    </div>
-                </div>
-                <div id="overrideError"
-                    style="display:none;color:#c0392b;font-size:0.85rem;padding:.5rem .75rem;background:#fdf0ee;border-radius:6px;margin-bottom:.75rem;">
-                </div>
-                <div id="overridePreview"
-                    style="display:none;padding:.75rem;background:#f0f7ee;border-radius:8px;border:1px solid #b7d9ae;font-size:0.9rem;color:#2d6a27;">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-outline" id="cancelOverrideBtn">Cancel</button>
-                <div class="modal-footer-right">
-                    <button class="btn-primary" id="confirmOverrideBtn">Save Clock-Out</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <script>
+
         (function () {
             const modal = document.getElementById('overrideModal');
             const closeBtn = document.getElementById('closeOverrideModal');
@@ -4141,9 +4090,9 @@
             // Expose so the table rows can call it
             window.openManualClockout = openOverride;
         })();
-    </script>
+    
 
-    <script>
+
         /* ═══════════════════════════════════════════════════════════
            DEDUCTION EDIT MODAL
            ═══════════════════════════════════════════════════════════ */
@@ -4279,7 +4228,65 @@
                 }
             });
         })();
-    </script>
+    
+</script>
+
+    <!-- ── Manual Clock-Out Override Modal ─────────────────────────────────── -->
+    <div class="modal-overlay" id="overrideModal">
+        <div class="modal" style="max-width:min(480px, calc(100vw - 2rem));">
+            <div class="modal-header">
+                <h2>Manual <span>Clock-Out</span></h2>
+                <button class="modal-close" id="closeOverrideModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.9rem;color:#888;margin-bottom:1.25rem;">
+                    Override the clock-out time for an employee who forgot to clock out.
+                    Hours and pay are recalculated automatically.
+                </p>
+                <div style="margin-bottom:1rem;">
+                    <label
+                        style="font-size:0.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#666;display:block;margin-bottom:.4rem;">Employee</label>
+                    <div id="overrideEmpName"
+                        style="font-size:1rem;font-weight:600;padding:.6rem .9rem;background:#f8f6f0;border-radius:8px;border:1px solid #e8e0cf;">
+                    </div>
+                    <input type="hidden" id="overrideAttId">
+                    <input type="hidden" id="overrideClockIn">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label
+                            style="font-size:0.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#666;display:block;margin-bottom:.4rem;">Clock-In</label>
+                        <div id="overrideClockInDisplay"
+                            style="font-size:1rem;padding:.6rem .9rem;background:#f8f6f0;border-radius:8px;border:1px solid #e8e0cf;">
+                        </div>
+                    </div>
+                    <div>
+                        <label
+                            style="font-size:0.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#666;display:block;margin-bottom:.4rem;">Set
+                            Clock-Out</label>
+                        <input type="time" id="overrideTimeInput"
+                            style="width:100%;padding:.6rem .9rem;border:1px solid #c9a961;border-radius:8px;font-size:1rem;background:#fff;">
+                    </div>
+                </div>
+                <div id="overrideError"
+                    style="display:none;color:#c0392b;font-size:0.85rem;padding:.5rem .75rem;background:#fdf0ee;border-radius:6px;margin-bottom:.75rem;">
+                </div>
+                <div id="overridePreview"
+                    style="display:none;padding:.75rem;background:#f0f7ee;border-radius:8px;border:1px solid #b7d9ae;font-size:0.9rem;color:#2d6a27;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" id="cancelOverrideBtn">Cancel</button>
+                <div class="modal-footer-right">
+                    <button class="btn-primary" id="confirmOverrideBtn">Save Clock-Out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+
+    
 
 </body>
 

@@ -22,9 +22,9 @@ cryptography==46.0.5
 # Environment
 python-dotenv==1.2.2
 
-# TensorFlow
-tensorflow==2.15.0
-tf-keras==2.15.1
+# TensorFlow (CPU-only build — ~300 MB lighter than the full GPU wheel,
+# safe on Render Starter which has no GPU anyway)
+tensorflow-cpu==2.15.0
 
 # DeepFace & Vision
 deepface==0.0.93

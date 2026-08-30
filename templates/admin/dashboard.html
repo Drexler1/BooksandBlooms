@@ -854,7 +854,8 @@
             .card:nth-child(2) { animation-delay: 0.2s; }
             .card:nth-child(3) { animation-delay: 0.3s; }
             .card:nth-child(4) { animation-delay: 0.4s; }
-        </style>
+
+</style>
     </head>
     <body>
         <div class="nav-overlay" id="navOverlay"></div>
@@ -1093,6 +1094,11 @@
             </div>
         </div>
 
+        
+
+        
+
+        
         <script>
             // Update date and time
             function updateDateTime() {
@@ -1183,7 +1189,98 @@
             setInterval(refreshLowStock, 90_000);
         </script>
 
-        <script>
+
+
+            // Update date and time
+            function updateDateTime() {
+                const now = new Date();
+                
+                const dateOptions = { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                };
+                const dateStr = now.toLocaleDateString('en-US', dateOptions);
+                document.getElementById('currentDate').textContent = dateStr;
+                
+                const timeStr = now.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                document.getElementById('currentTime').textContent = timeStr;
+            }
+
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+
+            // Chart filter buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+            // ── Live low-stock polling ─────────────────────────────────────────
+            // Fetches /api/inventory/low-stock every 90 s and updates the card
+            // and the alert table without a full page reload.
+            const BADGE_MAP = { low: 'medium', out: 'low' };
+            const LABEL_MAP = { low: 'Low',    out: 'Critical' };
+
+            async function refreshLowStock() {
+                try {
+                    const res  = await fetch('/api/inventory/low-stock?limit=20');
+                    const data = await res.json();
+                    if (!data.success) return;
+
+                    const count   = data.count;
+                    const items   = data.items;
+                    const hasCrit = items.some(i => i.status === 'out');
+
+                    // ── Summary card ──────────────────────────────────────────
+                    const countEl  = document.getElementById('dashLowStockCount');
+                    const badgeEl  = document.getElementById('dashLowStockBadge');
+                    const iconEl   = document.getElementById('dashLowStockIcon');
+                    const cardEl   = document.getElementById('dashLowStockCard');
+
+                    if (countEl) countEl.textContent = count || '0';
+                    if (badgeEl) badgeEl.textContent = `↑ ${count} item${count !== 1 ? 's' : ''}`;
+                    if (iconEl)  iconEl.textContent   = hasCrit ? '🚨' : '📦';
+                    if (cardEl) {
+                        cardEl.style.borderColor = hasCrit ? 'var(--danger)' : '';
+                    }
+
+                    // ── Alert table ───────────────────────────────────────────
+                    const tbody = document.getElementById('dashLowStockBody');
+                    if (!tbody) return;
+
+                    if (items.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="4">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">✅</div>
+                                <p>All stock levels are healthy</p>
+                            </div></td></tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = items.map(item => `
+                        <tr>
+                            <td data-label="Product"><strong>${item.name}</strong></td>
+                            <td data-label="Category">${item.category}</td>
+                            <td data-label="Stock">${item.stock} ${item.unit}</td>
+                            <td data-label="Status"><span class="badge ${BADGE_MAP[item.status] || 'medium'}">${LABEL_MAP[item.status] || item.status}</span></td>
+                        </tr>`).join('');
+                } catch (e) { /* silent — non-critical */ }
+            }
+
+            // Run once on load then every 90 seconds
+            refreshLowStock();
+            setInterval(refreshLowStock, 90_000);
+        
+
+
             // ── Top Products Date Filter ──────────────────────────────────────
             (function () {
                 function getDateRange(range) {
@@ -1256,9 +1353,9 @@
                     });
                 }
             })();
-        </script>
+        
 
-        <script>
+
             // ── Sync nav top to actual header height ─────────────────────────
             (function () {
                 var hdr = document.querySelector('header');
@@ -1306,6 +1403,7 @@
                     if (window.innerWidth > 768) closeNav();
                 });
             })();
-        </script>
-    </body>
+        
+</script>
+</body>
     </html>

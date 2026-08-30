@@ -756,16 +756,6 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # CSRF mitigation
 app.config["SESSION_COOKIE_SECURE"]   = True   # HTTPS only (set False for local HTTP dev)
 
-# ── Force MySQL session timezone to Philippine Time (UTC+8) ──────────────
-@app.before_request
-def set_db_timezone():
-    try:
-        cur = mysql.connection.cursor()
-        cur.execute("SET time_zone = '+08:00'")
-        cur.close()
-    except Exception:
-        pass
-
 # ── HTTP security headers ─────────────────────────────────────────────────
 @app.after_request
 def set_security_headers(response):
@@ -1718,7 +1708,11 @@ def login():
 
         # ── Legacy admin tab ─────────────────────────────────────────────────
         if role == "admin":
-            cur.execute("SELECT * FROM admins WHERE username_hash=%s", (u_hash,))
+            cur.execute(
+                "SELECT admin_id, username, full_name, password, email"
+                " FROM admins WHERE username_hash=%s",
+                (u_hash,),
+            )
             user = _dec_adm(cur.fetchone())
             if user and _check_login_password(password, user):
                 session.clear()
@@ -1732,7 +1726,8 @@ def login():
         # ── Manager tab ──────────────────────────────────────────────────────
         elif role == "manager":
             cur.execute(
-                """SELECT * FROM employees WHERE username_hash=%s
+                """SELECT employee_id, username, full_name, password, email
+                   FROM employees WHERE username_hash=%s
                    AND role='manager' AND employment_status='active'""",
                 (u_hash,),
             )
@@ -1752,7 +1747,11 @@ def login():
                 redirect_to = url_for("dashboard")
             else:
                 # Fallback: try admins table via Manager tab
-                cur.execute("SELECT * FROM admins WHERE username_hash=%s", (u_hash,))
+                cur.execute(
+                    "SELECT admin_id, username, full_name, password, email"
+                    " FROM admins WHERE username_hash=%s",
+                    (u_hash,),
+                )
                 admin = _dec_adm(cur.fetchone())
                 if admin and _check_login_password(password, admin):
                     session.clear()
@@ -1766,7 +1765,8 @@ def login():
         # ── Cashier tab ──────────────────────────────────────────────────────
         elif role == "cashier":
             cur.execute(
-                """SELECT * FROM employees WHERE username_hash=%s
+                """SELECT employee_id, username, full_name, password, email
+                   FROM employees WHERE username_hash=%s
                    AND role='cashier' AND employment_status='active'""",
                 (u_hash,),
             )
@@ -2429,6 +2429,158 @@ def reset_password():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
+# ── Dashboard data cache (60-second TTL) ────────────────────────────────────
+# Avoids 6 serial round-trips to Aiven on every page load.
+# Safe for a POS — 60-second-old sales totals are fine for a summary view.
+_dashboard_cache: dict = {}
+_DASHBOARD_CACHE_TTL = 60  # seconds
+
+
+def _get_dashboard_data() -> dict:
+    """
+    Fetch all dashboard metrics in as few DB round-trips as possible and
+    cache the result for _DASHBOARD_CACHE_TTL seconds.
+    """
+    now = datetime.now(PHT)
+    cached = _dashboard_cache.get("data")
+    if cached and (now - cached["_cached_at"]).total_seconds() < _DASHBOARD_CACHE_TTL:
+        return cached
+
+    cur = mysql.connection.cursor(DictCursor)
+
+    # ── 1. Today + yesterday sales/counts in ONE query ────────────────────────
+    cur.execute("""
+        SELECT
+            COALESCE(SUM(CASE WHEN created_at >= CURDATE() THEN total_amount END), 0)          AS today_total,
+            COUNT(CASE WHEN created_at >= CURDATE() THEN 1 END)                                 AS today_count,
+            COALESCE(SUM(CASE WHEN created_at >= CURDATE() - INTERVAL 1 DAY
+                               AND created_at < CURDATE() THEN total_amount END), 0)            AS yest_total,
+            COUNT(CASE WHEN created_at >= CURDATE() - INTERVAL 1 DAY
+                        AND created_at < CURDATE() THEN 1 END)                                  AS yest_count
+        FROM transactions
+        WHERE created_at >= CURDATE() - INTERVAL 1 DAY
+          AND status = 'completed'
+    """)
+    srow = cur.fetchone()
+    today_total_raw = float(srow["today_total"])
+    today_count_raw = int(srow["today_count"])
+    yest_total      = float(srow["yest_total"])
+    yest_count      = int(srow["yest_count"])
+
+    sales_change = round((today_total_raw - yest_total) / yest_total * 100, 1) if yest_total > 0 else 0
+    transaction_change = round((today_count_raw - yest_count) / yest_count * 100, 1) if yest_count > 0 else 0
+
+    # ── 2. Top product today ──────────────────────────────────────────────────
+    cur.execute("""
+        SELECT ti.product_name, SUM(ti.quantity) AS units_sold
+        FROM transaction_items ti
+        JOIN transactions t ON t.transaction_id = ti.transaction_id
+        WHERE t.created_at >= CURDATE()
+          AND t.created_at < CURDATE() + INTERVAL 1 DAY
+          AND t.status = 'completed'
+        GROUP BY ti.product_name
+        ORDER BY units_sold DESC
+        LIMIT 1
+    """)
+    top_row = cur.fetchone()
+    top_product_name  = top_row["product_name"] if top_row else None
+    top_product_units = int(top_row["units_sold"]) if top_row else 0
+
+    # ── 3. Recent transactions (last 10) ─────────────────────────────────────
+    cur.execute("""
+        SELECT t.transaction_id, t.total_amount, t.created_at,
+               COUNT(ti.item_id)   AS item_count,
+               MIN(ti.category_name) AS category
+        FROM transactions t
+        LEFT JOIN transaction_items ti ON ti.transaction_id = t.transaction_id
+        WHERE t.status = 'completed'
+        GROUP BY t.transaction_id
+        ORDER BY t.created_at DESC
+        LIMIT 10
+    """)
+    recent_transactions = []
+    for r in cur.fetchall():
+        diff = now - r["created_at"]
+        secs = int(diff.total_seconds())
+        if secs < 60:
+            time_ago = f"{secs}s ago"
+        elif secs < 3600:
+            time_ago = f"{secs // 60}m ago"
+        elif secs < 86400:
+            time_ago = f"{secs // 3600}h ago"
+        else:
+            time_ago = f"{secs // 86400}d ago"
+        recent_transactions.append({
+            "id":         r["transaction_id"],
+            "amount":     f"{float(r['total_amount']):,.2f}",
+            "item_count": int(r["item_count"] or 0),
+            "category":   r["category"] or "—",
+            "time_ago":   time_ago,
+        })
+
+    # ── 4. Top products all-time (up to 10) ───────────────────────────────────
+    cur.execute("""
+        SELECT ti.product_name AS name, ti.category_name AS category,
+               SUM(ti.quantity)   AS units_sold,
+               SUM(ti.line_total) AS revenue
+        FROM transaction_items ti
+        JOIN transactions t ON t.transaction_id = ti.transaction_id
+        WHERE t.status = 'completed'
+        GROUP BY ti.product_name, ti.category_name
+        ORDER BY units_sold DESC
+        LIMIT 10
+    """)
+    top_products = [
+        {
+            "name":       r["name"],
+            "category":   r["category"] or "—",
+            "units_sold": int(r["units_sold"]),
+            "revenue":    f"{float(r['revenue']):,.2f}",
+        }
+        for r in cur.fetchall()
+    ]
+
+    # ── 5. 7-day sales chart ──────────────────────────────────────────────────
+    cur.execute("""
+        SELECT DATE(created_at) AS day, COALESCE(SUM(total_amount), 0) AS total
+        FROM transactions
+        WHERE created_at >= CURDATE() - INTERVAL 6 DAY
+          AND status = 'completed'
+        GROUP BY DATE(created_at)
+        ORDER BY day ASC
+    """)
+    chart_rows  = {str(r["day"]): float(r["total"]) for r in cur.fetchall()}
+    day_labels  = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    week_days   = [(date.today() - timedelta(days=6 - i)) for i in range(7)]
+    week_totals = [chart_rows.get(str(d), 0.0) for d in week_days]
+    max_total   = max(week_totals) if any(week_totals) else 1
+    sales_chart_data = [
+        {
+            "day":        day_labels[d.weekday() + 1 if d.weekday() < 6 else 0],
+            "label":      f"{total:,.0f}" if total else "0",
+            "height_pct": round(total / max_total * 90, 1) if max_total else 5,
+        }
+        for d, total in zip(week_days, week_totals)
+    ]
+
+    cur.close()
+
+    result = {
+        "_cached_at":          now,
+        "today_sales":         f"{today_total_raw:,.2f}",
+        "sales_change":        sales_change,
+        "transaction_count":   today_count_raw,
+        "transaction_change":  transaction_change,
+        "top_product_name":    top_product_name,
+        "top_product_units":   top_product_units,
+        "recent_transactions": recent_transactions,
+        "top_products":        top_products,
+        "sales_chart_data":    sales_chart_data,
+    }
+    _dashboard_cache["data"] = result
+    return result
+
+
 @app.route("/dashboard")
 def dashboard():
     if session.get("role") not in ["admin", "manager"]:
@@ -2436,8 +2588,6 @@ def dashboard():
 
     # ── Resolve full_name (always set in session at login) ────────────────────
     full_name = session.get("full_name") or session.get("role", "User").capitalize()
-
-
 
     # ── Inventory: low-stock items (uses shared helper) ────────────────────
     try:
@@ -2447,176 +2597,35 @@ def dashboard():
         low_stock_items = []
     low_stock_count = len(low_stock_items)
 
-    # ── Sales data from transactions table ───────────────────────────────────
-    today_sales = None
-    sales_change = 0
-    transaction_count = None
-    transaction_change = 0
-    top_product_name = None
-    top_product_units = 0
-    sales_chart_data = []
-    recent_transactions = []
-    top_products = []
-
+    # ── All sales metrics — served from 60-second cache ───────────────────────
     try:
-        cur = mysql.connection.cursor(DictCursor)
-
-        # ── Today's sales & transaction count ─────────────────────────────────
-        cur.execute("""
-            SELECT
-                COALESCE(SUM(total_amount), 0)  AS today_total,
-                COUNT(*)                         AS today_count
-            FROM transactions
-            WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY
-              AND status = 'completed'
-        """)
-        row = cur.fetchone()
-        today_total_raw = float(row["today_total"])
-        today_count_raw = int(row["today_count"])
-        today_sales = f"{today_total_raw:,.2f}"
-        transaction_count = today_count_raw
-
-        # ── Yesterday's sales & transaction count (for % change) ──────────────
-        cur.execute("""
-            SELECT
-                COALESCE(SUM(total_amount), 0) AS yest_total,
-                COUNT(*)                        AS yest_count
-            FROM transactions
-            WHERE created_at >= CURDATE() - INTERVAL 1 DAY AND created_at < CURDATE()
-              AND status = 'completed'
-        """)
-        yrow = cur.fetchone()
-        yest_total = float(yrow["yest_total"])
-        yest_count = int(yrow["yest_count"])
-
-        if yest_total > 0:
-            sales_change = round((today_total_raw - yest_total) / yest_total * 100, 1)
-        if yest_count > 0:
-            transaction_change = round(
-                (today_count_raw - yest_count) / yest_count * 100, 1
-            )
-
-        # ── Top-selling product today ──────────────────────────────────────────
-        cur.execute("""
-            SELECT ti.product_name, ti.category_name,
-                   SUM(ti.quantity) AS units_sold
-            FROM transaction_items ti
-            JOIN transactions t ON t.transaction_id = ti.transaction_id
-            WHERE t.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY
-              AND t.status = 'completed'
-            GROUP BY ti.product_name, ti.category_name
-            ORDER BY units_sold DESC
-            LIMIT 1
-        """)
-        top_row = cur.fetchone()
-        if top_row:
-            top_product_name = top_row["product_name"]
-            top_product_units = int(top_row["units_sold"])
-
-        # ── Recent transactions (last 10) ──────────────────────────────────────
-        cur.execute("""
-            SELECT t.transaction_id, t.total_amount,
-                   t.created_at,
-                   COUNT(ti.item_id)             AS item_count,
-                   MIN(ti.category_name)         AS category
-            FROM transactions t
-            LEFT JOIN transaction_items ti ON ti.transaction_id = t.transaction_id
-            WHERE t.status = 'completed'
-            GROUP BY t.transaction_id
-            ORDER BY t.created_at DESC
-            LIMIT 10
-        """)
-        now_dt = datetime.now(PHT)
-        for r in cur.fetchall():
-            diff = now_dt - r["created_at"]
-            secs = int(diff.total_seconds())
-            if secs < 60:
-                time_ago = f"{secs}s ago"
-            elif secs < 3600:
-                time_ago = f"{secs // 60}m ago"
-            elif secs < 86400:
-                time_ago = f"{secs // 3600}h ago"
-            else:
-                time_ago = f"{secs // 86400}d ago"
-            recent_transactions.append(
-                {
-                    "id": r["transaction_id"],
-                    "amount": f"{float(r['total_amount']):,.2f}",
-                    "item_count": int(r["item_count"] or 0),
-                    "category": r["category"] or "—",
-                    "time_ago": time_ago,
-                }
-            )
-
-        # ── Top products (all-time, up to 10) ─────────────────────────────────
-        cur.execute("""
-            SELECT ti.product_name      AS name,
-                   ti.category_name     AS category,
-                   SUM(ti.quantity)     AS units_sold,
-                   SUM(ti.line_total)   AS revenue
-            FROM transaction_items ti
-            JOIN transactions t ON t.transaction_id = ti.transaction_id
-            WHERE t.status = 'completed'
-            GROUP BY ti.product_name, ti.category_name
-            ORDER BY units_sold DESC
-            LIMIT 10
-        """)
-        for r in cur.fetchall():
-            top_products.append(
-                {
-                    "name": r["name"],
-                    "category": r["category"] or "—",
-                    "units_sold": int(r["units_sold"]),
-                    "revenue": f"{float(r['revenue']):,.2f}",
-                }
-            )
-
-        # ── Sales chart — last 7 days ──────────────────────────────────────────
-        cur.execute("""
-            SELECT DATE(created_at) AS day,
-                   COALESCE(SUM(total_amount), 0) AS total
-            FROM transactions
-            WHERE created_at >= CURDATE() - INTERVAL 6 DAY
-              AND status = 'completed'
-            GROUP BY DATE(created_at)
-            ORDER BY day ASC
-        """)
-        chart_rows = {str(r["day"]): float(r["total"]) for r in cur.fetchall()}
-
-        day_labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        week_days = [(date.today() - timedelta(days=6 - i)) for i in range(7)]
-        week_totals = [chart_rows.get(str(d), 0.0) for d in week_days]
-        max_total = max(week_totals) if any(week_totals) else 1
-        for d, total in zip(week_days, week_totals):
-            sales_chart_data.append(
-                {
-                    "day": day_labels[d.weekday() + 1 if d.weekday() < 6 else 0],
-                    "label": f"{total:,.0f}" if total else "0",
-                    "height_pct": round(total / max_total * 90, 1) if max_total else 5,
-                }
-            )
-
-        cur.close()
+        d = _get_dashboard_data()
     except Exception as exc:
         app.logger.error(f"[dashboard] sales query failed: {exc}")
+        d = {
+            "today_sales": None, "sales_change": 0,
+            "transaction_count": None, "transaction_change": 0,
+            "top_product_name": None, "top_product_units": 0,
+            "recent_transactions": [], "top_products": [], "sales_chart_data": [],
+        }
 
     return render_template(
         "admin/dashboard.html",
         full_name=full_name,
         # summary cards
-        today_sales=today_sales,
-        sales_change=sales_change,
-        transaction_count=transaction_count,
-        transaction_change=transaction_change,
+        today_sales=d["today_sales"],
+        sales_change=d["sales_change"],
+        transaction_count=d["transaction_count"],
+        transaction_change=d["transaction_change"],
         low_stock_count=low_stock_count,
         new_low_stock_count=low_stock_count,
-        top_product_name=top_product_name,
-        top_product_units=top_product_units,
+        top_product_name=d["top_product_name"],
+        top_product_units=d["top_product_units"],
         # chart & tables
-        sales_chart_data=sales_chart_data,
-        recent_transactions=recent_transactions,
+        sales_chart_data=d["sales_chart_data"],
+        recent_transactions=d["recent_transactions"],
         low_stock_items=low_stock_items,
-        top_products=top_products,
+        top_products=d["top_products"],
     )
 
 

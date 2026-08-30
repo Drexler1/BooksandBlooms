@@ -22,4 +22,4 @@ RUN python -c "from deepface import DeepFace; import numpy as np; DeepFace.repre
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120", "--preload", "app:app"]
