@@ -25,6 +25,9 @@ python-dotenv==1.2.2
 # TensorFlow (CPU-only build — ~300 MB lighter than the full GPU wheel,
 # safe on Render Starter which has no GPU anyway)
 tensorflow-cpu==2.15.0
+# DeepFace 0.0.93 imports from tensorflow.keras — tf-keras re-exposes
+# that path when using tensorflow-cpu
+tf-keras==2.15.1
 
 # DeepFace & Vision
 deepface==0.0.93
