@@ -2429,6 +2429,71 @@ def reset_password():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
+# ── POS product catalogue cache (30-second TTL) ─────────────────────────────
+# The cashier dashboard fetches /api/pos/products on every page load AND via
+# SSE stream. Caching avoids two DB round-trips per cashier per page open.
+_pos_products_cache: dict = {}
+_POS_PRODUCTS_TTL = 30  # seconds
+
+
+def _get_pos_products() -> dict:
+    """Return cached POS product catalogue, refreshing every 30 seconds."""
+    now = datetime.now(PHT)
+    cached = _pos_products_cache.get("data")
+    if cached and (now - cached["_cached_at"]).total_seconds() < _POS_PRODUCTS_TTL:
+        return cached
+
+    cur = mysql.connection.cursor(DictCursor)
+    cur.execute("""
+        SELECT c.category_id, c.name,
+               COUNT(p.product_id) AS product_count
+        FROM   categories c
+        LEFT   JOIN products p ON p.category_id = c.category_id AND p.is_active = 1
+        GROUP  BY c.category_id
+        HAVING product_count > 0
+        ORDER  BY c.name
+    """)
+    categories = [
+        {"category_id": c["category_id"], "name": c["name"],
+         "product_count": int(c["product_count"])}
+        for c in cur.fetchall()
+    ]
+    cur.execute("""
+        SELECT p.product_id, p.name, p.description,
+               p.image_url, p.icon, p.cup_eligible, p.price, p.stock, p.unit,
+               c.category_id, c.name AS category_name
+        FROM   products p
+        LEFT   JOIN categories c ON c.category_id = p.category_id
+        WHERE  p.is_active = 1
+        ORDER  BY c.name, p.name
+    """)
+    items = [
+        {
+            "product_id":    r["product_id"],
+            "name":          r["name"],
+            "description":   r["description"] or "",
+            "image_url":     r["image_url"] or "",
+            "icon":          r["icon"] or "📦",
+            "cup_eligible":  bool(r.get("cup_eligible", 0)),
+            "price":         float(r["price"]),
+            "stock":         int(r["stock"]),
+            "unit":          r["unit"],
+            "category_id":   r["category_id"],
+            "category_name": r["category_name"] or "Other",
+        }
+        for r in cur.fetchall()
+    ]
+    cur.close()
+    result = {"_cached_at": now, "items": items, "categories": categories}
+    _pos_products_cache["data"] = result
+    return result
+
+
+def _invalidate_pos_cache():
+    """Call this after any product create/update/delete to bust the cache."""
+    _pos_products_cache.clear()
+
+
 # ── Dashboard data cache (60-second TTL) ────────────────────────────────────
 # Avoids 6 serial round-trips to Aiven on every page load.
 # Safe for a POS — 60-second-old sales totals are fine for a summary view.
@@ -7997,7 +8062,8 @@ def api_inventory_items_create():
         mysql.connection.commit()
         new_id = cur.lastrowid
         cur.close()
-        # Broadcast the updated catalogue to all live SSE subscribers
+        # Bust POS product cache and broadcast to SSE subscribers
+        _invalidate_pos_cache()
         _threading.Thread(target=_sse_notify_product_change, daemon=True).start()
         return jsonify(
             {
@@ -8080,7 +8146,8 @@ def api_inventory_items_update(product_id):
         cur.close()
         if affected == 0:
             return jsonify({"success": False, "message": "Product not found"}), 404
-        # Broadcast the updated catalogue to all live SSE subscribers
+        # Bust POS product cache and broadcast to SSE subscribers
+        _invalidate_pos_cache()
         _threading.Thread(target=_sse_notify_product_change, daemon=True).start()
         return jsonify({"success": True, "message": f'"{name}" updated'})
     except Exception as exc:
@@ -8107,7 +8174,8 @@ def api_inventory_items_delete(product_id):
         cur.close()
         if affected == 0:
             return jsonify({"success": False, "message": "Product not found"}), 404
-        # Broadcast the updated catalogue to all live SSE subscribers
+        # Bust POS product cache and broadcast to SSE subscribers
+        _invalidate_pos_cache()
         _threading.Thread(target=_sse_notify_product_change, daemon=True).start()
         return jsonify({"success": True, "message": "Product removed from inventory"})
     except Exception as exc:
@@ -9310,62 +9378,14 @@ def api_pos_products():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     try:
-        cur = mysql.connection.cursor(DictCursor)
-
-        cur.execute("""
-            SELECT c.category_id, c.name,
-                   COUNT(p.product_id) AS product_count
-            FROM   categories c
-            LEFT   JOIN products p
-                   ON p.category_id = c.category_id AND p.is_active = 1
-            GROUP  BY c.category_id
-            HAVING product_count > 0
-            ORDER  BY c.name
-        """)
-        categories = [
-            {
-                "category_id": c["category_id"],
-                "name": c["name"],
-                "product_count": int(c["product_count"]),
-            }
-            for c in cur.fetchall()
-        ]
-
-        cur.execute("""
-            SELECT p.product_id, p.name, p.description,
-                   p.image_url, p.icon, p.cup_eligible, p.price, p.stock, p.unit,
-                   c.category_id, c.name AS category_name
-            FROM   products p
-            LEFT   JOIN categories c ON c.category_id = p.category_id
-            WHERE  p.is_active = 1
-            ORDER  BY c.name, p.name
-        """)
-        items = [
-            {
-                "product_id": r["product_id"],
-                "name": r["name"],
-                "description": r["description"] or "",
-                "image_url": r["image_url"] or "",
-                "icon": r["icon"] or "📦",
-                "cup_eligible": bool(r.get("cup_eligible", 0)),
-                "price": float(r["price"]),
-                "stock": int(r["stock"]),
-                "unit": r["unit"],
-                "category_id": r["category_id"],
-                "category_name": r["category_name"] or "Other",
-            }
-            for r in cur.fetchall()
-        ]
-        cur.close()
+        d = _get_pos_products()
         # Return both `items` and `products` so old and new frontend code both work
-        return jsonify(
-            {
-                "success": True,
-                "items": items,
-                "products": items,
-                "categories": categories,
-            }
-        )
+        return jsonify({
+            "success":    True,
+            "items":      d["items"],
+            "products":   d["items"],
+            "categories": d["categories"],
+        })
     except Exception as exc:
         app.logger.error(f"[products] api_pos_products: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500

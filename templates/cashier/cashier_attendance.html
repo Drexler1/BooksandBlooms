@@ -2620,6 +2620,8 @@
             return null; // custom
         }
 
+        // Client-side attendance cache: avoid re-fetching same period within 45s
+        const _attCache = {};
         window.loadMyAttendance = async function loadMyAttendance() {
             const body = document.getElementById('attendanceTableBody');
             const count = document.getElementById('recordCount');
@@ -2642,10 +2644,20 @@
                 qs = new URLSearchParams({ range_start: range.start, range_end: range.end });
             }
 
+            // Return cached result if same query fetched within last 45 seconds
+            const cacheKey = qs.toString();
+            const _cached = _attCache[cacheKey];
+            if (_cached && (Date.now() - _cached.ts) < 45000) {
+                if (count) count.textContent = `${(_cached.data.records||[]).length} record(s)`;
+                return;
+            }
+
             try {
                 const res = await fetch('/api/my_attendance?' + qs.toString());
                 const data = await res.json();
                 if (!data.success) { if (count) count.textContent = data.message || 'Error'; return; }
+                // Store in cache for 45s
+                _attCache[cacheKey] = { ts: Date.now(), data };
 
                 const records = data.records || [];
                 if (count) count.textContent = `${records.length} record(s)`;

@@ -2015,6 +2015,21 @@
                             <button class="category-tab active" data-cat="">All</button>
                         </div>
                         <div class="products-grid" id="productsGrid">
+                            <!-- skeleton cards shown while /api/pos/products loads -->
+                            <style>
+                                .skeleton-card{background:var(--card-bg,#1e1e2e);border-radius:12px;padding:1rem;animation:skpulse 1.2s ease-in-out infinite}
+                                .skeleton-img{width:100%;height:90px;background:#333;border-radius:8px;margin-bottom:.6rem}
+                                .skeleton-line{height:12px;background:#333;border-radius:4px;margin:.4rem 0}
+                                .skeleton-line.short{width:50%}
+                                @keyframes skpulse{0%,100%{opacity:.6}50%{opacity:1}}
+                            </style>
+                            <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                            <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                            <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                            <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                            <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                            <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                        </div>
                             <div style="grid-column:1/-1;text-align:center;color:#bbb;padding:3rem;">Loading menu…</div>
                         </div>
                     </div>
@@ -2820,8 +2835,9 @@
 
         /* INIT */
         loadProducts();             // immediate REST fetch on page load
-        _refreshCupStock();         // warm the cup-stock cache before first modal open
         _connectCashierSSE();       // then stream live updates via SSE
+        // cup stock is fetched lazily when the size picker modal first opens
+        // (_refreshCupStock called inside addToCart for cup-eligible products)
         // Removed 10s poll — SSE handles live updates; polling + SSE was double-hitting server
 
         // Close SSE when navigating away — frees the server thread immediately

@@ -1256,7 +1256,7 @@
             const dateVal = document.getElementById('dateFilter').value;
             tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#999">⏳ Loading…</td></tr>`;
 
-            const qs = new URLSearchParams({ limit: 1000 });
+            const qs = new URLSearchParams({ limit: 50 });
             if (dateVal) qs.set('date', dateVal);
 
             try {
