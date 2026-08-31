@@ -928,8 +928,8 @@ def detect_face_strict(img, gray, registration_mode=False):
 
 def extract_embedding(img, x, y, w, h):
     """
-    Crop and resize a detected face, then extract a Facenet-512 embedding.
-    Returns the embedding vector (list of 512 floats).
+    Crop and resize a detected face, then extract a Facenet embedding.
+    Returns the embedding vector (list of 128 floats).
 
     Key rules:
     • img must be a uint8 BGR array (0–255) — do NOT normalise to float first.
@@ -943,7 +943,7 @@ def extract_embedding(img, x, y, w, h):
     # Crop to the detected face bounding box
     face_crop = img[y : y + h, x : x + w]
 
-    # Resize to the exact input size FaceNet-512 expects
+    # Resize to the exact input size Facenet expects (same as Facenet512: 160x160)
     face_crop = cv2.resize(face_crop, (160, 160))
 
     # ── IMPORTANT: keep as uint8 (0-255) ────────────────────────────────────
@@ -978,11 +978,11 @@ def sharpness_score(img_bgr):
 
 def persist_embedding(employee_id, embedding_vector):
     """
-    Serialize the averaged FaceNet-512 embedding to JSON and store it in
+    Serialize the averaged Facenet embedding to JSON and store it in
     the face_model_path column.  Also warms the in-memory cache.
 
     Using face_model_path as the storage column (it exists but was unused).
-    The value is a JSON string: '{"v":1,"emb":[...512 floats...]}'
+    The value is a JSON string: '{"v":1,"emb":[...128 floats...]}'
     """
     payload = json.dumps({"v": 1, "emb": embedding_vector}, separators=(",", ":"))
     try:
@@ -1020,7 +1020,7 @@ def load_embedding_from_db(employee_id, cur):
         try:
             payload = json.loads(model_path)
             emb = payload.get("emb")
-            if emb and len(emb) == 512:
+            if emb and len(emb) in (128, 512):  # 128 = Facenet, 512 = Facenet512 (legacy)
                 app.logger.info(
                     f"[load_embedding] employee {employee_id}: loaded from DB JSON"
                 )
@@ -5498,11 +5498,12 @@ def lockout_status():
 
 
 # ── Secret token that must be submitted with the form ─────────────────────────
-# IMPORTANT: Replace this with a long, random string (e.g. from os.urandom).
-# Keep this value out of version control (use an environment variable in prod).
-ADMIN_SETUP_TOKEN = os.environ.get(
-    "ADMIN_SETUP_TOKEN", "change-me-before-deploying-abc123!"
-)
+# Set ADMIN_SETUP_TOKEN in your Render environment variables.
+# The app refuses to start without it — never falls back to a default.
+_admin_setup_token = os.environ.get("ADMIN_SETUP_TOKEN")
+if not _admin_setup_token:
+    raise RuntimeError("ADMIN_SETUP_TOKEN is not set in the environment — refusing to start.")
+ADMIN_SETUP_TOKEN = _admin_setup_token
 
 
 @app.route("/setup/create-admin-xK9mQ2", methods=["GET", "POST"])
