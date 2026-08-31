@@ -1135,8 +1135,6 @@
             // ── Live low-stock polling ─────────────────────────────────────────
             // Fetches /api/inventory/low-stock every 90 s and updates the card
             // and the alert table without a full page reload.
-            const BADGE_MAP = { low: 'medium', out: 'low' };
-            const LABEL_MAP = { low: 'Low',    out: 'Critical' };
 
             async function refreshLowStock() {
                 try {
@@ -1187,7 +1185,6 @@
             // Run once on load then every 90 seconds
             refreshLowStock();
             setInterval(refreshLowStock, 90_000);
-        </script>
 
 
 
