@@ -1,5 +1,9 @@
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress TensorFlow CPU warnings
+# Limit TensorFlow/numpy thread usage to reduce memory on Render free tier
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
 
 from dotenv import load_dotenv
 
@@ -19,19 +23,48 @@ from decimal import Decimal
 from flask_mysqldb import MySQL
 from MySQLdb.cursors import DictCursor
 from flask_wtf.csrf import CSRFProtect, CSRFError
-from deepface import DeepFace
+# DeepFace, cv2, and numpy are intentionally NOT imported at the top level.
+# tensorflow-cpu alone uses ~500MB which exceeds Render's 512MB free limit.
+# They are imported lazily inside _get_deepface() / _get_cv2_np() below
+# so the rest of the app starts normally, and face-verify loads them on demand.
 from datetime import datetime, timedelta, date
 import pytz
 
 PHT = pytz.timezone("Asia/Manila")
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-import base64, cv2, numpy as np, time, hashlib, bcrypt, json, secrets, re
+import base64, time, hashlib, bcrypt, json, secrets, re
 import csv, io
 from flask import Response
 from werkzeug.utils import secure_filename
 import threading
 import requests as http_requests
+
+# ── Lazy-load helpers for heavy ML deps ─────────────────────────────────────
+_deepface_lock = threading.Lock()
+_DeepFace = None
+_cv2 = None
+_np = None
+
+def _get_deepface():
+    """Import DeepFace (and TensorFlow) only on first call."""
+    global _DeepFace
+    if _DeepFace is None:
+        with _deepface_lock:
+            if _DeepFace is None:
+                from deepface import DeepFace as _DF
+                _DeepFace = _DF
+    return _DeepFace
+
+def _get_cv2_np():
+    """Import cv2 and numpy only on first call."""
+    global _cv2, _np
+    if _cv2 is None:
+        import cv2 as _c
+        import numpy as _n
+        _cv2 = _c
+        _np = _n
+    return _cv2, _np
 
 def _send_email_resend(
     to_email: str,
@@ -740,16 +773,14 @@ Compress(app)
 
 # ── Warm DeepFace/Facenet at startup so first face-verify is fast ──────────
 def _warm_deepface():
-    try:
-        import numpy as _np
-        from deepface import DeepFace as _DF
-        _dummy = _np.zeros((160, 160, 3), dtype=_np.uint8)
-        _DF.represent(_dummy, model_name="Facenet", enforce_detection=False)
-        app.logger.info("[startup] DeepFace Facenet model warmed.")
-    except Exception as _e:
-        app.logger.warning(f"[startup] DeepFace warm failed (non-fatal): {_e}")
+    # Warming is intentionally DISABLED on the free tier to prevent OOM crashes.
+    # DeepFace + TensorFlow (~450 MB) will be loaded lazily on the first
+    # /verify_face request instead of at startup.
+    app.logger.info("[startup] DeepFace warm skipped (lazy-load mode).")
 
-threading.Thread(target=_warm_deepface, daemon=True).start()
+# Do NOT start the warm thread — it would import TensorFlow at startup and
+# immediately push RAM over Render's 512 MB free-tier limit.
+# threading.Thread(target=_warm_deepface, daemon=True).start()
 
 # ── Session cookie security flags ────────────────────────────────────────
 app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
@@ -784,9 +815,17 @@ MAX_FACE_MISMATCHES = 3  # hard lockout after this many consecutive mismatches
 FACE_LOCKOUT_SECONDS = 30  # lockout duration in seconds
 
 # ── Haar cascade for quick face detection ──────────────────────────────────
-face_cascade = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
+# Loaded lazily so cv2/numpy are not imported at startup (saves ~200 MB RAM)
+_face_cascade = None
+
+def _get_face_cascade():
+    global _face_cascade
+    if _face_cascade is None:
+        cv2, _ = _get_cv2_np()
+        _face_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        )
+    return _face_cascade
 
 # ── Liveness session store ──────────────────────────────────────────────────────
 # Tracks head-nod challenge state per employee during verification
@@ -853,6 +892,7 @@ def decode_base64_image(image_data: str):
     Decode a base64 data-URI string to an OpenCV BGR image.
     Returns (img_bgr, gray) or raises ValueError on failure.
     """
+    cv2, np = _get_cv2_np()
     if "," in image_data:
         image_data = image_data.split(",")[1]
     img_bytes = base64.b64decode(image_data)
@@ -873,6 +913,7 @@ def detect_face_strict(img, gray, registration_mode=False):
                                 always fail the blur check), relaxes distance and
                                 centering tolerances, and uses softer Haar params.
     """
+    cv2, np = _get_cv2_np()
     frame_h, frame_w = img.shape[:2]
 
     # ── Histogram equalisation: boosts contrast for dim / low-light webcams ─
@@ -897,7 +938,7 @@ def detect_face_strict(img, gray, registration_mode=False):
     # minNeighbors=3 (vs 5) accepts faces with less repeated confirmation.
     scale = 1.1 if registration_mode else 1.2
     neighbors = 3 if registration_mode else 4
-    faces = face_cascade.detectMultiScale(
+    faces = _get_face_cascade().detectMultiScale(
         gray_eq, scaleFactor=scale, minNeighbors=neighbors, minSize=(50, 50)
     )
     if len(faces) == 0:
@@ -940,6 +981,9 @@ def extract_embedding(img, x, y, w, h):
     • We do NOT pass model= as a pre-built object; newer versions of DeepFace
       removed that parameter and it causes a TypeError crash.
     """
+    cv2, np = _get_cv2_np()
+    DeepFace = _get_deepface()
+
     # Crop to the detected face bounding box
     face_crop = img[y : y + h, x : x + w]
 
@@ -963,6 +1007,7 @@ def extract_embedding(img, x, y, w, h):
 
 def cosine_distance(a, b):
     """Return cosine distance in [0, 2]; lower → more similar (0 = identical)."""
+    _, np = _get_cv2_np()
     a, b = np.array(a), np.array(b)
     return 1.0 - float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
@@ -972,6 +1017,7 @@ def sharpness_score(img_bgr):
     Return the Laplacian variance of a BGR image crop.
     Higher = sharper. Used to pick the best frame during registration.
     """
+    cv2, _ = _get_cv2_np()
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     return cv2.Laplacian(gray, cv2.CV_64F).var()
 
@@ -1036,6 +1082,8 @@ def load_embedding_from_db(employee_id, cur):
     if not os.path.exists(reg_path):
         return None
     try:
+        cv2, _ = _get_cv2_np()
+        DeepFace = _get_deepface()
         reg_img = cv2.imread(reg_path)
         if reg_img is None:
             return None
@@ -1140,10 +1188,11 @@ def register_face_frame():
 
             # ── Decode & analyse frame ──────────────────────────────────────
             try:
+                _cv2_local, _ = _get_cv2_np()
                 img, gray = decode_base64_image(image_data)
                 # Flip mirrored canvas back to natural orientation for Haar
-                img = cv2.flip(img, 1)
-                gray = cv2.flip(gray, 1)
+                img = _cv2_local.flip(img, 1)
+                gray = _cv2_local.flip(gray, 1)
                 x, y, w, h = detect_face_strict(img, gray, registration_mode=True)
             except ValueError as e:
                 return jsonify(
@@ -1171,7 +1220,8 @@ def register_face_frame():
             # reference) is the clearest one, even though verification uses
             # the averaged embedding, not this image.
             face_crop = img[y : y + h, x : x + w]
-            crop_160 = cv2.resize(face_crop, (160, 160))
+            _cv2_local, _ = _get_cv2_np()
+            crop_160 = _cv2_local.resize(face_crop, (160, 160))
             sharp = sharpness_score(crop_160)
             if sharp > sess["best_sharpness"]:
                 sess["best_sharpness"] = sharp
@@ -1238,11 +1288,12 @@ def commit_face_registration():
     # ── Save sharpest face image ─────────────────────────────────────────────
     filename = f"{employee_id}.jpg"
     image_path = os.path.join(UPLOAD_FOLDER, filename)
-    cv2.imwrite(image_path, sess["best_face"], [cv2.IMWRITE_JPEG_QUALITY, 95])
+    _cv2_local, _np_local = _get_cv2_np()
+    _cv2_local.imwrite(image_path, sess["best_face"], [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
     face_path = f"face_images/{filename}"
 
     # ── Average embeddings for best accuracy ────────────────────────────────
-    avg_emb = np.mean(sess["embeddings"], axis=0).tolist()
+    avg_emb = _np_local.mean(sess["embeddings"], axis=0).tolist()
 
     # ── Persist to DB ───────────────────────────────────────────────────────
     try:
@@ -1367,11 +1418,12 @@ def verify_face():
 
     # ── Decode & validate incoming frame ────────────────────────────────────
     try:
+        _cv2_local, _ = _get_cv2_np()
         img, gray = decode_base64_image(image_data)
         # The browser mirrors the canvas — flip back to natural orientation
         # so Haar detection works correctly (trained on unmirrored faces).
-        img = cv2.flip(img, 1)
-        gray = cv2.flip(gray, 1)
+        img = _cv2_local.flip(img, 1)
+        gray = _cv2_local.flip(gray, 1)
         x, y, w, h = detect_face_strict(img, gray)
     except ValueError as e:
         return jsonify({"success": False, "message": str(e)})
@@ -2902,22 +2954,23 @@ def add_employee():
         best_face = None
         best_sharp_ae = -1.0
 
+        _cv2_local, _np_local = _get_cv2_np()
         for file in files:
-            file_bytes = np.frombuffer(file.read(), np.uint8)
-            img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            file_bytes = _np_local.frombuffer(file.read(), _np_local.uint8)
+            img = _cv2_local.imdecode(file_bytes, _cv2_local.IMREAD_COLOR)
             if img is None:
                 continue
 
             try:
                 # Browser canvas is mirrored – flip to natural orientation
-                img = cv2.flip(img, 1)
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                img = _cv2_local.flip(img, 1)
+                gray = _cv2_local.cvtColor(img, _cv2_local.COLOR_BGR2GRAY)
                 x, y, w, h = detect_face_strict(img, gray, registration_mode=True)
                 emb = extract_embedding(img, x, y, w, h)
                 embeddings.append(emb)
                 # Pick sharpest crop across all frames
                 crop = img[y : y + h, x : x + w]
-                crop_160 = cv2.resize(crop, (160, 160))
+                crop_160 = _cv2_local.resize(crop, (160, 160))
                 sharp = sharpness_score(crop_160)
                 if sharp > best_sharp_ae:
                     best_sharp_ae = sharp
@@ -2938,7 +2991,7 @@ def add_employee():
         # ── Save sharpest face image ─────────────────────────────────────────
         filename = f"{employee_id}.jpg"
         image_path = os.path.join(UPLOAD_FOLDER, filename)
-        cv2.imwrite(image_path, best_face, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        _cv2_local.imwrite(image_path, best_face, [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
         face_path = f"face_images/{filename}"
 
         cur.execute(
@@ -2949,7 +3002,8 @@ def add_employee():
         cur.close()
 
         # ── Persist averaged embedding to DB (face_model_path) ───────────────
-        avg_emb = np.mean(embeddings, axis=0).tolist()
+        _, _np_local = _get_cv2_np()
+        avg_emb = _np_local.mean(embeddings, axis=0).tolist()
         persist_embedding(str(employee_id), avg_emb)
 
         # Fetch the created_at timestamp so the frontend can build BB-YYMM-NNN
@@ -3002,22 +3056,23 @@ def update_employee(employee_id):
         best_face = None
         best_sharp_ue = -1.0
 
+        _cv2_local, _np_local = _get_cv2_np()
         for file in files:
-            file_bytes = np.frombuffer(file.read(), np.uint8)
-            img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            file_bytes = _np_local.frombuffer(file.read(), _np_local.uint8)
+            img = _cv2_local.imdecode(file_bytes, _cv2_local.IMREAD_COLOR)
             if img is None:
                 continue
             try:
                 # Browser canvas is mirrored – flip to natural orientation
                 # (was missing in update_employee — caused orientation mismatch)
-                img = cv2.flip(img, 1)
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                img = _cv2_local.flip(img, 1)
+                gray = _cv2_local.cvtColor(img, _cv2_local.COLOR_BGR2GRAY)
                 x, y, w, h = detect_face_strict(img, gray, registration_mode=True)
                 emb = extract_embedding(img, x, y, w, h)
                 embeddings.append(emb)
                 # Pick sharpest crop across all frames
                 crop = img[y : y + h, x : x + w]
-                crop_160 = cv2.resize(crop, (160, 160))
+                crop_160 = _cv2_local.resize(crop, (160, 160))
                 sharp = sharpness_score(crop_160)
                 if sharp > best_sharp_ue:
                     best_sharp_ue = sharp
@@ -3029,7 +3084,7 @@ def update_employee(employee_id):
             # New face registered during edit
             filename = f"{employee_id}.jpg"
             image_path = os.path.join(UPLOAD_FOLDER, filename)
-            cv2.imwrite(image_path, best_face, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            _cv2_local.imwrite(image_path, best_face, [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
             face_path = f"face_images/{filename}"
 
             cur.execute(
@@ -3051,7 +3106,8 @@ def update_employee(employee_id):
                 ),
             )
             # Persist new averaged embedding; also invalidates old cache entry
-            avg_emb_ue = np.mean(embeddings, axis=0).tolist()
+            _, _np_local = _get_cv2_np()
+            avg_emb_ue = _np_local.mean(embeddings, axis=0).tolist()
             persist_embedding(str(employee_id), avg_emb_ue)
         else:
             cur.execute(
