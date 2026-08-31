@@ -11195,9 +11195,11 @@ def _midnight_clockout_thread():
     with app.app_context():
         while True:
             now = datetime.now(PHT)
-            # Next midnight = start of tomorrow
-            next_midnight = datetime.combine(
-                now.date() + timedelta(days=1), datetime.min.time()
+            # Next midnight = start of tomorrow (timezone-aware, matching `now`)
+            next_midnight = PHT.localize(
+                datetime.combine(
+                    now.date() + timedelta(days=1), datetime.min.time()
+                )
             ) + timedelta(
                 seconds=30
             )  # +30 s buffer so DB writes from 23:59 flush
