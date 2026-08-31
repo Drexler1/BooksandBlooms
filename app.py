@@ -773,14 +773,21 @@ Compress(app)
 
 # ── Warm DeepFace/Facenet at startup so first face-verify is fast ──────────
 def _warm_deepface():
-    # Warming is intentionally DISABLED on the free tier to prevent OOM crashes.
-    # DeepFace + TensorFlow (~450 MB) will be loaded lazily on the first
-    # /verify_face request instead of at startup.
-    app.logger.info("[startup] DeepFace warm skipped (lazy-load mode).")
+    try:
+        import numpy as _np_warm
+        DeepFace = _get_deepface()
+        _get_cv2_np()
+        DeepFace.represent(
+            _np_warm.zeros((160, 160, 3), dtype=_np_warm.uint8),
+            model_name="Facenet",
+            detector_backend="skip",
+            enforce_detection=False,
+        )
+        app.logger.info("[startup] DeepFace/FaceNet warm complete.")
+    except Exception as e:
+        app.logger.warning(f"[startup] DeepFace warm failed (non-fatal): {e}")
 
-# Do NOT start the warm thread — it would import TensorFlow at startup and
-# immediately push RAM over Render's 512 MB free-tier limit.
-# threading.Thread(target=_warm_deepface, daemon=True).start()
+threading.Thread(target=_warm_deepface, daemon=True).start()
 
 # ── Session cookie security flags ────────────────────────────────────────
 app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie

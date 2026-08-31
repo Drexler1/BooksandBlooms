@@ -1,5 +1,4 @@
-﻿# Core Flask
-Flask==3.1.1
+﻿Flask==3.1.1
 flask-cors==6.0.2
 Flask-MySQLdb==2.0.0
 Flask-WTF==1.2.2
@@ -10,45 +9,24 @@ MarkupSafe==3.0.3
 click==8.3.1
 blinker==1.9.0
 WTForms==3.2.2
-
-# Database
 mysqlclient==2.2.6
-
-# Auth & Crypto
 bcrypt==4.2.1
 pycryptodome==3.20.0
 cryptography==46.0.5
-
-# Environment
 python-dotenv==1.2.2
-
-# TensorFlow (CPU-only build — ~300 MB lighter than the full GPU wheel,
-# safe on Render Starter which has no GPU anyway)
 tensorflow-cpu==2.15.0
-# DeepFace 0.0.93 imports from tensorflow.keras — tf-keras re-exposes
-# that path when using tensorflow-cpu
 tf-keras==2.15.1
-
-# DeepFace & Vision
 deepface==0.0.93
 opencv-python-headless==4.8.1.78
 numpy==1.26.4
 Pillow==10.4.0
-
-# DeepFace dependencies
 mtcnn==1.0.0
 retina-face==0.0.17
 gdown==5.2.1
 tqdm==4.67.3
 requests==2.32.5
-
-# PDF
 reportlab==5.0.1
-
-# WSGI server
 gunicorn==25.1.0
-
-# Utilities
 python-dateutil==2.9.0.post0
 pytz==2026.1.post1
 six==1.17.0
@@ -56,8 +34,4 @@ certifi==2026.2.25
 charset-normalizer==3.4.5
 idna==3.11
 urllib3==2.6.3
-
-# Compression
 Flask-Compress==1.15
-# Email (Brevo — HTTPS, works on Render free tier, sends to any recipient)
-# No extra package needed — uses requests (already listed above)
