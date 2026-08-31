@@ -2334,7 +2334,7 @@ def verify_otp():
         flash("OTP session not found. Please request a new one.", "danger")
         return redirect(url_for("forgot_password"))
 
-    if record["expires_at"] < datetime.now(PHT):
+    if PHT.localize(record["expires_at"]) < datetime.now(PHT):
         flash("Your OTP has expired. Please request a new one.", "danger")
         return redirect(url_for("forgot_password"))
 
@@ -2403,7 +2403,7 @@ def reset_password():
             flash("This reset link is invalid or has already been used.", "danger")
             return redirect(url_for("forgot_password"))
 
-        if record["expires_at"] < datetime.now(PHT):
+        if PHT.localize(record["expires_at"]) < datetime.now(PHT):
             flash(
                 "This reset link has expired. Please request a new one.", "danger"
             )
@@ -2441,7 +2441,7 @@ def reset_password():
         flash("This reset link is invalid or has already been used.", "danger")
         return redirect(url_for("forgot_password"))
 
-    if record["expires_at"] < datetime.now(PHT):
+    if PHT.localize(record["expires_at"]) < datetime.now(PHT):
         flash("This reset link has expired. Please request a new one.", "danger")
         return redirect(url_for("forgot_password"))
 
