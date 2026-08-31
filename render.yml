@@ -6,6 +6,7 @@ services:
     plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app -c gunicorn.conf.py --bind 0.0.0.0:10000
+    healthCheckPath: /ping
     envVars:
       - key: FLASK_SECRET_KEY
         sync: false

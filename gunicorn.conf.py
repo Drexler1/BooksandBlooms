@@ -10,9 +10,11 @@
 #                                     app.py handles warming in the background
 #                                     without blocking gunicorn startup.
 
-bind           = "0.0.0.0:8080"   # overridden at runtime by --bind in start cmd
-workers        = 1
-threads        = 4
-timeout        = 120
-preload_app    = True              # import app once in master, share across workers
-worker_class   = "gthread"         # thread-based workers — better for I/O-heavy routes
+bind             = "0.0.0.0:8080"   # overridden at runtime by --bind in start cmd
+workers          = 1
+threads          = 4
+timeout          = 300               # increased: covers Render cold-start + DB migration window
+graceful_timeout = 120               # give in-flight requests time to finish on restart
+keepalive        = 5                 # hold connections open briefly to reduce reconnect overhead
+preload_app      = True              # import app once in master, share across workers
+worker_class     = "gthread"         # thread-based workers — better for I/O-heavy routes

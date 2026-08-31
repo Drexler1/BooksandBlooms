@@ -1162,7 +1162,13 @@ reg_locks = set()  # set of tokens currently being processed
 
 @app.route("/ping")
 def ping():
-    return "ok", 200
+    # Lightweight healthcheck — must stay fast (no DB call).
+    # Render and UptimeRobot both hit this endpoint to confirm the app is alive.
+    from flask import make_response
+    resp = make_response("ok", 200)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Content-Type"] = "text/plain"
+    return resp
 
 
 @app.route("/register_face_frame", methods=["POST"])
