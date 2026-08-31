@@ -1,29 +1,18 @@
-# gunicorn.conf.py — placed in repo root, referenced by Dockerfile CMD
+# gunicorn.conf.py — repo root, used by both Render (via render.yml) and
+# Railway (via Dockerfile CMD).
 #
-# Fixes the TF re-trace cold-start: gunicorn forks the master process, and
-# TF's graph/session state does not survive fork() cleanly.  post_fork()
-# runs inside each worker after the fork, so the warm-up executes in the
-# correct process context.
+# Railway (Standard plan, 2 GB RAM):  TF/DeepFace loads fine at startup.
+# Render Starter (512 MB):            TF is lazy-loaded per-request; the
+#                                     post_fork warm-up is intentionally
+#                                     skipped here because it would OOM-kill
+#                                     the worker before any request is served.
+#                                     The _warm_deepface() daemon thread in
+#                                     app.py handles warming in the background
+#                                     without blocking gunicorn startup.
 
-bind    = "0.0.0.0:8080"   # overridden at runtime by $PORT via CMD
-workers = 1
-threads = 4
-timeout = 120
-preload_app = True
-
-
-def post_fork(server, worker):
-    """Re-warm FaceNet inside every forked worker process."""
-    try:
-        import numpy as np
-        from deepface import DeepFace
-
-        DeepFace.represent(
-            np.zeros((160, 160, 3), dtype=np.uint8),
-            model_name="Facenet",
-            detector_backend="skip",
-            enforce_detection=False,
-        )
-        server.log.info("[post_fork] FaceNet warm complete in worker %s", worker.pid)
-    except Exception as exc:
-        server.log.warning("[post_fork] warm failed (non-fatal): %s", exc)
+bind           = "0.0.0.0:8080"   # overridden at runtime by --bind in start cmd
+workers        = 1
+threads        = 4
+timeout        = 120
+preload_app    = True              # import app once in master, share across workers
+worker_class   = "gthread"         # thread-based workers — better for I/O-heavy routes

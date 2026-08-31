@@ -498,7 +498,7 @@ def _ensure_trash_table():
 
 
 # Timestamp of last purge check — avoids hitting DB on every single request
-_last_purge_check = None
+_last_purge_check = datetime.now(PHT)  # skip purge on very first request after cold start
 _PURGE_INTERVAL_SECONDS = 300  # check at most every 5 minutes
 
 
@@ -8347,17 +8347,9 @@ def api_inventory_restock():
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
-_migration_done = False
-
-
 @app.before_request
-def ensure_migration():
-    """Run the DB migration exactly once after the app has a live DB connection."""
-    global _migration_done
-    if not _migration_done:
-        _migration_done = True  # Set first so a crash doesn't cause infinite loops
-        run_auto_migration()
-    # Run the trash purge on every request (rate-limited internally to every 5 min)
+def ensure_purge():
+    """Rate-limited trash purge on every request (at most every 5 min)."""
     _purge_expired_trash()
 
 
@@ -12900,6 +12892,18 @@ def api_backup_import():
     except Exception as exc:
         app.logger.error(f"[backup] import failed: {exc}")
         return jsonify({"success": False, "message": f"Restore failed: {exc}"}), 500
+
+
+# ── Run DB migration at module-load time (inside an app context) ──────────────
+# This replaces the old @app.before_request ensure_migration() hook.
+# Running here means the first real HTTP request is never blocked by DDL work.
+# preload_app=True in gunicorn.conf.py means this executes once in the master
+# process, before any worker is forked.
+with app.app_context():
+    try:
+        run_auto_migration()
+    except Exception as _mig_exc:
+        app.logger.error(f"[startup] run_auto_migration failed: {_mig_exc}")
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
