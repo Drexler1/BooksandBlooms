@@ -12894,16 +12894,21 @@ def api_backup_import():
         return jsonify({"success": False, "message": f"Restore failed: {exc}"}), 500
 
 
-# ── Run DB migration at module-load time (inside an app context) ──────────────
-# This replaces the old @app.before_request ensure_migration() hook.
-# Running here means the first real HTTP request is never blocked by DDL work.
-# preload_app=True in gunicorn.conf.py means this executes once in the master
-# process, before any worker is forked.
-with app.app_context():
+# ── Run DB migration in a background thread at startup ────────────────────────
+# Mirrors the _preload_embedding_cache pattern above: daemon thread +
+# app.app_context() lets Flask-MySQLdb open a connection without needing a
+# live HTTP request. gunicorn can finish starting and pass the /ping healthcheck
+# while migration runs in the background. Migration is fully idempotent.
+def _run_migration_thread():
+    import time as _time
+    _time.sleep(3)  # let gunicorn workers fully start before touching the DB
     try:
-        run_auto_migration()
+        with app.app_context():
+            run_auto_migration()
     except Exception as _mig_exc:
         app.logger.error(f"[startup] run_auto_migration failed: {_mig_exc}")
+
+threading.Thread(target=_run_migration_thread, daemon=True, name="auto-migration").start()
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
