@@ -789,6 +789,42 @@ def _warm_deepface():
 
 threading.Thread(target=_warm_deepface, daemon=True).start()
 
+
+def _preload_embedding_cache():
+    """Pre-populate embedding_cache from DB at startup.
+
+    Reads the JSON embeddings already stored in face_model_path — a cheap DB
+    read + JSON parse, no ML inference — so the first clock-in after any
+    Railway restart is instant instead of hitting a cold load_embedding_from_db.
+    """
+    try:
+        with app.app_context():
+            _pre_cur = mysql.connection.cursor(DictCursor)
+            _pre_cur.execute(
+                "SELECT employee_id, face_model_path FROM employees "
+                "WHERE face_model_path IS NOT NULL AND face_model_path != ''"
+            )
+            rows = _pre_cur.fetchall()
+            _pre_cur.close()
+            loaded = 0
+            for row in rows:
+                try:
+                    raw = row.get("face_model_path") or ""
+                    if raw.startswith("{"):
+                        payload = json.loads(raw)
+                        emb = payload.get("emb")
+                        if emb and len(emb) in (128, 512):
+                            embedding_cache[str(row["employee_id"])] = emb
+                            loaded += 1
+                except Exception:
+                    pass
+            app.logger.info(f"[startup] Pre-loaded {loaded} embeddings into cache.")
+    except Exception as exc:
+        app.logger.warning(f"[startup] Embedding cache pre-load failed (non-fatal): {exc}")
+
+
+threading.Thread(target=_preload_embedding_cache, daemon=True).start()
+
 # ── Session cookie security flags ────────────────────────────────────────
 app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # CSRF mitigation
@@ -806,7 +842,8 @@ def set_security_headers(response):
 # ── Performance caches ──────────────────────────────────────────────────────────
 embedding_cache = {}  # { employee_id: embedding_vector }
 last_frame_time = {}  # { employee_id: datetime }
-MIN_FRAME_INTERVAL = 0.8  # seconds between frames per employee
+MIN_FRAME_INTERVAL = 0.4   # seconds between liveness frames (reduced from 0.8 — still anti-DoS)
+MIN_MATCH_INTERVAL = 1.5   # stricter rate-limit applied only at the embedding comparison step
 
 # ── Face-verification security state ────────────────────────────────────────
 # One-time tokens issued by /verify_face on success; consumed by /log_attendance.
@@ -1523,6 +1560,14 @@ def verify_face():
     # return cannot leave passed=True. Without this, the next frame would skip
     # liveness entirely and go straight to face matching.
     reset_liveness(employee_id)
+
+    # ── Stricter rate-limit at the match step (prevents brute-force replay) ──
+    _last_match = last_frame_time.get(f"match_{employee_id}")
+    if _last_match:
+        _match_elapsed = (now - _last_match).total_seconds()
+        if _match_elapsed < MIN_MATCH_INTERVAL:
+            return jsonify({"success": False, "message": "Please wait a moment before trying again."})
+    last_frame_time[f"match_{employee_id}"] = now
 
     # ── Perform face match ───────────────────────────────────────────────────
     try:
