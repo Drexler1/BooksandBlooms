@@ -738,14 +738,14 @@ mysql = MySQL(app)
 from flask_compress import Compress
 Compress(app)
 
-# ── Warm DeepFace/Facenet512 at startup so first face-verify is fast ──────────
+# ── Warm DeepFace/Facenet at startup so first face-verify is fast ──────────
 def _warm_deepface():
     try:
         import numpy as _np
         from deepface import DeepFace as _DF
         _dummy = _np.zeros((160, 160, 3), dtype=_np.uint8)
-        _DF.represent(_dummy, model_name="Facenet512", enforce_detection=False)
-        app.logger.info("[startup] DeepFace Facenet512 model warmed.")
+        _DF.represent(_dummy, model_name="Facenet", enforce_detection=False)
+        app.logger.info("[startup] DeepFace Facenet model warmed.")
     except Exception as _e:
         app.logger.warning(f"[startup] DeepFace warm failed (non-fatal): {_e}")
 
@@ -954,7 +954,7 @@ def extract_embedding(img, x, y, w, h):
 
     result = DeepFace.represent(
         img_path=face_crop,
-        model_name="Facenet512",
+        model_name="Facenet",
         detector_backend="skip",
         enforce_detection=False,
     )
@@ -1042,7 +1042,7 @@ def load_embedding_from_db(employee_id, cur):
         reg_img = cv2.resize(reg_img, (160, 160))
         reg_result = DeepFace.represent(
             img_path=reg_img,
-            model_name="Facenet512",
+            model_name="Facenet",
             detector_backend="skip",
             enforce_detection=False,
         )

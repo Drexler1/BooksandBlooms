@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN python -c "from deepface import DeepFace; import numpy as np; DeepFace.represent(np.zeros((160,160,3), dtype=np.uint8), model_name='Facenet512', enforce_detection=False)"
+RUN python -c "from deepface import DeepFace; import numpy as np; DeepFace.represent(np.zeros((160,160,3), dtype=np.uint8), model_name='Facenet', enforce_detection=False)"
 
 EXPOSE 5000
 
