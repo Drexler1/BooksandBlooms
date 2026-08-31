@@ -25,12 +25,7 @@ from deepface import DeepFace; \
 import numpy as np; \
 DeepFace.represent(np.zeros((160,160,3), dtype=np.uint8), model_name='Facenet', enforce_detection=False)"
 
-EXPOSE 8080
+EXPOSE $PORT
 
-# Railway: more RAM → more threads, warm preload is safe
-CMD ["gunicorn", "app:app", \
-     "--bind", "0.0.0.0:8080", \
-     "--workers", "1", \
-     "--threads", "4", \
-     "--timeout", "120", \
-     "--preload"]
+# Railway injects $PORT at runtime — use sh -c so the variable is expanded
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --preload"]
