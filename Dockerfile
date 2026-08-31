@@ -25,7 +25,7 @@ from deepface import DeepFace; \
 import numpy as np; \
 DeepFace.represent(np.zeros((160,160,3), dtype=np.uint8), model_name='Facenet', enforce_detection=False)"
 
-EXPOSE $PORT
+EXPOSE 8080
 
-# Railway injects $PORT at runtime — use sh -c so the variable is expanded
+# Railway injects $PORT at runtime; sh -c lets the shell expand it
 CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --preload"]
