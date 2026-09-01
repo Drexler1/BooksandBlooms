@@ -3821,8 +3821,8 @@
             try {
                 // ── Capture frame ────────────────────────────────────────────────
                 const canvas = document.createElement("canvas");
-                canvas.width = cameraFeed.videoWidth || 640;
-                canvas.height = cameraFeed.videoHeight || 480;
+                canvas.width = 320;
+                canvas.height = 240;
                 const ctx = canvas.getContext("2d");
 
                 // ── DO NOT mirror the canvas ──────────────────────────────────────
@@ -3832,9 +3832,8 @@
                 // Previously this flip was being applied here AND the backend was
                 // also flipping, causing double-flip = wrong orientation for Haar
                 // detection → "No face detected" → liveness challenge never started.
-                ctx.drawImage(cameraFeed, 0, 0);
-
-                const imageData = canvas.toDataURL("image/jpeg", 0.92);  // higher quality = higher blur score
+                ctx.drawImage(cameraFeed, 0, 0, 320, 240);
+                const imageData = canvas.toDataURL("image/jpeg", 0.7);
 
                 // ── Send to backend ──────────────────────────────────────────────
                 const res = await fetch("/verify_face", {
@@ -3946,11 +3945,9 @@
                 if (isVerifying) return;            // don't stack – wait for current call
                 if (isMismatchLocked) return;       // halted after face mismatch — wait for cooldown
                 if (!state.cameraReady) return;     // wait for auto-exposure to settle
-                const now = Date.now();
-                if (now - lastCaptureTime < 2500) return;
-                lastCaptureTime = now;
+                lastCaptureTime = Date.now();
                 verifyIdentity();
-            }, 500);
+            }, 2500);
         }
 
         /* ── Sync nav top to actual header height ── */
