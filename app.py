@@ -118,6 +118,15 @@ app.secret_key = _secret
 # Only HTML form-submitting routes need the token.
 csrf = CSRFProtect(app)
 
+# ── CSRF token never expires (prevents "session token missing" on long-idle tabs)
+app.config["WTF_CSRF_TIME_LIMIT"] = None
+
+# ── Make csrf_token() available in every template without needing a live session
+@app.context_processor
+def inject_csrf_token():
+    from flask_wtf.csrf import generate_csrf
+    return dict(csrf_token=generate_csrf)
+
 # ── File upload size limit (5 MB) ───────────────────────────────────────────────
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
