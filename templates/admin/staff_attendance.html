@@ -3331,6 +3331,231 @@
             });
 
             /* ── Initial load ── */
+        /* ── Modal handlers: hoisted before loadAttendance() so onclick works immediately ── */
+        (function () {
+            const modal = document.getElementById('overrideModal');
+            const closeBtn = document.getElementById('closeOverrideModal');
+            const cancelBtn = document.getElementById('cancelOverrideBtn');
+            const confirmBtn = document.getElementById('confirmOverrideBtn');
+            const timeInput = document.getElementById('overrideTimeInput');
+            const errBox = document.getElementById('overrideError');
+            const preview = document.getElementById('overridePreview');
+
+            function openOverride(attId, empName, clockIn) {
+                document.getElementById('overrideAttId').value = attId;
+                document.getElementById('overrideEmpName').textContent = empName;
+                document.getElementById('overrideClockIn').value = clockIn;
+                document.getElementById('overrideClockInDisplay').textContent = clockIn;
+                // Default to 23:59 so it's always valid
+                timeInput.value = '23:59';
+                errBox.style.display = 'none';
+                preview.style.display = 'none';
+                modal.classList.add('open');
+            }
+
+            function closeOverride() { modal.classList.remove('open'); }
+
+            closeBtn.addEventListener('click', closeOverride);
+            cancelBtn.addEventListener('click', closeOverride);
+            modal.addEventListener('click', e => { if (e.target === modal) closeOverride(); });
+
+            // Live preview when time changes
+            timeInput.addEventListener('input', () => {
+                errBox.style.display = 'none';
+                preview.style.display = 'none';
+                const cin = document.getElementById('overrideClockIn').value; // "HH:MM:SS"
+                const cout = timeInput.value;
+                if (!cout || !cin) return;
+                const cinParts = cin.split(':').map(Number);
+                const coutParts = cout.split(':').map(Number);
+                const cinMins = cinParts[0] * 60 + cinParts[1];
+                const coutMins = coutParts[0] * 60 + coutParts[1];
+                const diffMins = coutMins - cinMins;
+                if (diffMins <= 0) {
+                    errBox.textContent = `Clock-out must be after clock-in (${cin.slice(0, 5)})`;
+                    errBox.style.display = 'block';
+                    return;
+                }
+                const h = Math.floor(diffMins / 60);
+                const m = diffMins % 60;
+                preview.textContent = `Hours worked: ${h}h ${String(m).padStart(2, '0')}m`;
+                preview.style.display = 'block';
+            });
+
+            confirmBtn.addEventListener('click', async () => {
+                errBox.style.display = 'none';
+                const attId = document.getElementById('overrideAttId').value;
+                const cout = timeInput.value;
+                if (!cout) { errBox.textContent = 'Please enter a clock-out time.'; errBox.style.display = 'block'; return; }
+
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Saving…';
+                try {
+                    const res = await fetch('/api/attendance/manual_clockout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ attendance_id: parseInt(attId), clock_out: cout })
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        closeOverride();
+                        if (typeof loadAttendance === 'function') loadAttendance();
+                        if (typeof showToast === 'function') showToast(json.message, 'success');
+                    } else {
+                        errBox.textContent = json.message || 'Failed to save.';
+                        errBox.style.display = 'block';
+                    }
+                } catch (e) {
+                    errBox.textContent = 'Network error — please try again.';
+                    errBox.style.display = 'block';
+                } finally {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Save Clock-Out';
+                }
+            });
+
+            // Expose so the table rows can call it
+            window.openManualClockout = openOverride;
+        })();
+    
+
+
+        /* ═══════════════════════════════════════════════════════════
+           DEDUCTION EDIT MODAL
+           ═══════════════════════════════════════════════════════════ */
+        (function () {
+            const modal = document.getElementById('deductionEditModal');
+            const attIdEl = document.getElementById('deductEditAttId');
+            const amtEl = document.getElementById('deductEditAmount');
+            const waiveEl = document.getElementById('deductEditWaive');
+            const errEl = document.getElementById('deductEditError');
+            const saveBtn = document.getElementById('saveDeductionBtn');
+
+            window.openDeductionEdit = function (attId, currentAmount, currentWaived) {
+                attIdEl.value = attId;
+                amtEl.value = parseFloat(currentAmount || 0).toFixed(2);
+                waiveEl.checked = !!currentWaived;
+                errEl.style.display = 'none';
+                modal.classList.add('open');
+            };
+
+            saveBtn && saveBtn.addEventListener('click', async () => {
+                const attId = parseInt(attIdEl.value);
+                const amount = parseFloat(amtEl.value);
+                const waived = waiveEl.checked;
+
+                if (isNaN(amount) || amount < 0) {
+                    errEl.textContent = 'Deduction amount must be a positive number.';
+                    errEl.style.display = 'block';
+                    return;
+                }
+
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving…';
+                errEl.style.display = 'none';
+
+                try {
+                    const res = await fetch('/api/attendance/edit_deduction', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ attendance_id: attId, late_deduction: amount, deduction_waived: waived })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        modal.classList.remove('open');
+                        if (typeof loadAttendance === 'function') loadAttendance();
+                        if (typeof showToast === 'function') showToast('Deduction updated.', 'success');
+                    } else {
+                        errEl.textContent = data.message || 'Failed to save.';
+                        errEl.style.display = 'block';
+                    }
+                } catch (e) {
+                    errEl.textContent = 'Network error — please try again.';
+                    errEl.style.display = 'block';
+                } finally {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '💾 Save';
+                }
+            });
+        })();
+
+        /* ═══════════════════════════════════════════════════════════
+           LATE DEDUCTION SETTINGS MODAL
+           ═══════════════════════════════════════════════════════════ */
+        (function () {
+            const modal = document.getElementById('lateDeductionSettingsModal');
+            const openBtn = document.getElementById('openLDSettings');
+            const saveBtn = document.getElementById('saveLDSettingsBtn');
+            const graceEl = document.getElementById('ldGraceMinutes');
+            const rateEl = document.getElementById('ldPerMinuteRate');
+            const errEl = document.getElementById('ldSettingsError');
+            const successEl = document.getElementById('ldSettingsSuccess');
+
+            async function loadLDSettings() {
+                try {
+                    const res = await fetch('/api/settings/late_deduction');
+                    const data = await res.json();
+                    if (data.success) {
+                        graceEl.value = data.settings.grace_minutes;
+                        rateEl.value = parseFloat(data.settings.per_minute_rate).toFixed(4);
+                    }
+                } catch (e) {
+                    console.warn('Could not load late deduction settings:', e);
+                }
+            }
+
+            openBtn && openBtn.addEventListener('click', () => {
+                errEl.style.display = 'none';
+                successEl.style.display = 'none';
+                loadLDSettings();
+                modal.classList.add('open');
+            });
+
+            saveBtn && saveBtn.addEventListener('click', async () => {
+                const grace = parseInt(graceEl.value);
+                const rate = parseFloat(rateEl.value);
+
+                errEl.style.display = 'none';
+                successEl.style.display = 'none';
+
+                if (isNaN(grace) || grace < 0 || grace > 120) {
+                    errEl.textContent = 'Grace period must be 0–120 minutes.';
+                    errEl.style.display = 'block';
+                    return;
+                }
+                if (isNaN(rate) || rate < 0) {
+                    errEl.textContent = 'Per-minute rate must be ≥ 0.';
+                    errEl.style.display = 'block';
+                    return;
+                }
+
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving…';
+
+                try {
+                    const res = await fetch('/api/settings/late_deduction', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ grace_minutes: grace, per_minute_rate: rate })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        successEl.textContent = `✅ Saved — grace: ${grace}m, rate: ₱${rate.toFixed(4)}/min`;
+                        successEl.style.display = 'block';
+                    } else {
+                        errEl.textContent = data.message || 'Failed to save.';
+                        errEl.style.display = 'block';
+                    }
+                } catch (e) {
+                    errEl.textContent = 'Network error — please try again.';
+                    errEl.style.display = 'block';
+                } finally {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '💾 Save Settings';
+                }
+            });
+        })();
+
             loadAttendance();
             // Auto-refresh every 60 s
             setInterval(loadAttendance, 60000);
@@ -4006,231 +4231,6 @@
 
     </script>
 
-    <script>
-        (function () {
-            const modal = document.getElementById('overrideModal');
-            const closeBtn = document.getElementById('closeOverrideModal');
-            const cancelBtn = document.getElementById('cancelOverrideBtn');
-            const confirmBtn = document.getElementById('confirmOverrideBtn');
-            const timeInput = document.getElementById('overrideTimeInput');
-            const errBox = document.getElementById('overrideError');
-            const preview = document.getElementById('overridePreview');
-
-            function openOverride(attId, empName, clockIn) {
-                document.getElementById('overrideAttId').value = attId;
-                document.getElementById('overrideEmpName').textContent = empName;
-                document.getElementById('overrideClockIn').value = clockIn;
-                document.getElementById('overrideClockInDisplay').textContent = clockIn;
-                // Default to 23:59 so it's always valid
-                timeInput.value = '23:59';
-                errBox.style.display = 'none';
-                preview.style.display = 'none';
-                modal.classList.add('open');
-            }
-
-            function closeOverride() { modal.classList.remove('open'); }
-
-            closeBtn.addEventListener('click', closeOverride);
-            cancelBtn.addEventListener('click', closeOverride);
-            modal.addEventListener('click', e => { if (e.target === modal) closeOverride(); });
-
-            // Live preview when time changes
-            timeInput.addEventListener('input', () => {
-                errBox.style.display = 'none';
-                preview.style.display = 'none';
-                const cin = document.getElementById('overrideClockIn').value; // "HH:MM:SS"
-                const cout = timeInput.value;
-                if (!cout || !cin) return;
-                const cinParts = cin.split(':').map(Number);
-                const coutParts = cout.split(':').map(Number);
-                const cinMins = cinParts[0] * 60 + cinParts[1];
-                const coutMins = coutParts[0] * 60 + coutParts[1];
-                const diffMins = coutMins - cinMins;
-                if (diffMins <= 0) {
-                    errBox.textContent = `Clock-out must be after clock-in (${cin.slice(0, 5)})`;
-                    errBox.style.display = 'block';
-                    return;
-                }
-                const h = Math.floor(diffMins / 60);
-                const m = diffMins % 60;
-                preview.textContent = `Hours worked: ${h}h ${String(m).padStart(2, '0')}m`;
-                preview.style.display = 'block';
-            });
-
-            confirmBtn.addEventListener('click', async () => {
-                errBox.style.display = 'none';
-                const attId = document.getElementById('overrideAttId').value;
-                const cout = timeInput.value;
-                if (!cout) { errBox.textContent = 'Please enter a clock-out time.'; errBox.style.display = 'block'; return; }
-
-                confirmBtn.disabled = true;
-                confirmBtn.textContent = 'Saving…';
-                try {
-                    const res = await fetch('/api/attendance/manual_clockout', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ attendance_id: parseInt(attId), clock_out: cout })
-                    });
-                    const json = await res.json();
-                    if (json.success) {
-                        closeOverride();
-                        if (typeof loadAttendance === 'function') loadAttendance();
-                        if (typeof showToast === 'function') showToast(json.message, 'success');
-                    } else {
-                        errBox.textContent = json.message || 'Failed to save.';
-                        errBox.style.display = 'block';
-                    }
-                } catch (e) {
-                    errBox.textContent = 'Network error — please try again.';
-                    errBox.style.display = 'block';
-                } finally {
-                    confirmBtn.disabled = false;
-                    confirmBtn.textContent = 'Save Clock-Out';
-                }
-            });
-
-            // Expose so the table rows can call it
-            window.openManualClockout = openOverride;
-        })();
-    
-
-
-        /* ═══════════════════════════════════════════════════════════
-           DEDUCTION EDIT MODAL
-           ═══════════════════════════════════════════════════════════ */
-        (function () {
-            const modal = document.getElementById('deductionEditModal');
-            const attIdEl = document.getElementById('deductEditAttId');
-            const amtEl = document.getElementById('deductEditAmount');
-            const waiveEl = document.getElementById('deductEditWaive');
-            const errEl = document.getElementById('deductEditError');
-            const saveBtn = document.getElementById('saveDeductionBtn');
-
-            window.openDeductionEdit = function (attId, currentAmount, currentWaived) {
-                attIdEl.value = attId;
-                amtEl.value = parseFloat(currentAmount || 0).toFixed(2);
-                waiveEl.checked = !!currentWaived;
-                errEl.style.display = 'none';
-                modal.classList.add('open');
-            };
-
-            saveBtn && saveBtn.addEventListener('click', async () => {
-                const attId = parseInt(attIdEl.value);
-                const amount = parseFloat(amtEl.value);
-                const waived = waiveEl.checked;
-
-                if (isNaN(amount) || amount < 0) {
-                    errEl.textContent = 'Deduction amount must be a positive number.';
-                    errEl.style.display = 'block';
-                    return;
-                }
-
-                saveBtn.disabled = true;
-                saveBtn.textContent = 'Saving…';
-                errEl.style.display = 'none';
-
-                try {
-                    const res = await fetch('/api/attendance/edit_deduction', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ attendance_id: attId, late_deduction: amount, deduction_waived: waived })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        modal.classList.remove('open');
-                        if (typeof loadAttendance === 'function') loadAttendance();
-                        if (typeof showToast === 'function') showToast('Deduction updated.', 'success');
-                    } else {
-                        errEl.textContent = data.message || 'Failed to save.';
-                        errEl.style.display = 'block';
-                    }
-                } catch (e) {
-                    errEl.textContent = 'Network error — please try again.';
-                    errEl.style.display = 'block';
-                } finally {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = '💾 Save';
-                }
-            });
-        })();
-
-        /* ═══════════════════════════════════════════════════════════
-           LATE DEDUCTION SETTINGS MODAL
-           ═══════════════════════════════════════════════════════════ */
-        (function () {
-            const modal = document.getElementById('lateDeductionSettingsModal');
-            const openBtn = document.getElementById('openLDSettings');
-            const saveBtn = document.getElementById('saveLDSettingsBtn');
-            const graceEl = document.getElementById('ldGraceMinutes');
-            const rateEl = document.getElementById('ldPerMinuteRate');
-            const errEl = document.getElementById('ldSettingsError');
-            const successEl = document.getElementById('ldSettingsSuccess');
-
-            async function loadLDSettings() {
-                try {
-                    const res = await fetch('/api/settings/late_deduction');
-                    const data = await res.json();
-                    if (data.success) {
-                        graceEl.value = data.settings.grace_minutes;
-                        rateEl.value = parseFloat(data.settings.per_minute_rate).toFixed(4);
-                    }
-                } catch (e) {
-                    console.warn('Could not load late deduction settings:', e);
-                }
-            }
-
-            openBtn && openBtn.addEventListener('click', () => {
-                errEl.style.display = 'none';
-                successEl.style.display = 'none';
-                loadLDSettings();
-                modal.classList.add('open');
-            });
-
-            saveBtn && saveBtn.addEventListener('click', async () => {
-                const grace = parseInt(graceEl.value);
-                const rate = parseFloat(rateEl.value);
-
-                errEl.style.display = 'none';
-                successEl.style.display = 'none';
-
-                if (isNaN(grace) || grace < 0 || grace > 120) {
-                    errEl.textContent = 'Grace period must be 0–120 minutes.';
-                    errEl.style.display = 'block';
-                    return;
-                }
-                if (isNaN(rate) || rate < 0) {
-                    errEl.textContent = 'Per-minute rate must be ≥ 0.';
-                    errEl.style.display = 'block';
-                    return;
-                }
-
-                saveBtn.disabled = true;
-                saveBtn.textContent = 'Saving…';
-
-                try {
-                    const res = await fetch('/api/settings/late_deduction', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ grace_minutes: grace, per_minute_rate: rate })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        successEl.textContent = `✅ Saved — grace: ${grace}m, rate: ₱${rate.toFixed(4)}/min`;
-                        successEl.style.display = 'block';
-                    } else {
-                        errEl.textContent = data.message || 'Failed to save.';
-                        errEl.style.display = 'block';
-                    }
-                } catch (e) {
-                    errEl.textContent = 'Network error — please try again.';
-                    errEl.style.display = 'block';
-                } finally {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = '💾 Save Settings';
-                }
-            });
-        })();
-    </script>
 
 
     <!-- ── Manual Clock-Out Override Modal ─────────────────────────────────── -->
