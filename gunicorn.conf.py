@@ -1,20 +1,16 @@
-# gunicorn.conf.py — repo root, used by both Render (via render.yml) and
-# Railway (via Dockerfile CMD).
+# gunicorn.conf.py — Railway deployment
 #
-# Railway (Standard plan, 2 GB RAM):  TF/DeepFace loads fine at startup.
-# Render Starter (512 MB):            TF is lazy-loaded per-request; the
-#                                     post_fork warm-up is intentionally
-#                                     skipped here because it would OOM-kill
-#                                     the worker before any request is served.
-#                                     The _warm_deepface() daemon thread in
-#                                     app.py handles warming in the background
-#                                     without blocking gunicorn startup.
+# preload_app = False so the worker starts immediately and can answer
+# /ping and page requests right away. TensorFlow/DeepFace loads lazily
+# in the background via the _warm_deepface() daemon thread in app.py.
+# With preload_app = True the master process blocks on TF import (~60s)
+# before forking any worker, causing every request to 499-timeout.
 
-bind             = "0.0.0.0:8080"   # overridden at runtime by --bind in start cmd
+bind             = "0.0.0.0:8080"   # overridden at runtime by --bind in Dockerfile CMD
 workers          = 1
 threads          = 4
-timeout          = 300               # increased: covers Render cold-start + DB migration window
-graceful_timeout = 120               # give in-flight requests time to finish on restart
-keepalive        = 5                 # hold connections open briefly to reduce reconnect overhead
-preload_app      = True              # import app once in master, share across workers
+timeout          = 120               # Railway proxy hard-cuts at 30s anyway; keep reasonable
+graceful_timeout = 30
+keepalive        = 5
+preload_app      = False             # workers start immediately; TF warms in background thread
 worker_class     = "gthread"         # thread-based workers — better for I/O-heavy routes
