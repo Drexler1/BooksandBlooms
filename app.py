@@ -1640,6 +1640,22 @@ def login():
     return render_template("index.html")
 
 
+@app.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+    """
+    Forgot-password page.
+    Full self-service reset is not implemented; password changes are handled
+    by an admin via /api/admin/change_password.  This route exists so
+    index.html's url_for('forgot_password') resolves without a BuildError.
+    """
+    role = request.args.get("role", "")
+    flash(
+        "To reset your password, please contact your system administrator.",
+        "info",
+    )
+    return redirect(url_for("login"))
+
+
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║                         DASHBOARD                                           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
