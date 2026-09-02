@@ -1016,9 +1016,8 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Item</th>
-                                    <th>Category / Type</th>
-                                    <th>Source</th>
+                                    <th>Product</th>
+                                    <th>Category</th>
                                     <th>Stock</th>
                                     <th>Status</th>
                                 </tr>
@@ -1027,24 +1026,15 @@
                                 {% if low_stock_items %}
                                 {% for item in low_stock_items %}
                                 <tr>
-                                    <td data-label="Item"><strong>{{ item.name }}</strong></td>
-                                    <td data-label="Category / Type">{{ item.category }}</td>
-                                    <td data-label="Source">
-                                        {% if item.source == 'product' %}
-                                            <span class="badge medium">Product</span>
-                                        {% elif item.source == 'ingredient' %}
-                                            <span class="badge low">Ingredient</span>
-                                        {% else %}
-                                            <span class="badge">Packaging</span>
-                                        {% endif %}
-                                    </td>
+                                    <td data-label="Product"><strong>{{ item.name }}</strong></td>
+                                    <td data-label="Category">{{ item.category }}</td>
                                     <td data-label="Stock">{{ item.stock }} {{ item.unit }}</td>
                                     <td data-label="Status"><span class="badge {{ item.status_class }}">{{ item.status_label }}</span></td>
                                 </tr>
                                 {% endfor %}
                                 {% else %}
                                 <tr>
-                                    <td colspan="5">
+                                    <td colspan="4">
                                         <div class="empty-state">
                                             <div class="empty-state-icon">✅</div>
                                             <p>All stock levels are healthy</p>
