@@ -859,7 +859,7 @@ def set_security_headers(response):
 # ── Performance caches ──────────────────────────────────────────────────────────
 embedding_cache = {}  # { employee_id: embedding_vector }
 last_frame_time = {}  # { employee_id: datetime }
-MIN_FRAME_INTERVAL = 0.4   # seconds between liveness frames (reduced from 0.8 — still anti-DoS)
+MIN_FRAME_INTERVAL = 0.4   # seconds between verification frames (anti-DoS)
 MIN_MATCH_INTERVAL = 0.5   # stricter rate-limit applied only at the embedding comparison step
 
 # ── Face-verification security state ────────────────────────────────────────
@@ -888,8 +888,8 @@ def _get_face_cascade():
         )
     return _face_cascade
 
-# ── Liveness session store ──────────────────────────────────────────────────────
-# Tracks head-nod challenge state per employee during verification
+# ── Liveness session store (kept for /reset_liveness route compatibility) ──────
+# Head-nod challenge removed; replaced by continuous face-match loop on client.
 liveness_sessions = {}
 
 # ── Registration capture store ─────────────────────────────────────────────────
@@ -905,14 +905,12 @@ reg_sessions = (
 
 
 def reset_liveness(emp_id):
-    """Reset the liveness (anti-spoofing) challenge for an employee."""
-    liveness_sessions[emp_id] = {
-        "step": "center",  # center → up → down (nod)
-        "last_y": None,
-        "passed": False,
-        "start_time": datetime.now(PHT),
-        "stable": 0,  # frames without movement (photo-detection)
-    }
+    """No-op stub kept for /reset_liveness route compatibility.
+
+    Head-nod challenge has been removed. Verification now relies on
+    continuous face-match frames from the client's autoVerifyLoop().
+    """
+    liveness_sessions.pop(emp_id, None)
 
 
 def is_admin():
@@ -1393,7 +1391,7 @@ def commit_face_registration():
 def verify_face():
     """
     Verify a live webcam frame against the employee's registered face embedding.
-    Includes liveness detection (head-nod challenge) to prevent photo spoofing.
+    Includes static-frame detection to reject photo/screen spoofing attempts.
 
     POST JSON:
         { "employee_id": str|int, "image": "data:image/jpeg;base64,..." }
@@ -1512,77 +1510,36 @@ def verify_face():
             }
         )
 
-    # ── Liveness challenge (head-nod: up → down) ─────────────────────────────
-    if employee_id not in liveness_sessions:
-        reset_liveness(employee_id)
-
-    s = liveness_sessions[employee_id]
-
-    # Expire challenge after 20 s
-    if (now - s["start_time"]).seconds > 20:
-        reset_liveness(employee_id)
-        return jsonify(
-            {
-                "success": False,
-                "message": "\u23f1\ufe0f Challenge expired – look at camera and try again",
-            }
-        )
+    # ── Static-frame / photo-spoof detection ────────────────────────────────
+    # Head-nod challenge removed. The client's autoVerifyLoop() sends a fresh
+    # frame every 2.5 s; we track the face bounding-box centroid across calls
+    # to detect a perfectly static source (photo / screen replay).
+    # A real webcam always has minor natural movement (≥1 px shift over ~15 s).
+    STATIC_FRAME_LIMIT = 6   # consecutive frames with <3 px shift → reject
+    STATIC_SHIFT_PX    = 3   # minimum pixel movement to count as "live"
 
     center_y = y + h // 2
 
-    if s["last_y"] is None:
-        s["last_y"] = center_y
-        return jsonify(
-            {
-                "success": False,
-                "message": "\u2b06\ufe0f Please move your head UP slowly",
-            }
-        )
+    if employee_id not in liveness_sessions:
+        liveness_sessions[employee_id] = {"last_y": center_y, "stable": 0}
 
-    move = center_y - s["last_y"]  # negative = moved up, positive = moved down
+    ls = liveness_sessions[employee_id]
+    move = abs(center_y - ls["last_y"])
 
-    # Anti-photo: reject if face has been perfectly static for >6 frames
-    if abs(move) < 3:
-        s["stable"] += 1
+    if move < STATIC_SHIFT_PX:
+        ls["stable"] += 1
     else:
-        s["stable"] = 0
+        ls["stable"] = 0
 
-    if s["stable"] > 6:
+    ls["last_y"] = center_y
+
+    if ls["stable"] > STATIC_FRAME_LIMIT:
         return jsonify(
             {
                 "success": False,
-                "message": "\U0001f6ab Static image detected – please move your head",
+                "message": "\U0001f6ab Static image detected – please look at the camera",
             }
         )
-
-    # ── Always update last_y so movement is measured frame-to-frame ─────────
-    s["last_y"] = center_y
-
-    if s["step"] == "center":
-        if move < -8:
-            s["step"] = "up"
-            return jsonify(
-                {
-                    "success": False,
-                    "message": "\u2b07\ufe0f Good! Now move your head DOWN",
-                }
-            )
-        return jsonify({"success": False, "message": "\u2b06\ufe0f Move your head UP"})
-
-    elif s["step"] == "up":
-        if move > 8:
-            s["passed"] = True
-
-    if not s["passed"]:
-        return jsonify(
-            {"success": False, "message": "\u2b07\ufe0f Keep moving your head DOWN"}
-        )
-
-    # ── Liveness passed — reset BEFORE any return below ─────────────────────
-    # Resetting here ensures that embedding errors, DB errors, or any early
-    # return cannot leave passed=True. Without this, the next frame would skip
-    # liveness entirely and go straight to face matching.
-    reset_liveness(employee_id)
 
     # ── Stricter rate-limit at the match step (prevents brute-force replay) ──
     _last_match = last_frame_time.get(f"match_{employee_id}")
