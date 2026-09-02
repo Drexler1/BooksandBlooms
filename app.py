@@ -27,6 +27,15 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "SecretKey")
 
+
+# ── Lightweight CSRF protection (no flask-wtf dependency) ─────────────────────
+def _get_csrf_token():
+    if "_csrf_token" not in session:
+        session["_csrf_token"] = secrets.token_hex(32)
+    return session["_csrf_token"]
+
+app.jinja_env.globals["csrf_token"] = _get_csrf_token
+
 _AES_RAW = os.environ.get("AES_SECRET_KEY", "change-this-aes-key-before-deploy!")
 AES_KEY = hashlib.sha256(_AES_RAW.encode()).digest()  # 32 bytes
 
@@ -1619,6 +1628,12 @@ def login():
         flash(_lockout_flash(new_state))
 
     return render_template("index.html")
+
+
+@app.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+    flash("To reset your password, please contact your system administrator.", "info")
+    return redirect(url_for("login"))
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
