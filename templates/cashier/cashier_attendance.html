@@ -2784,7 +2784,20 @@
             });
         });
         document.getElementById('applyCustom')?.addEventListener('click', loadMyAttendance);
-        document.getElementById('refreshBtn')?.addEventListener('click', loadMyAttendance);
+        document.getElementById('refreshBtn')?.addEventListener('click', function () {
+            // Clear cache so a real fetch always happens on manual refresh
+            Object.keys(_attCache).forEach(k => delete _attCache[k]);
+            // Visual feedback while loading
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '↺ Refreshing…';
+            btn.style.opacity = '0.6';
+            loadMyAttendance().finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '↺ Refresh';
+                btn.style.opacity = '';
+            });
+        });
 
         /* ── Calendar ── */
         let calDate = new Date();
