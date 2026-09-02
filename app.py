@@ -1,5 +1,13 @@
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress TensorFlow CPU warnings
+# Limit TensorFlow/numpy thread usage to reduce memory on Render free tier
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+
 from dotenv import load_dotenv
-load_dotenv()  # Load .env file before anything else reads os.environ
+
+load_dotenv()
 
 from flask import (
     Flask,
@@ -11,32 +19,128 @@ from flask import (
     url_for,
     jsonify,
 )
+from decimal import Decimal
 from flask_mysqldb import MySQL
 from MySQLdb.cursors import DictCursor
-from deepface import DeepFace
-from datetime import datetime
+from flask_wtf.csrf import CSRFProtect, CSRFError
+# DeepFace, cv2, and numpy are intentionally NOT imported at the top level.
+# tensorflow-cpu alone uses ~500MB which exceeds Render's 512MB free limit.
+# They are imported lazily inside _get_deepface() / _get_cv2_np() below
+# so the rest of the app starts normally, and face-verify loads them on demand.
+from datetime import datetime, timedelta, date
+import pytz
+
+PHT = pytz.timezone("Asia/Manila")
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-import base64, cv2, os, numpy as np, time, hashlib, bcrypt, json, secrets
-import smtplib, threading, csv, io
+import base64, time, hashlib, bcrypt, json, secrets, re
+import csv, io
 from flask import Response
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
+import threading
+import requests as http_requests
+
+# ── Lazy-load helpers for heavy ML deps ─────────────────────────────────────
+_deepface_lock = threading.Lock()
+_DeepFace = None
+_cv2 = None
+_np = None
+
+def _get_deepface():
+    """Import DeepFace (and TensorFlow) only on first call."""
+    global _DeepFace
+    if _DeepFace is None:
+        with _deepface_lock:
+            if _DeepFace is None:
+                from deepface import DeepFace as _DF
+                _DeepFace = _DF
+    return _DeepFace
+
+def _get_cv2_np():
+    """Import cv2 and numpy only on first call."""
+    global _cv2, _np
+    if _cv2 is None:
+        import cv2 as _c
+        import numpy as _n
+        _cv2 = _c
+        _np = _n
+    return _cv2, _np
+
+def _send_email_resend(
+    to_email: str,
+    subject: str,
+    html_body: str,
+    from_name: str = "Books & Blooms Café",
+    from_address: str = "bloomsbooks2@gmail.com",
+):
+    """
+    Send email via Brevo (formerly Sendinblue) API — HTTPS port 443,
+    works on Render free tier. Sends to ANY recipient email address.
+    Set BREVO_API_KEY in your Render dashboard → Environment.
+    Get your free API key at: https://app.brevo.com/settings/keys/api
+    """
+    api_key = os.environ.get("BREVO_API_KEY", "")
+    if not api_key:
+        raise RuntimeError(
+            "BREVO_API_KEY is not set in the environment. "
+            "Add it in your Render dashboard → Environment."
+        )
+    payload = {
+        "sender": {"name": from_name, "email": from_address},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_body,
+    }
+    response = http_requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=10,
+    )
+    if response.status_code not in (200, 201):
+        raise RuntimeError(
+            f"Brevo API error {response.status_code}: {response.text}"
+        )
+
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "SecretKey")
 
+# ── Reverse-proxy fix (Railway / Render / any HTTPS-terminating proxy) ───────────
+# Railway sits behind a load-balancer that terminates TLS and forwards plain HTTP
+# to gunicorn.  Flask sees http:// and refuses to set Secure cookies, so the session
+# cookie is never sent back to the browser — CSRF token in the session is lost and
+# every POST gets "tokens do not match."
+# ProxyFix reads X-Forwarded-Proto: https and makes Flask treat the request as HTTPS.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-# ── Lightweight CSRF protection (no flask-wtf dependency) ─────────────────────
-def _get_csrf_token():
-    if "_csrf_token" not in session:
-        session["_csrf_token"] = secrets.token_hex(32)
-    return session["_csrf_token"]
+_secret = os.environ.get("FLASK_SECRET_KEY")
+if not _secret:
+    raise RuntimeError("FLASK_SECRET_KEY is not set in .env — refusing to start.")
+app.secret_key = _secret
 
-app.jinja_env.globals["csrf_token"] = _get_csrf_token
+# ── CSRF protection ─────────────────────────────────────────────────────────────
+# CSRFProtect is initialised here; individual API routes (called via fetch/XHR
+# with JSON bodies) are exempted with @csrf.exempt below their @app.route line.
+# Only HTML form-submitting routes need the token.
+csrf = CSRFProtect(app)
+# Never expire CSRF tokens — avoids "token expired" errors when Railway restarts a
+# container while a browser tab with the login form is already open.
+app.config["WTF_CSRF_TIME_LIMIT"] = None
 
-_AES_RAW = os.environ.get("AES_SECRET_KEY", "change-this-aes-key-before-deploy!")
+# ── File upload size limit (5 MB) ───────────────────────────────────────────────
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+
+# ── Session timeout (30 minutes) ────────────────────────────────────────────────
+# If a cashier walks away with the browser open, the session expires automatically.
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
+
+_AES_RAW = os.environ.get("AES_SECRET_KEY")
+if not _AES_RAW:
+    raise RuntimeError("AES_SECRET_KEY is not set in .env — refusing to start.")
 AES_KEY = hashlib.sha256(_AES_RAW.encode()).digest()  # 32 bytes
 
 
@@ -83,7 +187,7 @@ def aes_username_hash(username: str) -> str:
     ).hexdigest()
 
 
-BCRYPT_ROUNDS = 12  # work factor — increase to 13+ if hardware allows
+BCRYPT_ROUNDS = 10  # lowered from 12 — ~250ms → ~65ms on Render Starter single CPU
 
 
 def hash_password(plaintext: str) -> str:
@@ -215,7 +319,7 @@ def _backfill_bcrypt_hashes():
 
 
 MAX_ATTEMPTS = 5  # lock after this many consecutive failures
-LOCKOUT_MINS = 15  # minutes the account stays locked
+LOCKOUT_SECONDS = 30  # seconds the account stays locked
 WARN_AT = 3  # show "X attempts remaining" when failures reach this
 
 
@@ -236,8 +340,7 @@ def _ensure_lockout_table():
     try:
         conn = mysql.connection
         cur = conn.cursor()
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `login_attempts` (
                 `attempt_key`   VARCHAR(64)  NOT NULL,
                 `fail_count`    INT          NOT NULL DEFAULT 0,
@@ -245,11 +348,9 @@ def _ensure_lockout_table():
                 `last_attempt`  DATETIME     DEFAULT NULL,
                 PRIMARY KEY (`attempt_key`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
         # ── Face mismatch security log ───────────────────────────────────────
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `face_mismatch_log` (
                 `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 `employee_id`     INT          NOT NULL,
@@ -260,8 +361,7 @@ def _ensure_lockout_table():
                 INDEX `idx_employee_id` (`employee_id`),
                 INDEX `idx_attempted_at` (`attempted_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
         conn.commit()
         cur.close()
         app.logger.info("[migration] login_attempts + face_mismatch_log tables ensured")
@@ -287,15 +387,13 @@ def _widen_face_model_path():
         cur = conn.cursor(DictCursor)
 
         # Check the current column type
-        cur.execute(
-            """
+        cur.execute("""
             SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
             FROM information_schema.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME   = 'employees'
               AND COLUMN_NAME  = 'face_model_path'
-        """
-        )
+        """)
         col = cur.fetchone()
 
         if col is None:
@@ -337,8 +435,7 @@ def _ensure_trash_table():
         conn = mysql.connection
         cur = conn.cursor(DictCursor)
 
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `employees_trash` (
                 `trash_id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 `employee_id`       INT          NOT NULL,
@@ -348,7 +445,6 @@ def _ensure_trash_table():
                 `password`          VARCHAR(255) NOT NULL DEFAULT '',
                 `password_hash`     VARCHAR(255) DEFAULT NULL,
                 `role`              ENUM('admin','manager','cashier') NOT NULL DEFAULT 'cashier',
-                `contact_number`    VARCHAR(255) NOT NULL DEFAULT '',
                 `face_image_path`   VARCHAR(255) DEFAULT NULL,
                 `face_model_path`   MEDIUMTEXT   DEFAULT NULL,
                 `last_login`        DATETIME     DEFAULT NULL,
@@ -358,39 +454,34 @@ def _ensure_trash_table():
                 INDEX `idx_delete_at` (`delete_at`),
                 INDEX `idx_employee_id` (`employee_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
         conn.commit()
         app.logger.info("[migration] employees_trash table ensured")
 
         # ── Migrate existing inactive employees into trash ───────────────────
-        cur.execute(
-            """
+        cur.execute("""
             SELECT employee_id, full_name, username, username_hash,
-                   password, password_hash, role, contact_number,
+                   password, password_hash, role,
                    face_image_path, face_model_path, last_login,
                    created_at, disabled_at
             FROM employees
             WHERE employment_status = 'inactive'
               AND disabled_at IS NOT NULL
               AND employee_id NOT IN (SELECT employee_id FROM employees_trash)
-        """
-        )
+        """)
         rows = cur.fetchall()
         migrated = 0
         for row in rows:
-            disabled_at = row["disabled_at"] or datetime.now()
-            import datetime as _dt
-
-            delete_at = disabled_at + _dt.timedelta(hours=24)
+            disabled_at = row["disabled_at"] or datetime.now(PHT)
+            delete_at = disabled_at + timedelta(hours=24)
             cur.execute(
                 """
                 INSERT INTO employees_trash
                     (employee_id, full_name, username, username_hash,
-                     password, password_hash, role, contact_number,
+                     password, password_hash, role,
                      face_image_path, face_model_path, last_login,
                      created_at, disabled_at, delete_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
                 (
                     row["employee_id"],
@@ -400,7 +491,6 @@ def _ensure_trash_table():
                     row["password"],
                     row["password_hash"],
                     row["role"],
-                    row["contact_number"],
                     row["face_image_path"],
                     row["face_model_path"],
                     row["last_login"],
@@ -421,7 +511,7 @@ def _ensure_trash_table():
 
 
 # Timestamp of last purge check — avoids hitting DB on every single request
-_last_purge_check = None
+_last_purge_check = datetime.now(PHT)  # skip purge on very first request after cold start
 _PURGE_INTERVAL_SECONDS = 300  # check at most every 5 minutes
 
 
@@ -432,7 +522,7 @@ def _purge_expired_trash():
     Called lazily on requests, at most every _PURGE_INTERVAL_SECONDS.
     """
     global _last_purge_check
-    now = datetime.now()
+    now = datetime.now(PHT)
     if (
         _last_purge_check
         and (now - _last_purge_check).total_seconds() < _PURGE_INTERVAL_SECONDS
@@ -442,13 +532,11 @@ def _purge_expired_trash():
 
     try:
         cur = mysql.connection.cursor(DictCursor)
-        cur.execute(
-            """
+        cur.execute("""
             SELECT trash_id, employee_id, face_image_path
             FROM employees_trash
             WHERE delete_at <= NOW()
-        """
-        )
+        """)
         expired = cur.fetchall()
 
         for row in expired:
@@ -524,7 +612,7 @@ def check_lockout(username_hash: str, role: str) -> dict:
             "attempts_left": MAX_ATTEMPTS,
         }
 
-    now = datetime.utcnow()
+    now = datetime.now(PHT)
     locked_until = row.get("locked_until")
 
     if locked_until and locked_until > now:
@@ -558,7 +646,7 @@ def record_failed_attempt(username_hash: str, role: str) -> dict:
     Returns the same dict shape as check_lockout() reflecting the new state.
     """
     key = _lockout_key(username_hash, role)
-    now = datetime.utcnow()
+    now = datetime.now(PHT)
     try:
         conn = mysql.connection
         cur = conn.cursor(DictCursor)
@@ -573,9 +661,7 @@ def record_failed_attempt(username_hash: str, role: str) -> dict:
         locked_until = None
 
         if new_count >= MAX_ATTEMPTS:
-            from datetime import timedelta
-
-            locked_until = now + timedelta(minutes=LOCKOUT_MINS)
+            locked_until = now + timedelta(seconds=LOCKOUT_SECONDS)
 
         cur.execute(
             """
@@ -602,7 +688,7 @@ def record_failed_attempt(username_hash: str, role: str) -> dict:
     if locked_until:
         return {
             "locked": True,
-            "seconds_left": LOCKOUT_MINS * 60,
+            "seconds_left": LOCKOUT_SECONDS,
             "fail_count": new_count,
             "attempts_left": 0,
         }
@@ -635,10 +721,11 @@ def _lockout_flash(state: dict):
     if state["locked"]:
         mins = state["seconds_left"] // 60
         secs = state["seconds_left"] % 60
+        duration = f"{mins}m {secs:02d}s" if mins else f"{secs}s"
         return (
             f"LOCKOUT:{state['seconds_left']}:"
             f"Too many failed attempts. Account locked for "
-            f"{mins}m {secs:02d}s. Try again later."
+            f"{duration}. Try again later."
         )
     if state["fail_count"] >= WARN_AT:
         left = state["attempts_left"]
@@ -652,7 +739,7 @@ def _lockout_flash(state: dict):
 def _dec_emp(row: dict) -> dict:
     """Decrypt all PII fields on an employees row."""
     if row:
-        for f in ("username", "full_name", "password", "contact_number"):
+        for f in ("username", "full_name", "password", "email"):
             if row.get(f):
                 row[f] = aes_decrypt(row[f])
     return row
@@ -661,7 +748,7 @@ def _dec_emp(row: dict) -> dict:
 def _dec_adm(row: dict) -> dict:
     """Decrypt all PII fields on an admins row."""
     if row:
-        for f in ("username", "full_name", "password"):
+        for f in ("username", "full_name", "password", "email"):
             if row.get(f):
                 row[f] = aes_decrypt(row[f])
     return row
@@ -678,18 +765,102 @@ os.makedirs(PRODUCT_IMAGE_FOLDER, exist_ok=True)
 
 # ── MySQL ───────────────────────────────────────────────────────────────────────
 app.config["MYSQL_HOST"]     = os.environ.get("MYSQL_HOST", "localhost")
-app.config["MYSQL_PORT"]     = int(os.environ.get("MYSQL_PORT", 3306))
 app.config["MYSQL_USER"]     = os.environ.get("MYSQL_USER", "root")
 app.config["MYSQL_PASSWORD"] = os.environ.get("MYSQL_PASSWORD", "")
 app.config["MYSQL_DB"]       = os.environ.get("MYSQL_DB", "pos_system")
-app.config["MYSQL_SSL_CA"]   = os.environ.get("MYSQL_SSL_CA", "")
+app.config["MYSQL_PORT"]     = int(os.environ.get("MYSQL_PORT", 3306))
+
+# ── Aiven SSL (required for cloud-hosted MySQL) ──────────────────────────────
+_ssl_ca = os.environ.get("MYSQL_SSL_CA", "")  # path to ca.pem from Aiven
+if _ssl_ca:
+    app.config["MYSQL_SSL_CA"] = _ssl_ca
+
+# ── MySQL connection tuning (prevents "gone away" on Aiven idle timeout) ──────
+app.config["MYSQL_CONNECT_TIMEOUT"] = 10   # fail fast if Aiven is unreachable
+app.config["MYSQL_READ_TIMEOUT"]    = 30   # prevent hung queries blocking threads
+app.config["MYSQL_WRITE_TIMEOUT"]   = 30
 
 mysql = MySQL(app)
+from flask_compress import Compress
+Compress(app)
+
+# ── Warm DeepFace/Facenet at startup so first face-verify is fast ──────────
+def _warm_deepface():
+    try:
+        import numpy as _np_warm
+        DeepFace = _get_deepface()
+        _get_cv2_np()
+        DeepFace.represent(
+            _np_warm.zeros((160, 160, 3), dtype=_np_warm.uint8),
+            model_name="Facenet",
+            detector_backend="skip",
+            enforce_detection=False,
+        )
+        app.logger.info("[startup] DeepFace/FaceNet warm complete.")
+    except Exception as e:
+        app.logger.warning(f"[startup] DeepFace warm failed (non-fatal): {e}")
+
+threading.Thread(target=_warm_deepface, daemon=True).start()
+
+
+def _preload_embedding_cache():
+    """Pre-populate embedding_cache from DB at startup.
+
+    Reads the JSON embeddings already stored in face_model_path — a cheap DB
+    read + JSON parse, no ML inference — so the first clock-in after any
+    Railway restart is instant instead of hitting a cold load_embedding_from_db.
+    """
+    try:
+        with app.app_context():
+            _pre_cur = mysql.connection.cursor(DictCursor)
+            _pre_cur.execute(
+                "SELECT employee_id, face_model_path FROM employees "
+                "WHERE face_model_path IS NOT NULL AND face_model_path != ''"
+            )
+            rows = _pre_cur.fetchall()
+            _pre_cur.close()
+            loaded = 0
+            for row in rows:
+                try:
+                    raw = row.get("face_model_path") or ""
+                    if raw.startswith("{"):
+                        payload = json.loads(raw)
+                        emb = payload.get("emb")
+                        if emb and len(emb) in (128, 512):
+                            embedding_cache[str(row["employee_id"])] = emb
+                            loaded += 1
+                except Exception:
+                    pass
+            app.logger.info(f"[startup] Pre-loaded {loaded} embeddings into cache.")
+    except Exception as exc:
+        app.logger.warning(f"[startup] Embedding cache pre-load failed (non-fatal): {exc}")
+
+
+threading.Thread(target=_preload_embedding_cache, daemon=True).start()
+
+# ── Session cookie security flags ────────────────────────────────────────
+app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # CSRF mitigation
+# True only on Railway (RAILWAY_ENVIRONMENT is injected automatically by Railway).
+# Local dev runs on plain HTTP, so Secure=True would silently drop the session cookie.
+app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+
+# ── HTTP security headers ─────────────────────────────────────────────────
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Frame-Options"]        = "SAMEORIGIN"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
+    response.headers["X-XSS-Protection"]       = "1; mode=block"
+    return response
+
+
 
 # ── Performance caches ──────────────────────────────────────────────────────────
 embedding_cache = {}  # { employee_id: embedding_vector }
 last_frame_time = {}  # { employee_id: datetime }
-MIN_FRAME_INTERVAL = 0.8  # seconds between frames per employee
+MIN_FRAME_INTERVAL = 0.4   # seconds between verification frames (anti-DoS)
+MIN_MATCH_INTERVAL = 0.5   # stricter rate-limit applied only at the embedding comparison step
 
 # ── Face-verification security state ────────────────────────────────────────
 # One-time tokens issued by /verify_face on success; consumed by /log_attendance.
@@ -705,12 +876,20 @@ MAX_FACE_MISMATCHES = 3  # hard lockout after this many consecutive mismatches
 FACE_LOCKOUT_SECONDS = 30  # lockout duration in seconds
 
 # ── Haar cascade for quick face detection ──────────────────────────────────
-face_cascade = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
+# Loaded lazily so cv2/numpy are not imported at startup (saves ~200 MB RAM)
+_face_cascade = None
 
-# ── Liveness session store ──────────────────────────────────────────────────────
-# Tracks head-nod challenge state per employee during verification
+def _get_face_cascade():
+    global _face_cascade
+    if _face_cascade is None:
+        cv2, _ = _get_cv2_np()
+        _face_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        )
+    return _face_cascade
+
+# ── Liveness session store (kept for /reset_liveness route compatibility) ──────
+# Head-nod challenge removed; replaced by continuous face-match loop on client.
 liveness_sessions = {}
 
 # ── Registration capture store ─────────────────────────────────────────────────
@@ -726,30 +905,45 @@ reg_sessions = (
 
 
 def reset_liveness(emp_id):
-    """Reset the liveness (anti-spoofing) challenge for an employee."""
-    liveness_sessions[emp_id] = {
-        "step": "center",  # center → up → down (nod)
-        "last_y": None,
-        "passed": False,
-        "start_time": datetime.now(),
-        "stable": 0,  # frames without movement (photo-detection)
-    }
+    """No-op stub kept for /reset_liveness route compatibility.
+
+    Head-nod challenge has been removed. Verification now relies on
+    continuous face-match frames from the client's autoVerifyLoop().
+    """
+    liveness_sessions.pop(emp_id, None)
 
 
 def is_admin():
     """
-    Return True if the current session has full admin privileges.
+    Return True if the current session belongs to an admin or a manager.
 
-    Admins can log in either via the legacy 'admin' role (session['role']=='admin')
-    OR via the Manager tab (session['role']=='manager' with session['is_admin']==True).
-    All routes that previously checked 'admin_id' in session should call is_admin()
-    instead so both paths are covered.
+    Accepted session states:
+      1. Legacy admin login  — role='admin'  AND admin_id in session
+      2. Admin via Manager tab — role='manager' AND is_admin=True
+      3. Regular manager login — role='manager' AND is_admin=False
+         (employees table row with role='manager'; has access to all
+          management pages but is NOT a super-admin)
+
+    All page/API routes use this helper so both admin and manager paths
+    are covered without duplicating logic.
     """
     if session.get("role") == "admin" and "admin_id" in session:
         return True
-    if session.get("role") == "manager" and session.get("is_admin") is True:
+    if session.get("role") == "manager":
+        # Covers both is_admin=True (admin logged in via Manager tab)
+        # and is_admin=False (regular manager employee account).
         return True
     return False
+
+
+def is_super_admin():
+    """
+    Return True only for true admin accounts (not managers).
+
+    Used to restrict sensitive configuration routes — like hourly rate
+    edits and late-deduction settings — that managers must not access.
+    """
+    return session.get("role") == "admin" and "admin_id" in session
 
 
 def decode_base64_image(image_data: str):
@@ -757,6 +951,7 @@ def decode_base64_image(image_data: str):
     Decode a base64 data-URI string to an OpenCV BGR image.
     Returns (img_bgr, gray) or raises ValueError on failure.
     """
+    cv2, np = _get_cv2_np()
     if "," in image_data:
         image_data = image_data.split(",")[1]
     img_bytes = base64.b64decode(image_data)
@@ -777,6 +972,7 @@ def detect_face_strict(img, gray, registration_mode=False):
                                 always fail the blur check), relaxes distance and
                                 centering tolerances, and uses softer Haar params.
     """
+    cv2, np = _get_cv2_np()
     frame_h, frame_w = img.shape[:2]
 
     # ── Histogram equalisation: boosts contrast for dim / low-light webcams ─
@@ -801,7 +997,7 @@ def detect_face_strict(img, gray, registration_mode=False):
     # minNeighbors=3 (vs 5) accepts faces with less repeated confirmation.
     scale = 1.1 if registration_mode else 1.2
     neighbors = 3 if registration_mode else 4
-    faces = face_cascade.detectMultiScale(
+    faces = _get_face_cascade().detectMultiScale(
         gray_eq, scaleFactor=scale, minNeighbors=neighbors, minSize=(50, 50)
     )
     if len(faces) == 0:
@@ -809,7 +1005,7 @@ def detect_face_strict(img, gray, registration_mode=False):
 
     # Pick largest detected face (most likely to be the subject)
     faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-    (x, y, w, h) = faces[0]
+    x, y, w, h = faces[0]
 
     # ── Distance check ───────────────────────────────────────────────────────
     ratio = (w * h) / (frame_w * frame_h)
@@ -832,8 +1028,8 @@ def detect_face_strict(img, gray, registration_mode=False):
 
 def extract_embedding(img, x, y, w, h):
     """
-    Crop and resize a detected face, then extract a Facenet-512 embedding.
-    Returns the embedding vector (list of 512 floats).
+    Crop and resize a detected face, then extract a Facenet embedding.
+    Returns the embedding vector (list of 128 floats).
 
     Key rules:
     • img must be a uint8 BGR array (0–255) — do NOT normalise to float first.
@@ -844,10 +1040,13 @@ def extract_embedding(img, x, y, w, h):
     • We do NOT pass model= as a pre-built object; newer versions of DeepFace
       removed that parameter and it causes a TypeError crash.
     """
+    cv2, np = _get_cv2_np()
+    DeepFace = _get_deepface()
+
     # Crop to the detected face bounding box
     face_crop = img[y : y + h, x : x + w]
 
-    # Resize to the exact input size FaceNet-512 expects
+    # Resize to the exact input size Facenet expects (same as Facenet512: 160x160)
     face_crop = cv2.resize(face_crop, (160, 160))
 
     # ── IMPORTANT: keep as uint8 (0-255) ────────────────────────────────────
@@ -858,7 +1057,7 @@ def extract_embedding(img, x, y, w, h):
 
     result = DeepFace.represent(
         img_path=face_crop,
-        model_name="Facenet512",
+        model_name="Facenet",
         detector_backend="skip",
         enforce_detection=False,
     )
@@ -867,6 +1066,7 @@ def extract_embedding(img, x, y, w, h):
 
 def cosine_distance(a, b):
     """Return cosine distance in [0, 2]; lower → more similar (0 = identical)."""
+    _, np = _get_cv2_np()
     a, b = np.array(a), np.array(b)
     return 1.0 - float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
@@ -876,17 +1076,18 @@ def sharpness_score(img_bgr):
     Return the Laplacian variance of a BGR image crop.
     Higher = sharper. Used to pick the best frame during registration.
     """
+    cv2, _ = _get_cv2_np()
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     return cv2.Laplacian(gray, cv2.CV_64F).var()
 
 
 def persist_embedding(employee_id, embedding_vector):
     """
-    Serialize the averaged FaceNet-512 embedding to JSON and store it in
+    Serialize the averaged Facenet embedding to JSON and store it in
     the face_model_path column.  Also warms the in-memory cache.
 
     Using face_model_path as the storage column (it exists but was unused).
-    The value is a JSON string: '{"v":1,"emb":[...512 floats...]}'
+    The value is a JSON string: '{"v":1,"emb":[...128 floats...]}'
     """
     payload = json.dumps({"v": 1, "emb": embedding_vector}, separators=(",", ":"))
     try:
@@ -924,7 +1125,7 @@ def load_embedding_from_db(employee_id, cur):
         try:
             payload = json.loads(model_path)
             emb = payload.get("emb")
-            if emb and len(emb) == 512:
+            if emb and len(emb) in (128, 512):  # 128 = Facenet, 512 = Facenet512 (legacy)
                 app.logger.info(
                     f"[load_embedding] employee {employee_id}: loaded from DB JSON"
                 )
@@ -940,13 +1141,15 @@ def load_embedding_from_db(employee_id, cur):
     if not os.path.exists(reg_path):
         return None
     try:
+        cv2, _ = _get_cv2_np()
+        DeepFace = _get_deepface()
         reg_img = cv2.imread(reg_path)
         if reg_img is None:
             return None
         reg_img = cv2.resize(reg_img, (160, 160))
         reg_result = DeepFace.represent(
             img_path=reg_img,
-            model_name="Facenet512",
+            model_name="Facenet",
             detector_backend="skip",
             enforce_detection=False,
         )
@@ -972,7 +1175,19 @@ def load_embedding_from_db(employee_id, cur):
 reg_locks = set()  # set of tokens currently being processed
 
 
+@app.route("/ping")
+def ping():
+    # Lightweight healthcheck — must stay fast (no DB call).
+    # Render and UptimeRobot both hit this endpoint to confirm the app is alive.
+    from flask import make_response
+    resp = make_response("ok", 200)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Content-Type"] = "text/plain"
+    return resp
+
+
 @app.route("/register_face_frame", methods=["POST"])
+@csrf.exempt
 def register_face_frame():
     """
     Called by the employee-management modal to capture one webcam frame
@@ -981,7 +1196,17 @@ def register_face_frame():
     Sequential safety: if a previous call for the same token is still
     running (DeepFace can take 2–5 s on CPU), this call returns immediately
     with a "busy" response so the client retries on the next tick.
+
+    SECURITY: only admins/managers may register new employee faces.
+    Without this guard, anyone on the network could POST a fabricated
+    token + face image and seed a registration session unattended.
     """
+    if not is_admin():
+        return (
+            jsonify({"success": False, "message": "Unauthorized", "captured": 0}),
+            401,
+        )
+
     try:
         data = request.get_json(silent=True) or {}
         token = data.get("token", "")
@@ -1028,10 +1253,11 @@ def register_face_frame():
 
             # ── Decode & analyse frame ──────────────────────────────────────
             try:
+                _cv2_local, _ = _get_cv2_np()
                 img, gray = decode_base64_image(image_data)
                 # Flip mirrored canvas back to natural orientation for Haar
-                img = cv2.flip(img, 1)
-                gray = cv2.flip(gray, 1)
+                img = _cv2_local.flip(img, 1)
+                gray = _cv2_local.flip(gray, 1)
                 x, y, w, h = detect_face_strict(img, gray, registration_mode=True)
             except ValueError as e:
                 return jsonify(
@@ -1059,7 +1285,8 @@ def register_face_frame():
             # reference) is the clearest one, even though verification uses
             # the averaged embedding, not this image.
             face_crop = img[y : y + h, x : x + w]
-            crop_160 = cv2.resize(face_crop, (160, 160))
+            _cv2_local, _ = _get_cv2_np()
+            crop_160 = _cv2_local.resize(face_crop, (160, 160))
             sharp = sharpness_score(crop_160)
             if sharp > sess["best_sharpness"]:
                 sess["best_sharpness"] = sharp
@@ -1089,6 +1316,7 @@ def register_face_frame():
 
 
 @app.route("/commit_face_registration", methods=["POST"])
+@csrf.exempt
 def commit_face_registration():
     """
     Finalize registration: average the captured embeddings, save the sharpest
@@ -1096,7 +1324,13 @@ def commit_face_registration():
 
     POST JSON:  { "token": str, "employee_id": int }
     Response:   { "success": bool, "message": str }
+
+    SECURITY: only admins/managers may finalize a face registration and
+    bind it to an employee record.
     """
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
     data = request.get_json(silent=True) or {}
     token = data.get("token", "")
     employee_id = data.get("employee_id")
@@ -1119,11 +1353,12 @@ def commit_face_registration():
     # ── Save sharpest face image ─────────────────────────────────────────────
     filename = f"{employee_id}.jpg"
     image_path = os.path.join(UPLOAD_FOLDER, filename)
-    cv2.imwrite(image_path, sess["best_face"], [cv2.IMWRITE_JPEG_QUALITY, 95])
+    _cv2_local, _np_local = _get_cv2_np()
+    _cv2_local.imwrite(image_path, sess["best_face"], [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
     face_path = f"face_images/{filename}"
 
     # ── Average embeddings for best accuracy ────────────────────────────────
-    avg_emb = np.mean(sess["embeddings"], axis=0).tolist()
+    avg_emb = _np_local.mean(sess["embeddings"], axis=0).tolist()
 
     # ── Persist to DB ───────────────────────────────────────────────────────
     try:
@@ -1152,10 +1387,11 @@ def commit_face_registration():
 
 
 @app.route("/verify_face", methods=["POST"])
+@csrf.exempt
 def verify_face():
     """
     Verify a live webcam frame against the employee's registered face embedding.
-    Includes liveness detection (head-nod challenge) to prevent photo spoofing.
+    Includes static-frame detection to reject photo/screen spoofing attempts.
 
     POST JSON:
         { "employee_id": str|int, "image": "data:image/jpeg;base64,..." }
@@ -1224,7 +1460,7 @@ def verify_face():
     else:
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
-    now = datetime.now()
+    now = datetime.now(PHT)
 
     # ── Rate-limit per employee (anti-spam) ─────────────────────────────────
     if employee_id in last_frame_time:
@@ -1247,11 +1483,12 @@ def verify_face():
 
     # ── Decode & validate incoming frame ────────────────────────────────────
     try:
+        _cv2_local, _ = _get_cv2_np()
         img, gray = decode_base64_image(image_data)
         # The browser mirrors the canvas — flip back to natural orientation
         # so Haar detection works correctly (trained on unmirrored faces).
-        img = cv2.flip(img, 1)
-        gray = cv2.flip(gray, 1)
+        img = _cv2_local.flip(img, 1)
+        gray = _cv2_local.flip(gray, 1)
         x, y, w, h = detect_face_strict(img, gray)
     except ValueError as e:
         return jsonify({"success": False, "message": str(e)})
@@ -1273,77 +1510,44 @@ def verify_face():
             }
         )
 
-    # ── Liveness challenge (head-nod: up → down) ─────────────────────────────
-    if employee_id not in liveness_sessions:
-        reset_liveness(employee_id)
-
-    s = liveness_sessions[employee_id]
-
-    # Expire challenge after 20 s
-    if (now - s["start_time"]).seconds > 20:
-        reset_liveness(employee_id)
-        return jsonify(
-            {
-                "success": False,
-                "message": "\u23f1\ufe0f Challenge expired – look at camera and try again",
-            }
-        )
+    # ── Static-frame / photo-spoof detection ────────────────────────────────
+    # Head-nod challenge removed. The client's autoVerifyLoop() sends a fresh
+    # frame every 2.5 s; we track the face bounding-box centroid across calls
+    # to detect a perfectly static source (photo / screen replay).
+    # A real webcam always has minor natural movement (≥1 px shift over ~15 s).
+    STATIC_FRAME_LIMIT = 6   # consecutive frames with <3 px shift → reject
+    STATIC_SHIFT_PX    = 3   # minimum pixel movement to count as "live"
 
     center_y = y + h // 2
 
-    if s["last_y"] is None:
-        s["last_y"] = center_y
-        return jsonify(
-            {
-                "success": False,
-                "message": "\u2b06\ufe0f Please move your head UP slowly",
-            }
-        )
+    if employee_id not in liveness_sessions:
+        liveness_sessions[employee_id] = {"last_y": center_y, "stable": 0}
 
-    move = center_y - s["last_y"]  # negative = moved up, positive = moved down
+    ls = liveness_sessions[employee_id]
+    move = abs(center_y - ls["last_y"])
 
-    # Anti-photo: reject if face has been perfectly static for >6 frames
-    if abs(move) < 3:
-        s["stable"] += 1
+    if move < STATIC_SHIFT_PX:
+        ls["stable"] += 1
     else:
-        s["stable"] = 0
+        ls["stable"] = 0
 
-    if s["stable"] > 6:
+    ls["last_y"] = center_y
+
+    if ls["stable"] > STATIC_FRAME_LIMIT:
         return jsonify(
             {
                 "success": False,
-                "message": "\U0001f6ab Static image detected – please move your head",
+                "message": "\U0001f6ab Static image detected – please look at the camera",
             }
         )
 
-    # ── Always update last_y so movement is measured frame-to-frame ─────────
-    s["last_y"] = center_y
-
-    if s["step"] == "center":
-        if move < -8:
-            s["step"] = "up"
-            return jsonify(
-                {
-                    "success": False,
-                    "message": "\u2b07\ufe0f Good! Now move your head DOWN",
-                }
-            )
-        return jsonify({"success": False, "message": "\u2b06\ufe0f Move your head UP"})
-
-    elif s["step"] == "up":
-        if move > 8:
-            s["passed"] = True
-
-    if not s["passed"]:
-        return jsonify(
-            {"success": False, "message": "\u2b07\ufe0f Keep moving your head DOWN"}
-        )
-
-    # ── Liveness passed — reset BEFORE any return below ─────────────────────
-    # Resetting here ensures that embedding errors, DB errors, or any early
-    # return cannot leave passed=True. Without this, the next frame would skip
-    # liveness entirely and go straight to face matching.
-    reset_liveness(employee_id)
+    # ── Stricter rate-limit at the match step (prevents brute-force replay) ──
+    _last_match = last_frame_time.get(f"match_{employee_id}")
+    if _last_match:
+        _match_elapsed = (now - _last_match).total_seconds()
+        if _match_elapsed < MIN_MATCH_INTERVAL:
+            return jsonify({"success": False, "message": "Please wait a moment before trying again."})
+    last_frame_time[f"match_{employee_id}"] = now
 
     # ── Perform face match ───────────────────────────────────────────────────
     try:
@@ -1396,7 +1600,7 @@ def verify_face():
             app.logger.error(f"[face_mismatch_log] write failed: {log_err}")
 
         if fm["count"] >= MAX_FACE_MISMATCHES:
-            fm["locked_until"] = datetime.now() + __import__("datetime").timedelta(
+            fm["locked_until"] = datetime.now(PHT) + timedelta(
                 seconds=FACE_LOCKOUT_SECONDS
             )
             fm["count"] = 0
@@ -1429,11 +1633,10 @@ def verify_face():
     verify_token = secrets.token_urlsafe(32)
     verified_tokens[verify_token] = {
         "employee_id": employee_id,
-        "expires": datetime.now()
-        + __import__("datetime").timedelta(seconds=VERIFY_TOKEN_TTL),
+        "expires": datetime.now(PHT) + timedelta(seconds=VERIFY_TOKEN_TTL),
     }
     # Purge expired tokens to prevent unbounded memory growth
-    _now = datetime.now()
+    _now = datetime.now(PHT)
     for _t in [t for t, v in list(verified_tokens.items()) if v["expires"] < _now]:
         verified_tokens.pop(_t, None)
 
@@ -1495,10 +1698,48 @@ def api_face_mismatch_log():
 @app.errorhandler(500)
 def handle_500(e):
     """Return JSON for any unhandled 500 error so the server stays up."""
-    return jsonify({"success": False, "message": f"Internal server error: {e}"}), 500
+    app.logger.error(f"[500] {e}")
+    if request.is_json or request.path.startswith("/api/"):
+        return jsonify({"success": False, "message": "Internal server error"}), 500
+    return render_template("errors/500.html"), 500
+
+
+@app.errorhandler(404)
+def handle_404(e):
+    if request.is_json or request.path.startswith("/api/"):
+        return jsonify({"success": False, "message": "Not found"}), 404
+    return render_template("errors/404.html"), 404
+
+
+@app.errorhandler(403)
+def handle_403(e):
+    if request.is_json or request.path.startswith("/api/"):
+        return jsonify({"success": False, "message": "Forbidden"}), 403
+    return render_template("errors/403.html"), 403
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    app.logger.warning(f"[CSRF] {request.path} — {e.description}")
+    if request.is_json or request.path.startswith("/api/"):
+        return (
+            jsonify({"success": False, "message": "CSRF token missing or invalid"}),
+            400,
+        )
+    flash("Session expired or invalid request. Please try again.", "danger")
+    return redirect(url_for("login")), 400
+
+
+@app.errorhandler(413)
+def handle_413(e):
+    if request.is_json or request.path.startswith("/api/"):
+        return jsonify({"success": False, "message": "File too large (max 5 MB)"}), 413
+    flash("Uploaded file is too large (maximum 5 MB).", "danger")
+    return redirect(request.referrer or url_for("dashboard")), 413
 
 
 @app.route("/reset_liveness", methods=["POST"])
+@csrf.exempt
 def reset_liveness_route():
     """
     Called by the frontend when the user enters Step 3 (Face Verify).
@@ -1551,7 +1792,11 @@ def login():
 
         # ── Legacy admin tab ─────────────────────────────────────────────────
         if role == "admin":
-            cur.execute("SELECT * FROM admins WHERE username_hash=%s", (u_hash,))
+            cur.execute(
+                "SELECT admin_id, username, full_name, password, email"
+                " FROM admins WHERE username_hash=%s",
+                (u_hash,),
+            )
             user = _dec_adm(cur.fetchone())
             if user and _check_login_password(password, user):
                 session.clear()
@@ -1565,7 +1810,8 @@ def login():
         # ── Manager tab ──────────────────────────────────────────────────────
         elif role == "manager":
             cur.execute(
-                """SELECT * FROM employees WHERE username_hash=%s
+                """SELECT employee_id, username, full_name, password, email
+                   FROM employees WHERE username_hash=%s
                    AND role='manager' AND employment_status='active'""",
                 (u_hash,),
             )
@@ -1585,7 +1831,11 @@ def login():
                 redirect_to = url_for("dashboard")
             else:
                 # Fallback: try admins table via Manager tab
-                cur.execute("SELECT * FROM admins WHERE username_hash=%s", (u_hash,))
+                cur.execute(
+                    "SELECT admin_id, username, full_name, password, email"
+                    " FROM admins WHERE username_hash=%s",
+                    (u_hash,),
+                )
                 admin = _dec_adm(cur.fetchone())
                 if admin and _check_login_password(password, admin):
                     session.clear()
@@ -1599,7 +1849,8 @@ def login():
         # ── Cashier tab ──────────────────────────────────────────────────────
         elif role == "cashier":
             cur.execute(
-                """SELECT * FROM employees WHERE username_hash=%s
+                """SELECT employee_id, username, full_name, password, email
+                   FROM employees WHERE username_hash=%s
                    AND role='cashier' AND employment_status='active'""",
                 (u_hash,),
             )
@@ -1622,6 +1873,7 @@ def login():
 
         if auth_ok:
             # ── Successful login: clear the fail counter ──────────────────────
+            session.permanent = True  # honour PERMANENT_SESSION_LIFETIME (30 min)
             clear_failed_attempts(u_hash, lockout_role_key)
             return redirect(redirect_to)
 
@@ -1632,9 +1884,627 @@ def login():
     return render_template("index.html")
 
 
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                       FORGOT PASSWORD                                       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# ── Token store ────────────────────────────────────────────────────────────────
+# Reset tokens are written to the DB so they survive server restarts.
+# Each token is a 64-char hex secret tied to a (role, user_id, table) triplet,
+# expires after RESET_TOKEN_TTL_MINUTES, and is deleted on first use.
+RESET_TOKEN_TTL_MINUTES = 30
+
+
+def _ensure_reset_tokens_table():
+    """
+    Create password_reset_tokens if it does not exist.
+    Called once at startup inside run_auto_migration().
+    """
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
+                `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `token`        VARCHAR(128)  NOT NULL UNIQUE,
+                `role`         ENUM('admin','manager','cashier') NOT NULL,
+                `user_id`      INT UNSIGNED  NOT NULL,
+                `user_table`   ENUM('admins','employees')        NOT NULL,
+                `expires_at`   DATETIME      NOT NULL,
+                `otp_code`     VARCHAR(6)    DEFAULT NULL,
+                `otp_verified` TINYINT(1)    NOT NULL DEFAULT 0,
+                INDEX `idx_token`      (`token`),
+                INDEX `idx_expires_at` (`expires_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
+        # Add columns to existing tables that predate OTP flow
+        for col, defn in [
+            ("otp_code",     "VARCHAR(6) DEFAULT NULL"),
+            ("otp_verified", "TINYINT(1) NOT NULL DEFAULT 0"),
+        ]:
+            try:
+                cur.execute(
+                    f"ALTER TABLE `password_reset_tokens` ADD COLUMN `{col}` {defn}"
+                )
+            except Exception:
+                pass  # column already exists
+        conn.commit()
+        cur.close()
+        app.logger.info("[migration] password_reset_tokens table ensured")
+    except Exception as exc:
+        app.logger.error(f"[migration] _ensure_reset_tokens_table failed: {exc}")
+
+
+def _purge_expired_reset_tokens():
+    """Delete all tokens whose expiry has passed. Called lazily before lookups."""
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("DELETE FROM password_reset_tokens WHERE expires_at <= NOW()")
+        mysql.connection.commit()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] _purge_expired_reset_tokens failed: {exc}")
+
+
+def _send_gmail_reset(to_email: str, reset_url: str, full_name: str, role: str = "staff"):
+    """
+    Send a password-reset link to an admin via Gmail SMTP.
+
+    Required environment variables:
+        GMAIL_SENDER      — the Gmail address to send FROM
+        GMAIL_APP_PASSWORD — a Google App Password (not the account password)
+    """
+    sender = os.environ.get("GMAIL_SENDER", "")
+    app_pw = os.environ.get("GMAIL_APP_PASSWORD", "")
+    if not sender or not app_pw:
+        raise RuntimeError(
+            "GMAIL_SENDER and GMAIL_APP_PASSWORD must be set in the environment."
+        )
+
+    subject = "Books & Blooms Café — Password Reset"
+    html_body = f"""
+    <div style="font-family:'Outfit',Arial,sans-serif;max-width:520px;margin:auto;
+                background:#faf7f2;border:1.5px solid #e2d9cc;border-radius:14px;
+                padding:36px 32px;">
+      <p style="font-family:'Playfair Display',Georgia,serif;font-size:22px;
+                color:#1c1814;margin:0 0 8px">Books &amp; Blooms Café</p>
+      <p style="font-size:11px;color:#b8924a;letter-spacing:2px;
+                text-transform:uppercase;margin:0 0 28px">Staff Portal</p>
+      <p style="color:#1c1814;font-size:15px;margin:0 0 12px">
+        Hello, <strong>{full_name}</strong> 👋
+      </p>
+      <p style="color:#7a6e62;font-size:14px;line-height:1.6;margin:0 0 24px">
+        We received a request to reset your {role.capitalize()} account password.
+        Click the button below — this link expires in
+        <strong>{RESET_TOKEN_TTL_MINUTES} minutes</strong>.
+      </p>
+      <a href="{reset_url}"
+         style="display:inline-block;padding:14px 28px;background:#1c1814;
+                color:#d4a96a;border-radius:10px;text-decoration:none;
+                font-weight:600;font-size:14px;letter-spacing:1px">
+        Reset My Password
+      </a>
+      <p style="color:#7a6e62;font-size:12px;margin:24px 0 0;line-height:1.6">
+        If you did not request this reset, you can safely ignore this email.
+        Your password will remain unchanged.
+      </p>
+    </div>
+    """
+
+    _send_email_resend(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
+    app.logger.info(f"[reset] Reset link sent to {to_email}")
+
+
+def _send_sms_otp(phone_number: str, otp_code: str, full_name: str, role: str):
+    """
+    Send a 6-digit OTP to a Manager or Cashier via Semaphore SMS (semaphore.co).
+
+    Required environment variables:
+        SEMAPHORE_API_KEY   — your Semaphore API key
+        SEMAPHORE_SENDER    — your registered sender name (default: SEMAPHORE)
+    """
+    api_key     = os.environ.get("SEMAPHORE_API_KEY", "")
+    sender_name = os.environ.get("SEMAPHORE_SENDER", "SEMAPHORE")
+
+    if not api_key:
+        raise RuntimeError(
+            "SEMAPHORE_API_KEY must be set in the environment."
+        )
+
+    message = (
+        f"[Books & Blooms Cafe] Hi {full_name}, your OTP is: {otp_code}. "
+        f"It expires in 10 minutes. Do not share this with anyone."
+    )
+
+    # Semaphore expects the number in 09XXXXXXXXX or +639XXXXXXXXX format
+    import urllib.request, urllib.parse
+    payload = urllib.parse.urlencode({
+        "apikey":      api_key,
+        "number":      phone_number,
+        "message":     message,
+        "sendername":  sender_name,
+    }).encode("utf-8")
+    _ = otp_code  # already used in message above
+
+    url = "https://semaphore.co/api/v4/messages"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/x-www-form-urlencoded")
+
+    with urllib.request.urlopen(req) as resp:
+        result = json.loads(resp.read())
+        # Semaphore returns a list of message objects
+        if isinstance(result, list) and result:
+            status = result[0].get("status", "")
+            msg_id = result[0].get("message_id", "")
+            if status in ("Queued", "Sent", "Success"):
+                app.logger.info(
+                    f"[reset] Semaphore SMS queued to {phone_number} (id={msg_id})"
+                )
+            else:
+                app.logger.warning(f"[reset] Semaphore unexpected status: {result}")
+        else:
+            app.logger.warning(f"[reset] Semaphore unexpected response: {result}")
+
+
 @app.route("/forgot_password", methods=["GET", "POST"])
 def forgot_password():
-    flash("To reset your password, please contact your system administrator.", "info")
+    """
+    GET  — render the name entry form.
+    POST — search for matching staff profiles and redirect to choose_account.
+
+    Security: on POST we search by full_name only (no role field anymore).
+    The user picks their role implicitly by choosing their profile on the
+    next screen. If no match is found we still show choose_account with an
+    empty list so the response time/content doesn't reveal existence.
+    """
+    if request.method == "GET":
+        return render_template("forgot_password.html", submitted_name="")
+
+    full_name = (request.form.get("full_name") or "").strip()
+
+    if not full_name:
+        flash("Please enter your full name.", "danger")
+        return render_template("forgot_password.html", submitted_name="")
+
+    _purge_expired_reset_tokens()
+
+    matches = []
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        # ── Search admins ─────────────────────────────────────────────────
+        cur.execute("SELECT admin_id, full_name FROM admins")
+        for row in cur.fetchall():
+            dec_name = aes_decrypt(row.get("full_name") or "")
+            if dec_name.strip().lower() == full_name.lower():
+                matches.append({
+                    "id":           row["admin_id"],
+                    "table":        "admins",
+                    "role":         "admin",
+                    "display_name": dec_name.strip(),
+                })
+
+        # ── Search active employees (manager + cashier) ───────────────────
+        cur.execute(
+            "SELECT employee_id, full_name, role FROM employees "
+            "WHERE employment_status='active'"
+        )
+        for row in cur.fetchall():
+            dec_name = aes_decrypt(row.get("full_name") or "")
+            if dec_name.strip().lower() == full_name.lower():
+                matches.append({
+                    "id":           row["employee_id"],
+                    "table":        "employees",
+                    "role":         row["role"],
+                    "display_name": dec_name.strip(),
+                })
+
+        cur.close()
+
+    except Exception as exc:
+        app.logger.error(f"[reset] forgot_password search error: {exc}")
+        flash("An unexpected error occurred. Please try again.", "danger")
+        return render_template("forgot_password.html", submitted_name=full_name)
+
+    # Always redirect to choose_account regardless of match count
+    # (prevents timing/enumeration attacks)
+    session["recovery_matches"]   = matches
+    session["recovery_full_name"] = full_name
+    return redirect(url_for("choose_account"))
+
+
+# ── Helper: mask a contact string for display ────────────────────────────────
+def _mask_email(email: str) -> str:
+    """j***@gmail.com"""
+    if "@" not in email:
+        return "***"
+    local, domain = email.split("@", 1)
+    return local[0] + "***@" + domain
+
+
+def _mask_phone(phone: str) -> str:
+    """Keep last 4 digits: +63 *** *** 0249"""
+    digits = phone.strip()
+    if len(digits) >= 4:
+        return "*" * (len(digits) - 4) + digits[-4:]
+    return "****"
+
+
+@app.route("/choose_account", methods=["GET", "POST"])
+def choose_account():
+    """
+    GET  — show matching profiles stored in session from forgot_password.
+    POST — user clicked a profile; store choice and redirect to choose_method.
+    """
+    if request.method == "GET":
+        matches   = session.get("recovery_matches", [])
+        full_name = session.get("recovery_full_name", "")
+        if not full_name:
+            # Session expired or navigated here directly
+            return redirect(url_for("forgot_password"))
+        return render_template("choose_account.html", matches=matches)
+
+    # ── POST: user selected a profile ────────────────────────────────────────
+    account_id    = (request.form.get("account_id")    or "").strip()
+    account_table = (request.form.get("account_table") or "").strip()
+    role          = (request.form.get("role")          or "").strip().lower()
+    full_name     = (request.form.get("full_name")     or "").strip()
+
+    if not account_id or account_table not in ("admins", "employees") or role not in ("admin", "manager", "cashier"):
+        flash("Invalid account selection. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Fetch contact details for the chosen account
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        if account_table == "admins":
+            cur.execute(
+                "SELECT admin_id, full_name, email FROM admins WHERE admin_id=%s",
+                (account_id,),
+            )
+        else:
+            cur.execute(
+                "SELECT employee_id, full_name, email FROM employees "
+                "WHERE employee_id=%s AND employment_status='active'",
+                (account_id,),
+            )
+
+        row = cur.fetchone()
+        cur.close()
+
+    except Exception as exc:
+        app.logger.error(f"[reset] choose_account lookup error: {exc}")
+        flash("An error occurred. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if not row:
+        flash("Account not found. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Decrypt email and build masked version for display
+    has_email    = False
+    masked_email = ""
+
+    raw_email = aes_decrypt(row.get("email") or "")
+    if raw_email:
+        has_email    = True
+        masked_email = _mask_email(raw_email)
+
+    # Store in session for choose_method
+    session["recovery_account_id"]    = account_id
+    session["recovery_account_table"] = account_table
+    session["recovery_role"]          = role
+    session["recovery_full_name"]     = full_name
+
+    return render_template(
+        "choose_method.html",
+        account_id=account_id,
+        account_table=account_table,
+        role=role,
+        full_name=full_name,
+        has_email=has_email,
+        masked_email=masked_email,
+    )
+
+
+@app.route("/choose_method", methods=["POST"])
+def choose_method():
+    """
+    POST — receives the chosen delivery method (email or sms),
+           generates the token/OTP, dispatches it, and redirects
+           to verify_otp (SMS) or shows a success flash (email).
+    """
+    method        = (request.form.get("method")        or "").strip().lower()
+    account_id    = (request.form.get("account_id")    or "").strip()
+    account_table = (request.form.get("account_table") or "").strip()
+    role          = (request.form.get("role")          or "").strip().lower()
+    full_name     = (request.form.get("full_name")     or "").strip()
+
+    if method != "email" or not account_id or role not in ("admin", "manager", "cashier"):
+        flash("Invalid request. Please start over.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    _purge_expired_reset_tokens()
+
+    # Fetch account row to get email — all roles now use email
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        if account_table == "admins":
+            cur.execute(
+                "SELECT admin_id AS user_id, email, full_name FROM admins WHERE admin_id=%s",
+                (account_id,),
+            )
+        else:
+            cur.execute(
+                "SELECT employee_id AS user_id, email, full_name FROM employees "
+                "WHERE employee_id=%s AND employment_status='active'",
+                (account_id,),
+            )
+        row = cur.fetchone()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] choose_method lookup error: {exc}")
+        flash("An error occurred. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if not row:
+        flash("Account not found. Please start over.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Generate token + OTP
+    raw_token  = secrets.token_hex(32)
+    otp_code   = str(secrets.randbelow(900000) + 100000)
+    expires_at = datetime.now(PHT) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+
+    try:
+        ins = mysql.connection.cursor()
+        ins.execute(
+            """
+            INSERT INTO password_reset_tokens
+                (token, role, user_id, user_table, expires_at, otp_code, otp_verified)
+            VALUES (%s, %s, %s, %s, %s, %s, 1)
+            ON DUPLICATE KEY UPDATE
+                token        = VALUES(token),
+                expires_at   = VALUES(expires_at),
+                otp_code     = VALUES(otp_code),
+                otp_verified = 1
+            """,
+            (raw_token, role, row["user_id"], account_table, expires_at, otp_code),
+        )
+        mysql.connection.commit()
+        ins.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] choose_method token insert error: {exc}")
+        flash("An error occurred. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Dispatch — all roles now use email reset link
+    try:
+        raw_email = aes_decrypt(row.get("email") or "")
+        reset_url = url_for("reset_password", token=raw_token, role=role, _external=True)
+        _send_gmail_reset(
+            to_email=raw_email,
+            reset_url=reset_url,
+            full_name=full_name,
+            role=role,
+        )
+        flash(
+            "A reset link has been sent to your email address. "
+            "Check your inbox and follow the link to set a new password.",
+            "info",
+        )
+        return redirect(url_for("forgot_password"))
+
+    except RuntimeError as cfg_err:
+        app.logger.error(f"[reset] choose_method config error: {cfg_err}")
+        flash(
+            "Reset notification could not be sent — "
+            "please contact the café administrator.",
+            "danger",
+        )
+        return redirect(url_for("forgot_password"))
+
+    except Exception as send_err:
+        app.logger.error(f"[reset] choose_method send error: {send_err}")
+        flash(
+            "We had trouble sending the code. Please try again in a few moments.",
+            "danger",
+        )
+        return redirect(url_for("forgot_password"))
+
+
+@app.route("/verify_otp", methods=["GET", "POST"])
+def verify_otp():
+    """
+    GET  — render OTP entry screen (token passed as query param).
+    POST — validate the 6-digit OTP; on success mark token as verified
+           and redirect to /reset_password.
+    """
+    _purge_expired_reset_tokens()
+
+    if request.method == "GET":
+        token = (request.args.get("token") or "").strip()
+        role  = (request.args.get("role")  or "").strip().lower()
+        if not token or role not in ("manager", "cashier"):
+            flash("Invalid or missing OTP session.", "danger")
+            return redirect(url_for("forgot_password"))
+        return render_template("verify_otp.html", token=token, role=role, error=None)
+
+    # ── POST ──────────────────────────────────────────────────────────────────
+    token    = (request.form.get("token")    or "").strip()
+    role     = (request.form.get("role")     or "").strip().lower()
+    otp_input = (request.form.get("otp_code") or "").strip()
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT id, otp_code, expires_at FROM password_reset_tokens "
+            "WHERE token=%s",
+            (token,),
+        )
+        record = cur.fetchone()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[otp] DB error: {exc}")
+        flash("An error occurred. Please request a new OTP.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if not record:
+        flash("OTP session not found. Please request a new one.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if PHT.localize(record["expires_at"]) < datetime.now(PHT):
+        flash("Your OTP has expired. Please request a new one.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if otp_input != record["otp_code"]:
+        return render_template(
+            "verify_otp.html", token=token, role=role,
+            error="Incorrect OTP. Please try again."
+        )
+
+    # Mark OTP as verified
+    try:
+        upd = mysql.connection.cursor()
+        upd.execute(
+            "UPDATE password_reset_tokens SET otp_verified=1, otp_code=NULL "
+            "WHERE token=%s",
+            (token,),
+        )
+        mysql.connection.commit()
+        upd.close()
+    except Exception as exc:
+        app.logger.error(f"[otp] Failed to mark verified: {exc}")
+        flash("An error occurred. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    app.logger.info(f"[otp] OTP verified for token ...{token[-8:]}")
+    return redirect(url_for("reset_password", token=token, role=role))
+
+
+@app.route("/reset_password", methods=["GET", "POST"])
+def reset_password():
+    """
+    GET  — validate token from URL, render the set-new-password form.
+    POST — validate token again, enforce password rules, hash and save the
+           new password, then delete the token.
+
+    Token validation:
+      • Must exist in password_reset_tokens.
+      • Must not have expired (expires_at > NOW()).
+      • The role in the token must match the ?role= query parameter (double-check).
+    """
+    _purge_expired_reset_tokens()
+
+    if request.method == "GET":
+        token = (request.args.get("token") or "").strip()
+        role  = (request.args.get("role")  or "").strip().lower()
+
+        if not token or role not in ("admin", "manager", "cashier"):
+            flash("Invalid or missing reset link.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        try:
+            cur = mysql.connection.cursor(DictCursor)
+            cur.execute(
+                "SELECT id, role, expires_at, otp_verified FROM password_reset_tokens "
+                "WHERE token=%s",
+                (token,),
+            )
+            record = cur.fetchone()
+            cur.close()
+        except Exception as exc:
+            app.logger.error(f"[reset] DB error on token lookup: {exc}")
+            flash("An error occurred. Please request a new reset link.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        if not record:
+            flash("This reset link is invalid or has already been used.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        if PHT.localize(record["expires_at"]) < datetime.now(PHT):
+            flash(
+                "This reset link has expired. Please request a new one.", "danger"
+            )
+            return redirect(url_for("forgot_password"))
+
+        if record["role"] != role:
+            flash("Reset link role mismatch. Please request a new link.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        return render_template("reset_password.html", token=token, role=role)
+
+    # ── POST ──────────────────────────────────────────────────────────────────
+    token        = (request.form.get("token")        or "").strip()
+    new_password = (request.form.get("new_password") or "").strip()
+    confirm_pw   = (request.form.get("confirm_password") or "").strip()
+
+    # Re-derive role from the token record (don't trust a hidden form field)
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT id, role, user_id, user_table, expires_at "
+            "FROM password_reset_tokens WHERE token=%s",
+            (token,),
+        )
+        record = cur.fetchone()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] DB error on POST token lookup: {exc}")
+        flash("An error occurred. Please request a new reset link.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    role = record["role"] if record else ""
+
+    if not record:
+        flash("This reset link is invalid or has already been used.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if PHT.localize(record["expires_at"]) < datetime.now(PHT):
+        flash("This reset link has expired. Please request a new one.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # ── Validate new password ─────────────────────────────────────────────────
+    if len(new_password) < 8:
+        flash("Password must be at least 8 characters.", "danger")
+        return render_template("reset_password.html", token=token, role=role)
+
+    if new_password != confirm_pw:
+        flash("Passwords do not match. Please try again.", "danger")
+        return render_template("reset_password.html", token=token, role=role)
+
+    # ── Hash and save ─────────────────────────────────────────────────────────
+    new_hash   = hash_password(new_password)
+    table      = record["user_table"]
+    id_column  = "admin_id" if table == "admins" else "employee_id"
+
+    try:
+        upd_cur = mysql.connection.cursor()
+        upd_cur.execute(
+            f"UPDATE `{table}` SET password_hash=%s WHERE `{id_column}`=%s",
+            (new_hash, record["user_id"]),
+        )
+        # Consume token — one-time use only
+        upd_cur.execute(
+            "DELETE FROM password_reset_tokens WHERE token=%s", (token,)
+        )
+        mysql.connection.commit()
+        upd_cur.close()
+    except Exception as exc:
+        app.logger.error(f"[reset] Failed to save new password: {exc}")
+        flash("An error occurred while saving your new password. Please try again.", "danger")
+        return render_template("reset_password.html", token=token, role=role)
+
+    app.logger.info(
+        f"[reset] Password updated — table={table} user_id={record['user_id']} role={role}"
+    )
+    flash("Your password has been reset successfully. You can now sign in.", "info")
     return redirect(url_for("login"))
 
 
@@ -1643,30 +2513,230 @@ def forgot_password():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
+# ── POS product catalogue cache (30-second TTL) ─────────────────────────────
+# The cashier dashboard fetches /api/pos/products on every page load AND via
+# SSE stream. Caching avoids two DB round-trips per cashier per page open.
+_pos_products_cache: dict = {}
+_POS_PRODUCTS_TTL = 30  # seconds
+
+
+def _get_pos_products() -> dict:
+    """Return cached POS product catalogue, refreshing every 30 seconds."""
+    now = datetime.now(PHT)
+    cached = _pos_products_cache.get("data")
+    if cached and (now - cached["_cached_at"]).total_seconds() < _POS_PRODUCTS_TTL:
+        return cached
+
+    cur = mysql.connection.cursor(DictCursor)
+    cur.execute("""
+        SELECT c.category_id, c.name,
+               COUNT(p.product_id) AS product_count
+        FROM   categories c
+        LEFT   JOIN products p ON p.category_id = c.category_id AND p.is_active = 1
+        GROUP  BY c.category_id
+        HAVING product_count > 0
+        ORDER  BY c.name
+    """)
+    categories = [
+        {"category_id": c["category_id"], "name": c["name"],
+         "product_count": int(c["product_count"])}
+        for c in cur.fetchall()
+    ]
+    cur.execute("""
+        SELECT p.product_id, p.name, p.description,
+               p.image_url, p.icon, p.cup_eligible, p.price, p.stock, p.unit,
+               c.category_id, c.name AS category_name
+        FROM   products p
+        LEFT   JOIN categories c ON c.category_id = p.category_id
+        WHERE  p.is_active = 1
+        ORDER  BY c.name, p.name
+    """)
+    items = [
+        {
+            "product_id":    r["product_id"],
+            "name":          r["name"],
+            "description":   r["description"] or "",
+            "image_url":     r["image_url"] or "",
+            "icon":          r["icon"] or "📦",
+            "cup_eligible":  bool(r.get("cup_eligible", 0)),
+            "price":         float(r["price"]),
+            "stock":         int(r["stock"]),
+            "unit":          r["unit"],
+            "category_id":   r["category_id"],
+            "category_name": r["category_name"] or "Other",
+        }
+        for r in cur.fetchall()
+    ]
+    cur.close()
+    result = {"_cached_at": now, "items": items, "categories": categories}
+    _pos_products_cache["data"] = result
+    return result
+
+
+def _invalidate_pos_cache():
+    """Call this after any product create/update/delete to bust the cache."""
+    _pos_products_cache.clear()
+
+
+# ── Dashboard data cache (60-second TTL) ────────────────────────────────────
+# Avoids 6 serial round-trips to Aiven on every page load.
+# Safe for a POS — 60-second-old sales totals are fine for a summary view.
+_dashboard_cache: dict = {}
+_DASHBOARD_CACHE_TTL = 60  # seconds
+
+
+def _get_dashboard_data() -> dict:
+    """
+    Fetch all dashboard metrics in as few DB round-trips as possible and
+    cache the result for _DASHBOARD_CACHE_TTL seconds.
+    """
+    now = datetime.now(PHT)
+    cached = _dashboard_cache.get("data")
+    if cached and (now - cached["_cached_at"]).total_seconds() < _DASHBOARD_CACHE_TTL:
+        return cached
+
+    cur = mysql.connection.cursor(DictCursor)
+
+    # ── 1. Today + yesterday sales/counts in ONE query ────────────────────────
+    cur.execute("""
+        SELECT
+            COALESCE(SUM(CASE WHEN created_at >= CURDATE() THEN total_amount END), 0)          AS today_total,
+            COUNT(CASE WHEN created_at >= CURDATE() THEN 1 END)                                 AS today_count,
+            COALESCE(SUM(CASE WHEN created_at >= CURDATE() - INTERVAL 1 DAY
+                               AND created_at < CURDATE() THEN total_amount END), 0)            AS yest_total,
+            COUNT(CASE WHEN created_at >= CURDATE() - INTERVAL 1 DAY
+                        AND created_at < CURDATE() THEN 1 END)                                  AS yest_count
+        FROM transactions
+        WHERE created_at >= CURDATE() - INTERVAL 1 DAY
+          AND status = 'completed'
+    """)
+    srow = cur.fetchone()
+    today_total_raw = float(srow["today_total"])
+    today_count_raw = int(srow["today_count"])
+    yest_total      = float(srow["yest_total"])
+    yest_count      = int(srow["yest_count"])
+
+    sales_change = round((today_total_raw - yest_total) / yest_total * 100, 1) if yest_total > 0 else 0
+    transaction_change = round((today_count_raw - yest_count) / yest_count * 100, 1) if yest_count > 0 else 0
+
+    # ── 2. Top product today ──────────────────────────────────────────────────
+    cur.execute("""
+        SELECT ti.product_name, SUM(ti.quantity) AS units_sold
+        FROM transaction_items ti
+        JOIN transactions t ON t.transaction_id = ti.transaction_id
+        WHERE t.created_at >= CURDATE()
+          AND t.created_at < CURDATE() + INTERVAL 1 DAY
+          AND t.status = 'completed'
+        GROUP BY ti.product_name
+        ORDER BY units_sold DESC
+        LIMIT 1
+    """)
+    top_row = cur.fetchone()
+    top_product_name  = top_row["product_name"] if top_row else None
+    top_product_units = int(top_row["units_sold"]) if top_row else 0
+
+    # ── 3. Recent transactions (last 10) ─────────────────────────────────────
+    cur.execute("""
+        SELECT t.transaction_id, t.total_amount, t.created_at,
+               COUNT(ti.item_id)   AS item_count,
+               MIN(ti.category_name) AS category
+        FROM transactions t
+        LEFT JOIN transaction_items ti ON ti.transaction_id = t.transaction_id
+        WHERE t.status = 'completed'
+        GROUP BY t.transaction_id
+        ORDER BY t.created_at DESC
+        LIMIT 10
+    """)
+    recent_transactions = []
+    for r in cur.fetchall():
+        diff = now - r["created_at"]
+        secs = int(diff.total_seconds())
+        if secs < 60:
+            time_ago = f"{secs}s ago"
+        elif secs < 3600:
+            time_ago = f"{secs // 60}m ago"
+        elif secs < 86400:
+            time_ago = f"{secs // 3600}h ago"
+        else:
+            time_ago = f"{secs // 86400}d ago"
+        recent_transactions.append({
+            "id":         r["transaction_id"],
+            "amount":     f"{float(r['total_amount']):,.2f}",
+            "item_count": int(r["item_count"] or 0),
+            "category":   r["category"] or "—",
+            "time_ago":   time_ago,
+        })
+
+    # ── 4. Top products all-time (up to 10) ───────────────────────────────────
+    cur.execute("""
+        SELECT ti.product_name AS name, ti.category_name AS category,
+               SUM(ti.quantity)   AS units_sold,
+               SUM(ti.line_total) AS revenue
+        FROM transaction_items ti
+        JOIN transactions t ON t.transaction_id = ti.transaction_id
+        WHERE t.status = 'completed'
+        GROUP BY ti.product_name, ti.category_name
+        ORDER BY units_sold DESC
+        LIMIT 10
+    """)
+    top_products = [
+        {
+            "name":       r["name"],
+            "category":   r["category"] or "—",
+            "units_sold": int(r["units_sold"]),
+            "revenue":    f"{float(r['revenue']):,.2f}",
+        }
+        for r in cur.fetchall()
+    ]
+
+    # ── 5. 7-day sales chart ──────────────────────────────────────────────────
+    cur.execute("""
+        SELECT DATE(created_at) AS day, COALESCE(SUM(total_amount), 0) AS total
+        FROM transactions
+        WHERE created_at >= CURDATE() - INTERVAL 6 DAY
+          AND status = 'completed'
+        GROUP BY DATE(created_at)
+        ORDER BY day ASC
+    """)
+    chart_rows  = {str(r["day"]): float(r["total"]) for r in cur.fetchall()}
+    day_labels  = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    week_days   = [(date.today() - timedelta(days=6 - i)) for i in range(7)]
+    week_totals = [chart_rows.get(str(d), 0.0) for d in week_days]
+    max_total   = max(week_totals) if any(week_totals) else 1
+    sales_chart_data = [
+        {
+            "day":        day_labels[d.weekday() + 1 if d.weekday() < 6 else 0],
+            "label":      f"{total:,.0f}" if total else "0",
+            "height_pct": round(total / max_total * 90, 1) if max_total else 5,
+        }
+        for d, total in zip(week_days, week_totals)
+    ]
+
+    cur.close()
+
+    result = {
+        "_cached_at":          now,
+        "today_sales":         f"{today_total_raw:,.2f}",
+        "sales_change":        sales_change,
+        "transaction_count":   today_count_raw,
+        "transaction_change":  transaction_change,
+        "top_product_name":    top_product_name,
+        "top_product_units":   top_product_units,
+        "recent_transactions": recent_transactions,
+        "top_products":        top_products,
+        "sales_chart_data":    sales_chart_data,
+    }
+    _dashboard_cache["data"] = result
+    return result
+
+
 @app.route("/dashboard")
 def dashboard():
     if session.get("role") not in ["admin", "manager"]:
         return redirect(url_for("login"))
 
-    # ── Resolve full_name ──────────────────────────────────────────────────────
-    full_name = session.get("full_name")
-    if not full_name:
-        cur = mysql.connection.cursor(DictCursor)
-        if session["role"] == "admin":
-            cur.execute(
-                "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
-            )
-            user = _dec_adm(cur.fetchone())
-        else:
-            cur.execute(
-                "SELECT full_name FROM employees WHERE employee_id=%s",
-                (session["employee_id"],),
-            )
-            user = _dec_emp(cur.fetchone())
-        full_name = (
-            user["full_name"] if user else session["role"].capitalize()
-        ).strip()
-        cur.close()
+    # ── Resolve full_name (always set in session at login) ────────────────────
+    full_name = session.get("full_name") or session.get("role", "User").capitalize()
 
     # ── Inventory: low-stock items (uses shared helper) ────────────────────
     try:
@@ -1676,190 +2746,35 @@ def dashboard():
         low_stock_items = []
     low_stock_count = len(low_stock_items)
 
-    # ── Sales data from transactions table ───────────────────────────────────
-    today_sales = None
-    sales_change = 0
-    transaction_count = None
-    transaction_change = 0
-    top_product_name = None
-    top_product_units = 0
-    sales_chart_data = []
-    recent_transactions = []
-    top_products = []
-
+    # ── All sales metrics — served from 60-second cache ───────────────────────
     try:
-        cur = mysql.connection.cursor(DictCursor)
-
-        # ── Today's sales & transaction count ─────────────────────────────────
-        cur.execute(
-            """
-            SELECT
-                COALESCE(SUM(total_amount), 0)  AS today_total,
-                COUNT(*)                         AS today_count
-            FROM transactions
-            WHERE DATE(created_at) = CURDATE()
-              AND status = 'completed'
-        """
-        )
-        row = cur.fetchone()
-        today_total_raw = float(row["today_total"])
-        today_count_raw = int(row["today_count"])
-        today_sales = f"{today_total_raw:,.2f}"
-        transaction_count = today_count_raw
-
-        # ── Yesterday's sales & transaction count (for % change) ──────────────
-        cur.execute(
-            """
-            SELECT
-                COALESCE(SUM(total_amount), 0) AS yest_total,
-                COUNT(*)                        AS yest_count
-            FROM transactions
-            WHERE DATE(created_at) = CURDATE() - INTERVAL 1 DAY
-              AND status = 'completed'
-        """
-        )
-        yrow = cur.fetchone()
-        yest_total = float(yrow["yest_total"])
-        yest_count = int(yrow["yest_count"])
-
-        if yest_total > 0:
-            sales_change = round((today_total_raw - yest_total) / yest_total * 100, 1)
-        if yest_count > 0:
-            transaction_change = round(
-                (today_count_raw - yest_count) / yest_count * 100, 1
-            )
-
-        # ── Top-selling product today ──────────────────────────────────────────
-        cur.execute(
-            """
-            SELECT ti.product_name, ti.category_name,
-                   SUM(ti.quantity) AS units_sold
-            FROM transaction_items ti
-            JOIN transactions t ON t.transaction_id = ti.transaction_id
-            WHERE DATE(t.created_at) = CURDATE()
-              AND t.status = 'completed'
-            GROUP BY ti.product_name, ti.category_name
-            ORDER BY units_sold DESC
-            LIMIT 1
-        """
-        )
-        top_row = cur.fetchone()
-        if top_row:
-            top_product_name = top_row["product_name"]
-            top_product_units = int(top_row["units_sold"])
-
-        # ── Recent transactions (last 10) ──────────────────────────────────────
-        cur.execute(
-            """
-            SELECT t.transaction_id, t.total_amount,
-                   t.created_at,
-                   COUNT(ti.item_id)             AS item_count,
-                   MIN(ti.category_name)         AS category
-            FROM transactions t
-            LEFT JOIN transaction_items ti ON ti.transaction_id = t.transaction_id
-            WHERE t.status = 'completed'
-            GROUP BY t.transaction_id
-            ORDER BY t.created_at DESC
-            LIMIT 10
-        """
-        )
-        now_dt = datetime.now()
-        for r in cur.fetchall():
-            diff = now_dt - r["created_at"]
-            secs = int(diff.total_seconds())
-            if secs < 60:
-                time_ago = f"{secs}s ago"
-            elif secs < 3600:
-                time_ago = f"{secs // 60}m ago"
-            elif secs < 86400:
-                time_ago = f"{secs // 3600}h ago"
-            else:
-                time_ago = f"{secs // 86400}d ago"
-            recent_transactions.append(
-                {
-                    "id": r["transaction_id"],
-                    "amount": f"{float(r['total_amount']):,.2f}",
-                    "item_count": int(r["item_count"] or 0),
-                    "category": r["category"] or "—",
-                    "time_ago": time_ago,
-                }
-            )
-
-        # ── Top products (all-time, up to 10) ─────────────────────────────────
-        cur.execute(
-            """
-            SELECT ti.product_name      AS name,
-                   ti.category_name     AS category,
-                   SUM(ti.quantity)     AS units_sold,
-                   SUM(ti.line_total)   AS revenue
-            FROM transaction_items ti
-            JOIN transactions t ON t.transaction_id = ti.transaction_id
-            WHERE t.status = 'completed'
-            GROUP BY ti.product_name, ti.category_name
-            ORDER BY units_sold DESC
-            LIMIT 10
-        """
-        )
-        for r in cur.fetchall():
-            top_products.append(
-                {
-                    "name": r["name"],
-                    "category": r["category"] or "—",
-                    "units_sold": int(r["units_sold"]),
-                    "revenue": f"{float(r['revenue']):,.2f}",
-                }
-            )
-
-        # ── Sales chart — last 7 days ──────────────────────────────────────────
-        cur.execute(
-            """
-            SELECT DATE(created_at) AS day,
-                   COALESCE(SUM(total_amount), 0) AS total
-            FROM transactions
-            WHERE created_at >= CURDATE() - INTERVAL 6 DAY
-              AND status = 'completed'
-            GROUP BY DATE(created_at)
-            ORDER BY day ASC
-        """
-        )
-        chart_rows = {str(r["day"]): float(r["total"]) for r in cur.fetchall()}
-
-        from datetime import date as _date, timedelta as _td
-
-        day_labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        week_days = [(_date.today() - _td(days=6 - i)) for i in range(7)]
-        week_totals = [chart_rows.get(str(d), 0.0) for d in week_days]
-        max_total = max(week_totals) if any(week_totals) else 1
-        for d, total in zip(week_days, week_totals):
-            sales_chart_data.append(
-                {
-                    "day": day_labels[d.weekday() + 1 if d.weekday() < 6 else 0],
-                    "label": f"{total:,.0f}" if total else "0",
-                    "height_pct": round(total / max_total * 90, 1) if max_total else 5,
-                }
-            )
-
-        cur.close()
+        d = _get_dashboard_data()
     except Exception as exc:
         app.logger.error(f"[dashboard] sales query failed: {exc}")
+        d = {
+            "today_sales": None, "sales_change": 0,
+            "transaction_count": None, "transaction_change": 0,
+            "top_product_name": None, "top_product_units": 0,
+            "recent_transactions": [], "top_products": [], "sales_chart_data": [],
+        }
 
     return render_template(
         "admin/dashboard.html",
         full_name=full_name,
         # summary cards
-        today_sales=today_sales,
-        sales_change=sales_change,
-        transaction_count=transaction_count,
-        transaction_change=transaction_change,
+        today_sales=d["today_sales"],
+        sales_change=d["sales_change"],
+        transaction_count=d["transaction_count"],
+        transaction_change=d["transaction_change"],
         low_stock_count=low_stock_count,
         new_low_stock_count=low_stock_count,
-        top_product_name=top_product_name,
-        top_product_units=top_product_units,
+        top_product_name=d["top_product_name"],
+        top_product_units=d["top_product_units"],
         # chart & tables
-        sales_chart_data=sales_chart_data,
-        recent_transactions=recent_transactions,
+        sales_chart_data=d["sales_chart_data"],
+        recent_transactions=d["recent_transactions"],
         low_stock_items=low_stock_items,
-        top_products=top_products,
+        top_products=d["top_products"],
     )
 
 
@@ -1873,31 +2788,18 @@ def employee_management():
     if session.get("role") not in ["admin", "manager"]:
         return redirect(url_for("login"))
 
+    full_name = session.get("full_name") or session.get("role", "User").capitalize()
+
     cur = mysql.connection.cursor(DictCursor)
-
-    if session["role"] == "admin":
-        cur.execute(
-            "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
-        )
-        user = _dec_adm(cur.fetchone())
-    else:
-        cur.execute(
-            "SELECT full_name FROM employees WHERE employee_id=%s",
-            (session["employee_id"],),
-        )
-        user = _dec_emp(cur.fetchone())
-    full_name = user["full_name"] if user else session["role"].capitalize()
-
-    cur.execute(
-        """
-        SELECT employee_id, full_name, username, role, contact_number,
+    cur.execute("""
+        SELECT employee_id, full_name, username, role, email,
                employment_status, face_image_path, face_model_path,
                last_login, created_at,
                COALESCE(hourly_rate, 0) AS hourly_rate
         FROM employees
         ORDER BY created_at DESC
-    """
-    )
+        LIMIT 50
+    """)
     employees = [_dec_emp(row) for row in cur.fetchall()]
     cur.close()
 
@@ -1921,9 +2823,8 @@ def api_employee_of_month():
     if session.get("role") not in ["admin", "manager"]:
         return jsonify({"success": False, "message": "Unauthorized"}), 403
 
-    import datetime as _dt2
-    today = _dt2.date.today()
-    year  = int(request.args.get("year",  today.year))
+    today = date.today()
+    year = int(request.args.get("year", today.year))
     month = int(request.args.get("month", today.month))
 
     period_start = f"{year:04d}-{month:02d}-01"
@@ -1933,7 +2834,7 @@ def api_employee_of_month():
     else:
         period_end = f"{year:04d}-{month+1:02d}-01"
 
-    month_label = _dt2.date(year, month, 1).strftime("%B %Y")
+    month_label = date(year, month, 1).strftime("%B %Y")
 
     cur = mysql.connection.cursor(DictCursor)
     try:
@@ -1981,12 +2882,14 @@ def api_employee_of_month():
         rows = cur.fetchall()
 
         if not rows:
-            return jsonify({
-                "success": True,
-                "winner": None,
-                "runner_up": None,
-                "month_label": month_label,
-            })
+            return jsonify(
+                {
+                    "success": True,
+                    "winner": None,
+                    "runner_up": None,
+                    "month_label": month_label,
+                }
+            )
 
         winner_row = rows[0]
         winner = _dec_emp(dict(winner_row))
@@ -2001,22 +2904,24 @@ def api_employee_of_month():
             runner_up_row = _dec_emp(dict(rows[1]))
             runner_up_name = runner_up_row.get("full_name", "")
 
-        return jsonify({
-            "success": True,
-            "month_label": month_label,
-            "winner": {
-                "employee_id": winner["employee_id"],
-                "full_name":   winner.get("full_name", ""),
-                "role":        winner.get("role", ""),
-                "face_image_path": winner.get("face_image_path", ""),
-                "total_hours": total_hours,
-                "days_worked": days,
-                "avg_hours_per_day": avg_hours,
-                "total_earnings": earnings,
-                "hourly_rate": float(winner["hourly_rate"] or 0),
-            },
-            "runner_up": runner_up_name,
-        })
+        return jsonify(
+            {
+                "success": True,
+                "month_label": month_label,
+                "winner": {
+                    "employee_id": winner["employee_id"],
+                    "full_name": winner.get("full_name", ""),
+                    "role": winner.get("role", ""),
+                    "face_image_path": winner.get("face_image_path", ""),
+                    "total_hours": total_hours,
+                    "days_worked": days,
+                    "avg_hours_per_day": avg_hours,
+                    "total_earnings": earnings,
+                    "hourly_rate": float(winner["hourly_rate"] or 0),
+                },
+                "runner_up": runner_up_name,
+            }
+        )
     except Exception as e:
         app.logger.error(f"[api_employee_of_month] {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -2025,6 +2930,7 @@ def api_employee_of_month():
 
 
 @app.route("/add_employee", methods=["POST"])
+@csrf.exempt
 def add_employee():
     """
     Create a new employee record.
@@ -2043,7 +2949,7 @@ def add_employee():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "").strip()
     role = request.form.get("role", "").strip()
-    contact = request.form.get("contact", "").strip()
+    contact = request.form.get("contact", "").strip()  # now stores email
     status = request.form.get("status", "active")
     try:
         hourly_rate = float(request.form.get("hourly_rate", 0) or 0)
@@ -2058,7 +2964,7 @@ def add_employee():
         cur.execute(
             """INSERT INTO employees
                (full_name, username, username_hash, password, password_hash,
-                role, contact_number, employment_status, hourly_rate)
+                role, email, employment_status, hourly_rate)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (
                 aes_encrypt(full_name),
@@ -2067,7 +2973,7 @@ def add_employee():
                 aes_encrypt(password),
                 hash_password(password),
                 role,
-                aes_encrypt(contact),
+                aes_encrypt(contact),  # email column
                 status,
                 hourly_rate,
             ),
@@ -2080,22 +2986,23 @@ def add_employee():
         best_face = None
         best_sharp_ae = -1.0
 
+        _cv2_local, _np_local = _get_cv2_np()
         for file in files:
-            file_bytes = np.frombuffer(file.read(), np.uint8)
-            img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            file_bytes = _np_local.frombuffer(file.read(), _np_local.uint8)
+            img = _cv2_local.imdecode(file_bytes, _cv2_local.IMREAD_COLOR)
             if img is None:
                 continue
 
             try:
                 # Browser canvas is mirrored – flip to natural orientation
-                img = cv2.flip(img, 1)
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                img = _cv2_local.flip(img, 1)
+                gray = _cv2_local.cvtColor(img, _cv2_local.COLOR_BGR2GRAY)
                 x, y, w, h = detect_face_strict(img, gray, registration_mode=True)
                 emb = extract_embedding(img, x, y, w, h)
                 embeddings.append(emb)
                 # Pick sharpest crop across all frames
                 crop = img[y : y + h, x : x + w]
-                crop_160 = cv2.resize(crop, (160, 160))
+                crop_160 = _cv2_local.resize(crop, (160, 160))
                 sharp = sharpness_score(crop_160)
                 if sharp > best_sharp_ae:
                     best_sharp_ae = sharp
@@ -2116,7 +3023,7 @@ def add_employee():
         # ── Save sharpest face image ─────────────────────────────────────────
         filename = f"{employee_id}.jpg"
         image_path = os.path.join(UPLOAD_FOLDER, filename)
-        cv2.imwrite(image_path, best_face, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        _cv2_local.imwrite(image_path, best_face, [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
         face_path = f"face_images/{filename}"
 
         cur.execute(
@@ -2127,14 +3034,23 @@ def add_employee():
         cur.close()
 
         # ── Persist averaged embedding to DB (face_model_path) ───────────────
-        avg_emb = np.mean(embeddings, axis=0).tolist()
+        _, _np_local = _get_cv2_np()
+        avg_emb = _np_local.mean(embeddings, axis=0).tolist()
         persist_embedding(str(employee_id), avg_emb)
+
+        # Fetch the created_at timestamp so the frontend can build BB-YYMM-NNN
+        cur2 = mysql.connection.cursor(DictCursor)
+        cur2.execute("SELECT created_at FROM employees WHERE employee_id=%s", (employee_id,))
+        created_row = cur2.fetchone()
+        cur2.close()
+        created_at_str = created_row["created_at"].strftime("%y%m") if created_row and created_row.get("created_at") else datetime.now(PHT).strftime("%y%m")
 
         return jsonify(
             {
                 "success": True,
                 "message": "Employee registered with Face ID ✅",
                 "employee_id": employee_id,
+                "created_yymm": created_at_str,
             }
         )
 
@@ -2143,6 +3059,7 @@ def add_employee():
 
 
 @app.route("/update_employee/<int:employee_id>", methods=["POST"])
+@csrf.exempt
 def update_employee(employee_id):
     """Update employee details; also re-registers Face ID if new face_images[] are provided."""
     if not is_admin():
@@ -2151,7 +3068,7 @@ def update_employee(employee_id):
     full_name = request.form.get("full_name", "").strip()
     username = request.form.get("username", "").strip()
     role = request.form.get("role", "").strip()
-    contact = request.form.get("contact", "").strip()
+    contact = request.form.get("contact", "").strip()  # now stores email
     status = request.form.get("status", "").strip()
     try:
         hourly_rate = float(request.form.get("hourly_rate", 0) or 0)
@@ -2171,22 +3088,23 @@ def update_employee(employee_id):
         best_face = None
         best_sharp_ue = -1.0
 
+        _cv2_local, _np_local = _get_cv2_np()
         for file in files:
-            file_bytes = np.frombuffer(file.read(), np.uint8)
-            img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            file_bytes = _np_local.frombuffer(file.read(), _np_local.uint8)
+            img = _cv2_local.imdecode(file_bytes, _cv2_local.IMREAD_COLOR)
             if img is None:
                 continue
             try:
                 # Browser canvas is mirrored – flip to natural orientation
                 # (was missing in update_employee — caused orientation mismatch)
-                img = cv2.flip(img, 1)
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                img = _cv2_local.flip(img, 1)
+                gray = _cv2_local.cvtColor(img, _cv2_local.COLOR_BGR2GRAY)
                 x, y, w, h = detect_face_strict(img, gray, registration_mode=True)
                 emb = extract_embedding(img, x, y, w, h)
                 embeddings.append(emb)
                 # Pick sharpest crop across all frames
                 crop = img[y : y + h, x : x + w]
-                crop_160 = cv2.resize(crop, (160, 160))
+                crop_160 = _cv2_local.resize(crop, (160, 160))
                 sharp = sharpness_score(crop_160)
                 if sharp > best_sharp_ue:
                     best_sharp_ue = sharp
@@ -2198,21 +3116,21 @@ def update_employee(employee_id):
             # New face registered during edit
             filename = f"{employee_id}.jpg"
             image_path = os.path.join(UPLOAD_FOLDER, filename)
-            cv2.imwrite(image_path, best_face, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            _cv2_local.imwrite(image_path, best_face, [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
             face_path = f"face_images/{filename}"
 
             cur.execute(
                 """UPDATE employees
                    SET full_name=%s, username=%s, username_hash=%s, role=%s,
-                       contact_number=%s, employment_status=%s, face_image_path=%s,
-                       hourly_rate=%s
+                       email=%s, employment_status=%s,
+                       face_image_path=%s, hourly_rate=%s
                    WHERE employee_id=%s""",
                 (
                     enc_name,
                     enc_username,
                     u_hash,
                     role,
-                    enc_contact,
+                    enc_contact,  # email column
                     status,
                     face_path,
                     hourly_rate,
@@ -2220,20 +3138,22 @@ def update_employee(employee_id):
                 ),
             )
             # Persist new averaged embedding; also invalidates old cache entry
-            avg_emb_ue = np.mean(embeddings, axis=0).tolist()
+            _, _np_local = _get_cv2_np()
+            avg_emb_ue = _np_local.mean(embeddings, axis=0).tolist()
             persist_embedding(str(employee_id), avg_emb_ue)
         else:
             cur.execute(
                 """UPDATE employees
                    SET full_name=%s, username=%s, username_hash=%s, role=%s,
-                       contact_number=%s, employment_status=%s, hourly_rate=%s
+                       email=%s, employment_status=%s,
+                       hourly_rate=%s
                    WHERE employee_id=%s""",
                 (
                     enc_name,
                     enc_username,
                     u_hash,
                     role,
-                    enc_contact,
+                    enc_contact,  # email column
                     status,
                     hourly_rate,
                     employee_id,
@@ -2249,6 +3169,7 @@ def update_employee(employee_id):
 
 
 @app.route("/delete_employee/<int:employee_id>", methods=["DELETE"])
+@csrf.exempt
 def delete_employee(employee_id):
     """
     Move an employee to the trash (employees_trash table).
@@ -2259,15 +3180,13 @@ def delete_employee(employee_id):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     try:
-        import datetime as _dt
-
         cur = mysql.connection.cursor(DictCursor)
 
         # Fetch the full employee row before touching it
         cur.execute(
             """
             SELECT employee_id, full_name, username, username_hash,
-                   password, password_hash, role, contact_number,
+                   password, password_hash, role,
                    face_image_path, face_model_path, last_login,
                    created_at, disabled_at
             FROM employees WHERE employee_id=%s LIMIT 1
@@ -2292,18 +3211,18 @@ def delete_employee(employee_id):
                 400,
             )
 
-        now = datetime.now()
-        delete_at = now + _dt.timedelta(hours=24)
+        now = datetime.now(PHT)
+        delete_at = now + timedelta(hours=24)
 
         # Insert snapshot into trash
         cur.execute(
             """
             INSERT INTO employees_trash
                 (employee_id, full_name, username, username_hash,
-                 password, password_hash, role, contact_number,
+                 password, password_hash, role,
                  face_image_path, face_model_path, last_login,
                  created_at, disabled_at, delete_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
             (
                 emp["employee_id"],
@@ -2313,7 +3232,6 @@ def delete_employee(employee_id):
                 emp["password"],
                 emp["password_hash"],
                 emp["role"],
-                emp["contact_number"],
                 emp["face_image_path"],
                 emp["face_model_path"],
                 emp["last_login"],
@@ -2356,15 +3274,13 @@ def api_trash():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     cur = mysql.connection.cursor(DictCursor)
-    cur.execute(
-        """
+    cur.execute("""
         SELECT trash_id, employee_id, full_name, role,
                disabled_at, delete_at,
                GREATEST(0, TIMESTAMPDIFF(SECOND, NOW(), delete_at)) AS seconds_remaining
         FROM employees_trash
         ORDER BY delete_at ASC
-    """
-    )
+    """)
     rows = cur.fetchall()
     cur.close()
 
@@ -2380,6 +3296,7 @@ def api_trash():
 
 
 @app.route("/restore_employee/<int:employee_id>", methods=["POST"])
+@csrf.exempt
 def restore_employee(employee_id):
     """
     Restore an employee from the trash back to active status.
@@ -2423,6 +3340,7 @@ def restore_employee(employee_id):
 
 # ── Invalidate embedding cache when called externally ──────────────────────────
 @app.route("/invalidate_face_cache/<int:employee_id>", methods=["POST"])
+@csrf.exempt
 def invalidate_face_cache(employee_id):
     """Remove a cached embedding so the next verification re-reads from disk."""
     if session.get("role") not in ["admin", "manager"]:
@@ -2441,25 +3359,12 @@ def staff_attendance():
     if session.get("role") not in ["admin", "manager"]:
         return redirect(url_for("login"))
 
-    cur = mysql.connection.cursor(DictCursor)
-    if session["role"] == "admin":
-        cur.execute(
-            "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
-        )
-        user = _dec_adm(cur.fetchone())
-    else:
-        cur.execute(
-            "SELECT full_name FROM employees WHERE employee_id=%s",
-            (session["employee_id"],),
-        )
-        user = _dec_emp(cur.fetchone())
-    full_name = user["full_name"] if user else session["role"].capitalize()
-    cur.close()
-
+    full_name = session.get("full_name") or session.get("role", "User").capitalize()
     return render_template("admin/staff_attendance.html", full_name=full_name)
 
 
 @app.route("/log_attendance", methods=["POST"])
+@csrf.exempt
 def log_attendance():
     """
     Record a clock-in or clock-out after face verification has already succeeded.
@@ -2547,7 +3452,7 @@ def log_attendance():
             403,
         )
 
-    if datetime.now() > token_data["expires"]:
+    if datetime.now(PHT) > token_data["expires"]:
         verified_tokens.pop(verify_token, None)
         app.logger.warning(
             f"[log_attendance] EXPIRED TOKEN — employee {employee_id_str} ip={request.remote_addr}"
@@ -2600,21 +3505,67 @@ def log_attendance():
                 jsonify({"success": False, "message": "Already clocked in today"}),
                 400,
             )
+
+        # ── Late-deduction logic ─────────────────────────────────────────────
+        # Look up the configured shift start time for this shift_type so we can
+        # compare it against the actual clock-in time (NOW()).
+        late_minutes = 0
+        late_deduction = 0.00
+        try:
+            cur.execute(
+                "SELECT start_time FROM shift_config WHERE label=%s LIMIT 1",
+                (shift_type,),
+            )
+            shift_row = cur.fetchone()
+            cfg = _get_late_deduction_settings()
+            if shift_row and shift_row.get("start_time"):
+                now_time = datetime.now(PHT)
+                # Build shift-start datetime using today's date
+                start_str = shift_row["start_time"]  # "HH:MM"
+                sh, sm = map(int, start_str.split(":"))
+                shift_start = now_time.replace(
+                    hour=sh, minute=sm, second=0, microsecond=0
+                )
+                diff = int((now_time - shift_start).total_seconds() / 60)
+                if diff > cfg["grace_minutes"]:
+                    late_minutes = diff
+                    late_deduction = round(cfg["per_minute_rate"] * diff, 2)
+                    app.logger.info(
+                        f"[late_deduction] Employee {employee_id} is {diff}m late "
+                        f"(grace={cfg['grace_minutes']}m, "
+                        f"rate=₱{cfg['per_minute_rate']}/min) "
+                        f"→ ₱{cfg['per_minute_rate']} × {diff}m = ₱{late_deduction:.2f}"
+                    )
+        except Exception as ld_exc:
+            app.logger.warning(
+                f"[late_deduction] Could not compute late penalty: {ld_exc}"
+            )
+
         cur.execute(
-            "INSERT INTO attendance (employee_id, shift_type, clock_in, attendance_date) VALUES (%s, %s, NOW(), CURDATE())",
-            (employee_id, shift_type),
+            """INSERT INTO attendance
+               (employee_id, shift_type, clock_in, attendance_date,
+                late_minutes, late_deduction, deduction_waived)
+               VALUES (%s, %s, NOW(), CURDATE(), %s, %s, 0)""",
+            (employee_id, shift_type, late_minutes, late_deduction),
         )
         mysql.connection.commit()
         cur.close()
-        return jsonify(
-            {
-                "success": True,
-                "message": "Clock-in recorded ✅",
-                "employee": emp,
-                "action": "clock_in",
-                "shift_type": shift_type,
-            }
-        )
+
+        resp = {
+            "success": True,
+            "message": "Clock-in recorded ✅",
+            "employee": emp,
+            "action": "clock_in",
+            "shift_type": shift_type,
+        }
+        if late_minutes > 0:
+            resp["late_minutes"] = late_minutes
+            resp["late_deduction"] = late_deduction
+            resp["message"] = (
+                f"Clock-in recorded ✅ — you are {late_minutes}m late. "
+                f"₱{late_deduction:.2f} deduction applied."
+            )
+        return jsonify(resp)
 
     elif action == "clock_out":
         if not record:
@@ -2677,7 +3628,7 @@ def api_shifts_get():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     conn = mysql.connection
-    cur  = conn.cursor(DictCursor)
+    cur = conn.cursor(DictCursor)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS `shift_config` (
             id         INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2689,32 +3640,49 @@ def api_shifts_get():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
     conn.commit()
-    cur.execute("SELECT id, label, start_time, end_time, color FROM shift_config ORDER BY id ASC")
+    cur.execute(
+        "SELECT id, label, start_time, end_time, color FROM shift_config ORDER BY id ASC"
+    )
     rows = cur.fetchall()
     cur.close()
     return jsonify({"success": True, "shifts": rows})
 
 
 @app.route("/api/shifts", methods=["POST"])
+@csrf.exempt
 def api_shifts_post():
     """Replace all shifts with the submitted list (full replace strategy)."""
     if session.get("role") not in ["admin", "manager"]:
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
-    data   = request.get_json(force=True) or {}
+    data = request.get_json(force=True) or {}
     shifts = data.get("shifts", [])
 
     if not isinstance(shifts, list) or len(shifts) == 0:
-        return jsonify({"success": False, "message": "At least one shift is required."}), 400
+        return (
+            jsonify({"success": False, "message": "At least one shift is required."}),
+            400,
+        )
 
     for s in shifts:
         if not s.get("label", "").strip():
-            return jsonify({"success": False, "message": "Every shift must have a name."}), 400
+            return (
+                jsonify({"success": False, "message": "Every shift must have a name."}),
+                400,
+            )
         if not s.get("start_time") or not s.get("end_time"):
-            return jsonify({"success": False, "message": "Every shift must have start and end times."}), 400
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Every shift must have start and end times.",
+                    }
+                ),
+                400,
+            )
 
     conn = mysql.connection
-    cur  = conn.cursor(DictCursor)
+    cur = conn.cursor(DictCursor)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS `shift_config` (
             id         INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2728,7 +3696,15 @@ def api_shifts_post():
     cur.execute("DELETE FROM shift_config")
     cur.executemany(
         "INSERT INTO shift_config (label, start_time, end_time, color) VALUES (%s, %s, %s, %s)",
-        [(s["label"].strip(), s["start_time"], s["end_time"], s.get("color", "#c9a961")) for s in shifts]
+        [
+            (
+                s["label"].strip(),
+                s["start_time"],
+                s["end_time"],
+                s.get("color", "#c9a961"),
+            )
+            for s in shifts
+        ],
     )
     conn.commit()
     cur.close()
@@ -2749,7 +3725,7 @@ def api_attendance():
         except ValueError:
             return jsonify({"success": False, "message": "Invalid date format"}), 400
     else:
-        dt = datetime.now().date()
+        dt = datetime.now(PHT).date()
 
     cur = mysql.connection.cursor(DictCursor)
 
@@ -2760,8 +3736,8 @@ def api_attendance():
             e.full_name,
             e.role,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i:%%s') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i:%%s') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i:%%s %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i:%%s %%p') AS clock_out,
             CASE
                 WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out) / 60, 2)
@@ -2779,7 +3755,10 @@ def api_attendance():
                            * COALESCE(e.hourly_rate, 0), 2)
                 ELSE NULL END
             )                                                      AS daily_pay,
-            COALESCE(NULLIF(a.hourly_rate_snapshot,0), e.hourly_rate, 0) AS hourly_rate
+            COALESCE(NULLIF(a.hourly_rate_snapshot,0), e.hourly_rate, 0) AS hourly_rate,
+            COALESCE(a.late_minutes,     0)  AS late_minutes,
+            COALESCE(a.late_deduction,   0)  AS late_deduction,
+            COALESCE(a.deduction_waived, 0)  AS deduction_waived
         FROM attendance a
         JOIN employees e ON e.employee_id = a.employee_id
         WHERE a.attendance_date = %s
@@ -2827,14 +3806,15 @@ def api_attendance():
 
 @app.route("/admin_settings")
 def admin_settings():
-    if not is_admin():
+    # Settings are restricted to super-admins only; managers are not permitted.
+    if not is_super_admin():
         return redirect(url_for("login"))
 
     cur = mysql.connection.cursor(DictCursor)
     try:
         if session.get("role") == "admin" and "admin_id" in session:
             cur.execute(
-                "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
+                "SELECT full_name, email FROM admins WHERE admin_id=%s", (session["admin_id"],)
             )
             user = _dec_adm(cur.fetchone())
         else:
@@ -2843,18 +3823,226 @@ def admin_settings():
                 (session["employee_id"],),
             )
             user = _dec_emp(cur.fetchone())
-        full_name = user["full_name"] if user else session.get("full_name", "Admin")
+        full_name   = user["full_name"] if user else session.get("full_name", "Admin")
+        admin_email = user.get("email", "") if user else ""
     except Exception:
-        full_name = session.get("full_name", "Admin")
+        full_name   = session.get("full_name", "Admin")
+        admin_email = ""
     finally:
         cur.close()
 
-    return render_template("admin/admin_setting.html", full_name=full_name)
+    return render_template("admin/admin_setting.html", full_name=full_name, admin_email=admin_email)
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║                    EMAIL ALERT SETTINGS API                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+def _send_overtime_request_email_with_cfg(
+    employee_name, employee_id, request_date, extended_hours, reason, cfg
+):
+    """
+    Send an overtime request notification email using a **pre-fetched** cfg dict.
+
+    This variant is designed to run safely inside a background thread: it never
+    touches flask_mysqldb (which uses thread-local connections and would be None
+    in a new thread).  The caller is responsible for fetching and passing cfg
+    before spawning the thread.
+    """
+    if not cfg:
+        app.logger.warning(
+            "[overtime_email] No email settings available; skipping notification."
+        )
+        return
+
+    if not cfg.get("overtime_request_enabled", 1):
+        app.logger.info(
+            "[overtime_email] overtime_request_enabled is OFF; skipping notification."
+        )
+        return
+
+    missing = [
+        f
+        for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient")
+        if not cfg.get(f)
+    ]
+    if missing:
+        app.logger.warning(
+            f"[overtime_email] Missing SMTP fields {missing}; cannot send notification."
+        )
+        return
+
+    try:
+        review_url = "https://books-and-blooms.onrender.com/admin_settings"
+
+        html_body = f"""
+        <div style="font-family:DM Sans,Arial,sans-serif;max-width:560px;margin:0 auto;
+                    border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+          <div style="background:#1a1a1a;padding:20px 28px;border-bottom:3px solid #c9a961;">
+            <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+            <p style="color:#aaa;margin:4px 0 0;font-size:0.85rem;">Overtime Request Notification</p>
+          </div>
+          <div style="padding:28px;">
+            <h3 style="color:#1a1a1a;margin-top:0;">⏱️ New Overtime Request Submitted</h3>
+            <p style="color:#555;line-height:1.6;">
+              A cashier has submitted an overtime request and is waiting for your approval.
+            </p>
+            <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:0.92rem;">
+              <tr style="background:#f9f5ec;">
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;width:40%;">👤 Employee</td>
+                <td style="padding:10px 14px;color:#333;">{employee_name} (ID #{employee_id})</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">📅 Request Date</td>
+                <td style="padding:10px 14px;color:#333;">{request_date}</td>
+              </tr>
+              <tr style="background:#f9f5ec;">
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">⏳ Extended Hours</td>
+                <td style="padding:10px 14px;color:#333;">{float(extended_hours):.1f} hour(s)</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">📝 Reason</td>
+                <td style="padding:10px 14px;color:#333;">{reason or '—'}</td>
+              </tr>
+            </table>
+            <div style="margin-top:22px;text-align:center;">
+              <a href="{review_url}"
+                 style="background:#c9a961;color:#1a1a1a;padding:12px 28px;border-radius:8px;
+                        text-decoration:none;font-weight:700;font-size:0.95rem;display:inline-block;">
+                🔍 Review Request in Admin Panel
+              </a>
+            </div>
+            <div style="background:#f5f5f5;border-radius:8px;padding:12px 16px;margin-top:22px;
+                        font-size:0.82rem;color:#888;">
+              This notification was sent automatically by the Books &amp; Blooms Café POS system.
+              You can disable it under Admin Settings → Notifications.
+            </div>
+          </div>
+        </div>
+        """
+
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject=f"⏱️ Overtime Request — {employee_name} ({request_date})",
+            html_body=html_body,
+        )
+        app.logger.info(
+            f"[overtime_email] Notification sent to {cfg['alert_recipient']} "
+            f"for employee {employee_id} ({request_date})"
+        )
+    except Exception as exc:
+        app.logger.error(f"[overtime_email] Failed to send notification: {exc}")
+
+
+def _send_overtime_request_email(
+    employee_name, employee_id, request_date, extended_hours, reason
+):
+    """
+    Send an overtime request notification email to the alert recipient (owner/admin).
+    Fires only when overtime_request_enabled is set to 1 in email_alert_settings.
+    Runs in the calling thread; wrap in threading.Thread if you need non-blocking behaviour.
+
+    NOTE: Kept for backward compatibility. New code should call
+    _send_overtime_request_email_with_cfg() with a pre-fetched cfg dict instead,
+    especially from background threads where mysql.connection is not available.
+    """
+    try:
+        _ensure_email_settings_table()
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("SELECT * FROM email_alert_settings ORDER BY id LIMIT 1")
+        cfg = cur.fetchone()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[overtime_email] DB fetch failed: {exc}")
+        return
+
+    if not cfg:
+        app.logger.warning(
+            "[overtime_email] No email settings row found; skipping notification."
+        )
+        return
+
+    if not cfg.get("overtime_request_enabled", 1):
+        app.logger.info(
+            "[overtime_email] overtime_request_enabled is OFF; skipping notification."
+        )
+        return
+
+    missing = [
+        f
+        for f in ("smtp_host", "smtp_user", "smtp_password", "alert_recipient")
+        if not cfg.get(f)
+    ]
+    if missing:
+        app.logger.warning(
+            f"[overtime_email] Missing SMTP fields {missing}; cannot send notification."
+        )
+        return
+
+    try:
+        review_url = (
+            "https://books-and-blooms.onrender.com/admin_settings"
+        )
+
+        html_body = f"""
+        <div style="font-family:DM Sans,Arial,sans-serif;max-width:560px;margin:0 auto;
+                    border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+          <div style="background:#1a1a1a;padding:20px 28px;border-bottom:3px solid #c9a961;">
+            <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+            <p style="color:#aaa;margin:4px 0 0;font-size:0.85rem;">Overtime Request Notification</p>
+          </div>
+          <div style="padding:28px;">
+            <h3 style="color:#1a1a1a;margin-top:0;">⏱️ New Overtime Request Submitted</h3>
+            <p style="color:#555;line-height:1.6;">
+              A cashier has submitted an overtime request and is waiting for your approval.
+            </p>
+            <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:0.92rem;">
+              <tr style="background:#f9f5ec;">
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;width:40%;">👤 Employee</td>
+                <td style="padding:10px 14px;color:#333;">{employee_name} (ID #{employee_id})</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">📅 Request Date</td>
+                <td style="padding:10px 14px;color:#333;">{request_date}</td>
+              </tr>
+              <tr style="background:#f9f5ec;">
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">⏳ Extended Hours</td>
+                <td style="padding:10px 14px;color:#333;">{float(extended_hours):.1f} hour(s)</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">📝 Reason</td>
+                <td style="padding:10px 14px;color:#333;">{reason or '—'}</td>
+              </tr>
+            </table>
+            <div style="margin-top:22px;text-align:center;">
+              <a href="{review_url}"
+                 style="background:#c9a961;color:#1a1a1a;padding:12px 28px;border-radius:8px;
+                        text-decoration:none;font-weight:700;font-size:0.95rem;display:inline-block;">
+                🔍 Review Request in Admin Panel
+              </a>
+            </div>
+            <div style="background:#f5f5f5;border-radius:8px;padding:12px 16px;margin-top:22px;
+                        font-size:0.82rem;color:#888;">
+              This notification was sent automatically by the Books &amp; Blooms Café POS system.
+              You can disable it under Admin Settings → Notifications.
+            </div>
+          </div>
+        </div>
+        """
+
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject=f"⏱️ Overtime Request — {employee_name} ({request_date})",
+            html_body=html_body,
+        )
+        app.logger.info(
+            f"[overtime_email] Notification sent to {cfg['alert_recipient']} "
+            f"for employee {employee_id} ({request_date})"
+        )
+    except Exception as exc:
+        app.logger.error(f"[overtime_email] Failed to send notification: {exc}")
+
 
 def _ensure_email_settings_table():
     """
@@ -2863,8 +4051,7 @@ def _ensure_email_settings_table():
     """
     try:
         cur = mysql.connection.cursor()
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS email_alert_settings (
                 id                  INT AUTO_INCREMENT PRIMARY KEY,
                 smtp_host           VARCHAR(255)  NOT NULL DEFAULT '',
@@ -2875,15 +4062,23 @@ def _ensure_email_settings_table():
                 alert_recipient     VARCHAR(255)  NOT NULL DEFAULT '',
                 low_stock_enabled   TINYINT(1)    NOT NULL DEFAULT 1,
                 low_stock_threshold INT           NOT NULL DEFAULT 5,
-                daily_summary_enabled       TINYINT(1) NOT NULL DEFAULT 1,
-                new_employee_enabled        TINYINT(1) NOT NULL DEFAULT 0,
-                failed_login_enabled        TINYINT(1) NOT NULL DEFAULT 1,
-                maintenance_enabled         TINYINT(1) NOT NULL DEFAULT 0,
+                daily_summary_enabled       TINYINT(1)  NOT NULL DEFAULT 1,
+                daily_summary_time          VARCHAR(5)  NOT NULL DEFAULT '22:30',
+                failed_login_enabled        TINYINT(1)  NOT NULL DEFAULT 1,
+                maintenance_enabled         TINYINT(1)  NOT NULL DEFAULT 0,
+                overtime_request_enabled    TINYINT(1)  NOT NULL DEFAULT 1,
                 updated_at          TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
                                     ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            """
-        )
+            """)
+        # Migration: add daily_summary_time for existing installations
+        cur.execute("SHOW COLUMNS FROM email_alert_settings LIKE 'daily_summary_time'")
+        if not cur.fetchone():
+            cur.execute(
+                "ALTER TABLE email_alert_settings "
+                "ADD COLUMN daily_summary_time VARCHAR(5) NOT NULL DEFAULT '22:30' "
+                "AFTER daily_summary_enabled"
+            )
         # Seed one default row so GET always returns something
         cur.execute("SELECT COUNT(*) AS cnt FROM email_alert_settings")
         if cur.fetchone()[0] == 0:
@@ -2902,9 +4097,9 @@ def _ensure_email_settings_table():
 # ── GET  /api/settings/email ──────────────────────────────────────────────────
 @app.route("/api/settings/email", methods=["GET"])
 def api_get_email_settings():
-    """Return the current email / alert configuration (password masked)."""
-    if not is_admin():
-        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    """Return the current email / alert configuration (password masked). Super-admin only."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     _ensure_email_settings_table()
     try:
         cur = mysql.connection.cursor(DictCursor)
@@ -2913,10 +4108,10 @@ def api_get_email_settings():
         cur.close()
         if not row:
             return jsonify({"success": False, "message": "No settings found"}), 404
+        # Determine if a real password is saved BEFORE masking it
+        row["has_password"] = bool(row.get("smtp_password"))
         # Never return the raw SMTP password to the browser
         row["smtp_password"] = "••••••••" if row.get("smtp_password") else ""
-        row["has_password"] = bool(row.get("smtp_password") or
-                                   row["smtp_password"] == "••••••••")
         return jsonify({"success": True, "settings": row})
     except Exception as exc:
         app.logger.error(f"[email_settings] GET: {exc}")
@@ -2925,25 +4120,33 @@ def api_get_email_settings():
 
 # ── POST /api/settings/email ──────────────────────────────────────────────────
 @app.route("/api/settings/email", methods=["POST"])
+@csrf.exempt
 def api_save_email_settings():
     """
     Persist SMTP configuration and per-alert toggle states.
     Accepts JSON body with any subset of the settings columns.
     The SMTP password is only updated when the client sends a non-placeholder value.
     """
-    if not is_admin():
-        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     _ensure_email_settings_table()
 
     data = request.get_json(silent=True) or {}
 
     # Build SET clause dynamically from allowed fields
     allowed = {
-        "smtp_host", "smtp_port", "smtp_user", "smtp_use_tls",
+        "smtp_host",
+        "smtp_port",
+        "smtp_user",
+        "smtp_use_tls",
         "alert_recipient",
-        "low_stock_enabled", "low_stock_threshold",
-        "daily_summary_enabled", "new_employee_enabled",
-        "failed_login_enabled", "maintenance_enabled",
+        "low_stock_enabled",
+        "low_stock_threshold",
+        "daily_summary_enabled",
+        "daily_summary_time",
+        "failed_login_enabled",
+        "maintenance_enabled",
+        "overtime_request_enabled",
     }
     updates = {k: v for k, v in data.items() if k in allowed}
 
@@ -2988,16 +4191,17 @@ def api_save_email_settings():
 
 # ── POST /api/settings/email/auto-configure ──────────────────────────────────
 @app.route("/api/settings/email/auto-configure", methods=["POST"])
+@csrf.exempt
 def api_auto_configure_email():
     """
     Detect the SMTP provider from the email domain and return the
     recommended host / port / TLS settings without saving anything.
     Body: { "email": "user@gmail.com" }
     """
-    if not is_admin():
-        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
 
-    data  = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
 
     if "@" not in email:
@@ -3006,54 +4210,119 @@ def api_auto_configure_email():
     domain = email.split("@")[1]
 
     PROVIDERS = {
-        "gmail.com":       {"host": "smtp.gmail.com",          "port": 587, "tls": True,  "label": "Gmail"},
-        "googlemail.com":  {"host": "smtp.gmail.com",          "port": 587, "tls": True,  "label": "Gmail"},
-        "outlook.com":     {"host": "smtp-mail.outlook.com",   "port": 587, "tls": True,  "label": "Outlook"},
-        "hotmail.com":     {"host": "smtp-mail.outlook.com",   "port": 587, "tls": True,  "label": "Hotmail"},
-        "live.com":        {"host": "smtp-mail.outlook.com",   "port": 587, "tls": True,  "label": "Microsoft Live"},
-        "yahoo.com":       {"host": "smtp.mail.yahoo.com",     "port": 587, "tls": True,  "label": "Yahoo Mail"},
-        "ymail.com":       {"host": "smtp.mail.yahoo.com",     "port": 587, "tls": True,  "label": "Yahoo Mail"},
-        "icloud.com":      {"host": "smtp.mail.me.com",        "port": 587, "tls": True,  "label": "iCloud Mail"},
-        "me.com":          {"host": "smtp.mail.me.com",        "port": 587, "tls": True,  "label": "iCloud Mail"},
-        "zoho.com":        {"host": "smtp.zoho.com",           "port": 587, "tls": True,  "label": "Zoho Mail"},
-        "protonmail.com":  {"host": "127.0.0.1",               "port": 1025, "tls": False, "label": "ProtonMail (Bridge)"},
-        "proton.me":       {"host": "127.0.0.1",               "port": 1025, "tls": False, "label": "ProtonMail (Bridge)"},
+        "gmail.com": {
+            "host": "smtp.gmail.com",
+            "port": 587,
+            "tls": True,
+            "label": "Gmail",
+        },
+        "googlemail.com": {
+            "host": "smtp.gmail.com",
+            "port": 587,
+            "tls": True,
+            "label": "Gmail",
+        },
+        "outlook.com": {
+            "host": "smtp-mail.outlook.com",
+            "port": 587,
+            "tls": True,
+            "label": "Outlook",
+        },
+        "hotmail.com": {
+            "host": "smtp-mail.outlook.com",
+            "port": 587,
+            "tls": True,
+            "label": "Hotmail",
+        },
+        "live.com": {
+            "host": "smtp-mail.outlook.com",
+            "port": 587,
+            "tls": True,
+            "label": "Microsoft Live",
+        },
+        "yahoo.com": {
+            "host": "smtp.mail.yahoo.com",
+            "port": 587,
+            "tls": True,
+            "label": "Yahoo Mail",
+        },
+        "ymail.com": {
+            "host": "smtp.mail.yahoo.com",
+            "port": 587,
+            "tls": True,
+            "label": "Yahoo Mail",
+        },
+        "icloud.com": {
+            "host": "smtp.mail.me.com",
+            "port": 587,
+            "tls": True,
+            "label": "iCloud Mail",
+        },
+        "me.com": {
+            "host": "smtp.mail.me.com",
+            "port": 587,
+            "tls": True,
+            "label": "iCloud Mail",
+        },
+        "zoho.com": {
+            "host": "smtp.zoho.com",
+            "port": 587,
+            "tls": True,
+            "label": "Zoho Mail",
+        },
+        "protonmail.com": {
+            "host": "127.0.0.1",
+            "port": 1025,
+            "tls": False,
+            "label": "ProtonMail (Bridge)",
+        },
+        "proton.me": {
+            "host": "127.0.0.1",
+            "port": 1025,
+            "tls": False,
+            "label": "ProtonMail (Bridge)",
+        },
     }
 
     provider = PROVIDERS.get(domain)
     if provider:
-        return jsonify({
-            "success":  True,
-            "detected": True,
-            "provider": provider["label"],
-            "smtp_host": provider["host"],
-            "smtp_port": provider["port"],
-            "smtp_use_tls": 1 if provider["tls"] else 0,
-            "smtp_user":    email,
-        })
+        return jsonify(
+            {
+                "success": True,
+                "detected": True,
+                "provider": provider["label"],
+                "smtp_host": provider["host"],
+                "smtp_port": provider["port"],
+                "smtp_use_tls": 1 if provider["tls"] else 0,
+                "smtp_user": email,
+            }
+        )
     else:
-        return jsonify({
-            "success":  True,
-            "detected": False,
-            "provider": "Custom",
-            "smtp_host": f"smtp.{domain}",
-            "smtp_port": 587,
-            "smtp_use_tls": 1,
-            "smtp_user":    email,
-            "message": "Unknown provider — default settings applied. Adjust in advanced options if needed.",
-        })
+        return jsonify(
+            {
+                "success": True,
+                "detected": False,
+                "provider": "Custom",
+                "smtp_host": f"smtp.{domain}",
+                "smtp_port": 587,
+                "smtp_use_tls": 1,
+                "smtp_user": email,
+                "message": "Unknown provider — default settings applied. Adjust in advanced options if needed.",
+            }
+        )
 
 
 # ── POST /api/settings/email/test ────────────────────────────────────────────
 @app.route("/api/settings/email/test", methods=["POST"])
+@csrf.exempt
 def api_test_email():
     """
     Send a live test email using the currently saved SMTP credentials.
     Runs in a background thread so the HTTP response returns immediately.
     Returns { success, message } indicating whether the connection succeeded.
     """
-    if not is_admin():
-        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     _ensure_email_settings_table()
 
     try:
@@ -3065,26 +4334,33 @@ def api_test_email():
         return jsonify({"success": False, "message": f"DB error: {exc}"}), 500
 
     if not cfg:
-        return jsonify({"success": False, "message": "No email settings configured"}), 400
+        return (
+            jsonify({"success": False, "message": "No email settings configured"}),
+            400,
+        )
 
     missing = []
-    if not cfg.get("smtp_host"):   missing.append("SMTP Host")
-    if not cfg.get("smtp_user"):   missing.append("SMTP Username")
-    if not cfg.get("smtp_password"): missing.append("SMTP Password")
-    if not cfg.get("alert_recipient"): missing.append("Alert Recipient Email")
+    if not cfg.get("smtp_host"):
+        missing.append("SMTP Host")
+    if not cfg.get("smtp_user"):
+        missing.append("SMTP Username")
+    if not cfg.get("smtp_password"):
+        missing.append("SMTP Password")
+    if not cfg.get("alert_recipient"):
+        missing.append("Alert Recipient Email")
     if missing:
-        return jsonify({
-            "success": False,
-            "message": f"Missing required fields: {', '.join(missing)}"
-        }), 400
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": f"Missing required fields: {', '.join(missing)}",
+                }
+            ),
+            400,
+        )
 
     # Build and send the test message
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "📧 Books & Blooms Café — Test Email"
-        msg["From"]    = cfg["smtp_user"]
-        msg["To"]      = cfg["alert_recipient"]
-
         html_body = """
         <div style="font-family:DM Sans,Arial,sans-serif;max-width:520px;margin:0 auto;
                     border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
@@ -3095,7 +4371,7 @@ def api_test_email():
           <div style="padding:28px;">
             <h3 style="color:#1a1a1a;margin-top:0;">✅ Test Email Successful</h3>
             <p style="color:#555;line-height:1.6;">
-              Your SMTP configuration is working correctly.<br>
+              Your email configuration is working correctly.<br>
               Low-stock alerts and other notifications will be delivered to this address.
             </p>
             <div style="background:#f5f5f5;border-radius:8px;padding:14px 18px;margin-top:18px;
@@ -3105,48 +4381,55 @@ def api_test_email():
           </div>
         </div>
         """
-        msg.attach(MIMEText(html_body, "html"))
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject="📧 Books & Blooms Café — Test Email",
+            html_body=html_body,
+        )
+        return jsonify(
+            {"success": True, "message": f"Test email sent to {cfg['alert_recipient']}"}
+        )
 
-        port = int(cfg.get("smtp_port") or 587)
-        use_tls = bool(cfg.get("smtp_use_tls", True))
-
-        if use_tls:
-            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=10)
-            server.ehlo()
-            server.starttls()
-        else:
-            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=10)
-
-        server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
-        server.quit()
-
-        return jsonify({"success": True, "message": f"Test email sent to {cfg['alert_recipient']}"})
-
-    except smtplib.SMTPAuthenticationError:
-        return jsonify({
-            "success": False,
-            "message": "Authentication failed — check your SMTP username and password (use an App Password for Gmail)"
-        }), 400
-    except smtplib.SMTPConnectError:
-        return jsonify({
-            "success": False,
-            "message": f"Cannot connect to {cfg['smtp_host']}:{cfg.get('smtp_port', 587)} — verify host and port"
-        }), 400
     except Exception as exc:
         app.logger.error(f"[email_settings] test send failed: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
+# ── POST /api/settings/email/send-daily-summary ──────────────────────────────
+@app.route("/api/settings/email/send-daily-summary", methods=["POST"])
+@csrf.exempt
+def api_send_daily_summary():
+    """
+    Manually trigger the Daily Sales Summary email right now.
+    Useful when the scheduled send time was already missed (e.g. server was
+    just started after the target hour, or the admin wants a test run).
+    Super-admin only.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    import threading as _t
+
+    def _run():
+        with app.app_context():
+            _send_daily_sales_summary_email()
+
+    _t.Thread(target=_run, daemon=True, name="daily-summary-manual").start()
+    return jsonify({"success": True, "message": "Daily Sales Summary is being sent now."})
+
+
 # ── POST /api/settings/email/send-low-stock-alert ────────────────────────────
 @app.route("/api/settings/email/send-low-stock-alert", methods=["POST"])
+@csrf.exempt
 def api_send_low_stock_alert():
     """
     Manually trigger a low-stock alert email right now.
     Fetches the current low-stock items and sends a formatted email report.
+    Accessible by any authenticated session (admin, manager, or cashier).
     """
-    if not is_admin():
-        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    allowed_roles = {"admin", "manager", "cashier"}
+    if session.get("role") not in allowed_roles:
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     _ensure_email_settings_table()
 
     try:
@@ -3158,40 +4441,63 @@ def api_send_low_stock_alert():
         return jsonify({"success": False, "message": f"DB error: {exc}"}), 500
 
     if not cfg:
-        return jsonify({"success": False, "message": "Email settings not configured"}), 400
+        return (
+            jsonify({"success": False, "message": "Email settings not configured"}),
+            400,
+        )
 
     if not cfg.get("low_stock_enabled"):
-        return jsonify({"success": False, "message": "Low-stock alerts are disabled"}), 400
+        return (
+            jsonify({"success": False, "message": "Low-stock alerts are disabled"}),
+            400,
+        )
 
     missing = []
-    if not cfg.get("smtp_host"):      missing.append("SMTP Host")
-    if not cfg.get("smtp_user"):      missing.append("SMTP Username")
-    if not cfg.get("smtp_password"):  missing.append("SMTP Password")
-    if not cfg.get("alert_recipient"): missing.append("Alert Recipient Email")
+    if not cfg.get("smtp_host"):
+        missing.append("SMTP Host")
+    if not cfg.get("smtp_user"):
+        missing.append("SMTP Username")
+    if not cfg.get("smtp_password"):
+        missing.append("SMTP Password")
+    if not cfg.get("alert_recipient"):
+        missing.append("Alert Recipient Email")
     if missing:
-        return jsonify({
-            "success": False,
-            "message": f"Incomplete email configuration: {', '.join(missing)}"
-        }), 400
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": f"Incomplete email configuration: {', '.join(missing)}",
+                }
+            ),
+            400,
+        )
 
     try:
         items = _get_low_stock_items(limit=100)
     except Exception as exc:
-        return jsonify({"success": False, "message": f"Could not fetch inventory: {exc}"}), 500
+        return (
+            jsonify({"success": False, "message": f"Could not fetch inventory: {exc}"}),
+            500,
+        )
 
     # Only track ingredients and packaging — finished products are excluded
     supplies = [i for i in items if i["source"] in ("ingredient", "packaging")]
 
     if not supplies:
-        return jsonify({"success": True, "message": "No low-stock ingredients or supplies — everything is sufficiently stocked!"})
+        return jsonify(
+            {
+                "success": True,
+                "message": "No low-stock ingredients or supplies — everything is sufficiently stocked!",
+            }
+        )
 
     def _build_section_rows(section_items):
         html = ""
         for item in section_items:
             status_color = "#dc3545" if item["status"] == "out" else "#ff9800"
             source_label = {
-                "ingredient":  "Ingredient",
-                "packaging":   "Packaging",
+                "ingredient": "Ingredient",
+                "packaging": "Packaging",
             }.get(item["source"], item["source"].capitalize())
             html += f"""
         <tr>
@@ -3247,7 +4553,7 @@ def api_send_low_stock_alert():
 
     table_html = table_head + rows_html + "</tbody></table>"
 
-    now_str   = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+    now_str = datetime.now(PHT).strftime("%B %d, %Y at %I:%M %p")
     out_count = sum(1 for i in supplies if i["status"] == "out")
     low_count = sum(1 for i in supplies if i["status"] == "low")
 
@@ -3284,43 +4590,524 @@ def api_send_low_stock_alert():
     </div>"""
 
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"📦 Low-Stock Alert — {len(supplies)} ingredient/supply item(s) need restocking"
-        msg["From"]    = cfg["smtp_user"]
-        msg["To"]      = cfg["alert_recipient"]
-        msg.attach(MIMEText(html_body, "html"))
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject=f"📦 Low-Stock Alert — {len(supplies)} ingredient/supply item(s) need restocking",
+            html_body=html_body,
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": (
+                    f"Alert sent to {cfg['alert_recipient']} — "
+                    f"{len(supplies)} ingredient/supply item(s) reported"
+                ),
+                "items_count": len(supplies),
+                "supplies_count": len(supplies),
+            }
+        )
 
-        port    = int(cfg.get("smtp_port") or 587)
-        use_tls = bool(cfg.get("smtp_use_tls", True))
-
-        if use_tls:
-            server = smtplib.SMTP(cfg["smtp_host"], port, timeout=10)
-            server.ehlo()
-            server.starttls()
-        else:
-            server = smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=10)
-
-        server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], cfg["alert_recipient"], msg.as_string())
-        server.quit()
-
-        return jsonify({
-            "success": True,
-            "message": (
-                f"Alert sent to {cfg['alert_recipient']} — "
-                f"{len(supplies)} ingredient/supply item(s) reported"
-            ),
-            "items_count": len(supplies),
-            "supplies_count": len(supplies),
-        })
-
-    except smtplib.SMTPAuthenticationError:
-        return jsonify({
-            "success": False,
-            "message": "SMTP authentication failed — check username/password (use an App Password for Gmail)"
-        }), 400
     except Exception as exc:
         app.logger.error(f"[email_settings] low-stock send failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── Daily Sales Summary ───────────────────────────────────────────────────────
+
+
+def _send_daily_sales_summary_email(target_date=None, cfg=None):
+    """
+    Build and send the end-of-day sales summary email for `target_date`
+    (defaults to yesterday).  Accepts a pre-fetched `cfg` dict so it can
+    run safely inside a background thread without touching flask_mysqldb.
+    """
+    from datetime import date as _date
+
+    if target_date is None:
+        target_date = _date.today() - timedelta(days=1)
+
+    date_str = target_date.strftime("%B %d, %Y")  # e.g. "August 03, 2026"
+    date_sql = target_date.strftime("%Y-%m-%d")
+
+    # ── Fetch cfg if not supplied ─────────────────────────────────────────────
+    if cfg is None:
+        try:
+            _ensure_email_settings_table()
+            cur = mysql.connection.cursor(DictCursor)
+            cur.execute("SELECT * FROM email_alert_settings ORDER BY id LIMIT 1")
+            cfg = cur.fetchone()
+            cur.close()
+        except Exception as exc:
+            app.logger.error(f"[daily_summary] Could not fetch email settings: {exc}")
+            return
+
+    if not cfg:
+        app.logger.warning("[daily_summary] No email settings row found; skipping.")
+        return
+
+    if not cfg.get("daily_summary_enabled", 1):
+        app.logger.info("[daily_summary] daily_summary_enabled is OFF; skipping.")
+        return
+
+    if not cfg.get("alert_recipient"):
+        app.logger.warning("[daily_summary] No alert_recipient set; cannot send.")
+        return
+
+    # ── Query yesterday's sales data ──────────────────────────────────────────
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        # Overall totals
+        cur.execute(
+            """
+            SELECT
+                COUNT(*)                          AS transaction_count,
+                COALESCE(SUM(total_amount), 0)    AS gross_revenue,
+                COALESCE(SUM(discount_amount), 0) AS total_discounts,
+                COALESCE(AVG(total_amount), 0)    AS avg_order_value,
+                SUM(CASE WHEN payment_method = 'cash'  THEN 1 ELSE 0 END) AS cash_count,
+                SUM(CASE WHEN payment_method != 'cash' THEN 1 ELSE 0 END) AS digital_count
+            FROM transactions
+            WHERE created_at >= %s AND created_at < DATE_ADD(%s, INTERVAL 1 DAY)
+              AND status = 'completed'
+        """,
+            (date_sql, date_sql),
+        )
+        totals = cur.fetchone()
+
+        # Top 5 selling items
+        cur.execute(
+            """
+            SELECT ti.product_name,
+                   SUM(ti.quantity)               AS units_sold,
+                   SUM(ti.quantity * ti.unit_price) AS item_revenue
+            FROM transaction_items ti
+            JOIN transactions t ON t.transaction_id = ti.transaction_id
+            WHERE t.created_at >= %s AND t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)
+              AND t.status = 'completed'
+            GROUP BY ti.product_name
+            ORDER BY units_sold DESC
+            LIMIT 5
+        """,
+            (date_sql, date_sql),
+        )
+        top_items = cur.fetchall()
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[daily_summary] DB query failed: {exc}")
+        return
+
+    tx_count = int(totals["transaction_count"] or 0)
+    gross = float(totals["gross_revenue"] or 0)
+    discounts = float(totals["total_discounts"] or 0)
+    net_revenue = gross - discounts
+    avg_order = float(totals["avg_order_value"] or 0)
+    cash_count = int(totals["cash_count"] or 0)
+    digital_count = int(totals["digital_count"] or 0)
+
+    # ── Build top-items rows ──────────────────────────────────────────────────
+    top_rows_html = ""
+    if top_items:
+        for rank, item in enumerate(top_items, 1):
+            medal = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][rank - 1]
+            top_rows_html += f"""
+            <tr style="{'background:#f9f5ec;' if rank % 2 == 1 else ''}">
+              <td style="padding:10px 14px;text-align:center;font-size:1.1rem;">{medal}</td>
+              <td style="padding:10px 14px;font-weight:600;color:#333;">{item['product_name']}</td>
+              <td style="padding:10px 14px;text-align:center;color:#555;">{int(item['units_sold'])}</td>
+              <td style="padding:10px 14px;text-align:center;color:#7a5c1e;font-weight:600;">
+                ₱{float(item['item_revenue']):.2f}
+              </td>
+            </tr>"""
+    else:
+        top_rows_html = """
+            <tr>
+              <td colspan="4" style="padding:14px;text-align:center;color:#aaa;">
+                No sales recorded for this day.
+              </td>
+            </tr>"""
+
+    no_sales_banner = ""
+    if tx_count == 0:
+        no_sales_banner = """
+        <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;
+                    padding:12px 16px;margin-bottom:20px;color:#856404;font-size:0.88rem;">
+          ⚠️ No completed transactions were recorded for this day.
+        </div>"""
+
+    # ── HTML email body ───────────────────────────────────────────────────────
+    html_body = f"""
+    <div style="font-family:DM Sans,Arial,sans-serif;max-width:600px;margin:0 auto;
+                border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+
+      <!-- Header -->
+      <div style="background:#1a1a1a;padding:20px 28px;border-bottom:3px solid #c9a961;">
+        <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+        <p style="color:#aaa;margin:4px 0 0;font-size:0.85rem;">Daily Sales Summary — {date_str}</p>
+      </div>
+
+      <div style="padding:28px;">
+        <h3 style="color:#1a1a1a;margin-top:0;">📊 End-of-Day Sales Report</h3>
+        {no_sales_banner}
+
+        <!-- KPI cards -->
+        <table style="width:100%;border-collapse:separate;border-spacing:8px;margin-bottom:8px;">
+          <tr>
+            <td style="background:#f9f5ec;border-radius:8px;padding:14px 16px;text-align:center;width:33%;">
+              <div style="font-size:1.6rem;font-weight:700;color:#c9a961;">
+                ₱{net_revenue:,.2f}
+              </div>
+              <div style="font-size:0.75rem;color:#888;margin-top:4px;">Net Revenue</div>
+            </td>
+            <td style="background:#f9f5ec;border-radius:8px;padding:14px 16px;text-align:center;width:33%;">
+              <div style="font-size:1.6rem;font-weight:700;color:#c9a961;">
+                {tx_count}
+              </div>
+              <div style="font-size:0.75rem;color:#888;margin-top:4px;">Transactions</div>
+            </td>
+            <td style="background:#f9f5ec;border-radius:8px;padding:14px 16px;text-align:center;width:33%;">
+              <div style="font-size:1.6rem;font-weight:700;color:#c9a961;">
+                ₱{avg_order:,.2f}
+              </div>
+              <div style="font-size:0.75rem;color:#888;margin-top:4px;">Avg. Order Value</div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Breakdown -->
+        <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:0.92rem;">
+          <tr style="background:#f9f5ec;">
+            <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">💰 Gross Revenue</td>
+            <td style="padding:10px 14px;text-align:right;color:#333;">₱{gross:,.2f}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">🏷️ Total Discounts</td>
+            <td style="padding:10px 14px;text-align:right;color:#dc3545;">− ₱{discounts:,.2f}</td>
+          </tr>
+          <tr style="background:#f9f5ec;">
+            <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">💵 Cash Transactions</td>
+            <td style="padding:10px 14px;text-align:right;color:#333;">{cash_count}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#7a5c1e;">💳 Digital Transactions</td>
+            <td style="padding:10px 14px;text-align:right;color:#333;">{digital_count}</td>
+          </tr>
+        </table>
+
+        <!-- Top-selling items -->
+        <h4 style="color:#1a1a1a;margin:22px 0 10px;">🏆 Top-Selling Items</h4>
+        <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+          <thead>
+            <tr style="background:#1a1a1a;color:#c9a961;">
+              <th style="padding:8px 14px;text-align:center;width:40px;">#</th>
+              <th style="padding:8px 14px;text-align:left;">Product</th>
+              <th style="padding:8px 14px;text-align:center;">Units Sold</th>
+              <th style="padding:8px 14px;text-align:center;">Revenue</th>
+            </tr>
+          </thead>
+          <tbody>{top_rows_html}</tbody>
+        </table>
+
+        <!-- CTA -->
+        <div style="margin-top:26px;text-align:center;">
+          <a href="https://books-and-blooms.onrender.com/admin_sales"
+             style="background:#c9a961;color:#1a1a1a;padding:12px 28px;border-radius:8px;
+                    text-decoration:none;font-weight:700;font-size:0.95rem;display:inline-block;">
+            📈 View Full Sales Report
+          </a>
+        </div>
+
+        <div style="background:#f5f5f5;border-radius:8px;padding:12px 16px;margin-top:22px;
+                    font-size:0.82rem;color:#888;">
+          This summary was sent automatically by the Books &amp; Blooms Café POS system
+          at the end of {date_str}.  You can disable it under Admin Settings → Notifications.
+        </div>
+      </div>
+    </div>
+    """
+
+    # ── Send via Resend API ───────────────────────────────────────────────────
+    try:
+        _send_email_resend(
+            to_email=cfg["alert_recipient"],
+            subject=f"📊 Daily Sales Summary — {date_str}",
+            html_body=html_body,
+        )
+        app.logger.info(
+            f"[daily_summary] Summary for {date_sql} sent to {cfg['alert_recipient']}"
+        )
+    except Exception as exc:
+        app.logger.error(f"[daily_summary] Failed to send email: {exc}")
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                          DANGER ZONE ROUTES                                 ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+@app.route("/api/danger/reset_settings", methods=["POST"])
+@csrf.exempt
+def api_danger_reset_settings():
+    """
+    Revert all system configurations back to factory defaults.
+    Clears email_alert_settings and resets app_settings keys to their
+    seeded default values.  Admin-only.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        cur = mysql.connection.cursor()
+
+        # ── 1. Wipe email alert settings ──────────────────────────────────────
+        cur.execute("DELETE FROM email_alert_settings")
+
+        # ── 2. Reset app_settings keys to defaults ────────────────────────────
+        defaults = {
+            "late_grace_minutes": "10",
+            "late_per_minute_rate": "0.75",
+        }
+        for key, value in defaults.items():
+            cur.execute(
+                """
+                INSERT INTO app_settings (setting_key, setting_value)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+                """,
+                (key, value),
+            )
+
+        mysql.connection.commit()
+        cur.close()
+
+        app.logger.warning(
+            f"[danger] reset_settings executed by admin "
+            f"employee_id={session.get('employee_id')}"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": "All settings have been reset to factory defaults.",
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[danger] reset_settings failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/danger/clear_transactions", methods=["POST"])
+@csrf.exempt
+def api_danger_clear_transactions():
+    """
+    Permanently delete all completed sales records, transaction items,
+    and receipts from the database.  Voided transactions are also removed.
+    Admin-only.  Returns the count of deleted transactions.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        cur = mysql.connection.cursor()
+
+        # Count before deletion so we can report back
+        cur.execute("SELECT COUNT(*) AS cnt FROM transactions")
+        row = cur.fetchone()
+        count = int(row[0] if row else 0)
+
+        # Delete items first (FK child), then parent transactions
+        cur.execute("DELETE FROM transaction_items")
+        cur.execute("DELETE FROM transactions")
+
+        mysql.connection.commit()
+        cur.close()
+
+        app.logger.warning(
+            f"[danger] clear_transactions executed by admin "
+            f"employee_id={session.get('employee_id')} — {count} transactions deleted"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": f"{count} transaction record(s) permanently deleted.",
+                "deleted_count": count,
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[danger] clear_transactions failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/danger/clear_products", methods=["POST"])
+@csrf.exempt
+def api_danger_clear_products():
+    """
+    Permanently delete all products and their associated inventory items.
+    Categories and transaction history are preserved.
+
+    Deletion order (respects FK constraints):
+        inv_log      → references inv_items (child, logically)
+        stock_requests → standalone
+        transaction_items → FK → transactions (products FK set NULL on delete)
+        products      → FK → categories (ON DELETE SET NULL)
+        inv_items     → standalone
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        cur = mysql.connection.cursor()
+
+        cur.execute("SELECT COUNT(*) FROM products")
+        prod_count = int((cur.fetchone() or [0])[0])
+
+        cur.execute("SELECT COUNT(*) FROM inv_items")
+        inv_count = int((cur.fetchone() or [0])[0])
+
+        # Delete in FK-safe order
+        cur.execute("DELETE FROM inv_log")
+        cur.execute("DELETE FROM stock_requests")
+        cur.execute("DELETE FROM products")
+        cur.execute("DELETE FROM inv_items")
+
+        mysql.connection.commit()
+        cur.close()
+
+        app.logger.warning(
+            f"[danger] clear_products executed by admin "
+            f"employee_id={session.get('employee_id')} — "
+            f"{prod_count} products, {inv_count} inv_items deleted"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": (
+                    f"All products cleared: {prod_count} product(s) and "
+                    f"{inv_count} inventory item(s) deleted."
+                ),
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[danger] clear_products failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/danger/clear_categories", methods=["POST"])
+@csrf.exempt
+def api_danger_clear_categories():
+    """
+    Permanently delete all product categories.
+    Products referencing a category will have their category_id set to NULL
+    (assuming the FK is defined with ON DELETE SET NULL, which is standard
+    in the Books & Blooms schema). Transaction history is preserved.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        cur = mysql.connection.cursor()
+
+        cur.execute("SELECT COUNT(*) FROM categories")
+        cat_count = int((cur.fetchone() or [0])[0])
+
+        # Unlink products from categories first to avoid FK violations
+        # if the FK is not ON DELETE SET NULL
+        cur.execute("UPDATE products SET category_id = NULL")
+        cur.execute("DELETE FROM categories")
+
+        mysql.connection.commit()
+        cur.close()
+
+        app.logger.warning(
+            f"[danger] clear_categories executed by admin "
+            f"employee_id={session.get('employee_id')} — "
+            f"{cat_count} categories deleted"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": f"All categories cleared: {cat_count} category/categories deleted.",
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[danger] clear_categories failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/danger/clear_all_data", methods=["POST"])
+@csrf.exempt
+def api_danger_clear_all_data():
+    """
+    Permanently delete all sales records AND all products/inventory data
+    from the database, then re-seed the bare defaults so the app stays
+    functional.  Admin-only.
+
+    Deletion order (respects FK constraints):
+        inv_log          → references inv_items (no declared FK but safer first)
+        stock_requests   → standalone, references nothing
+        transaction_items → FK → transactions
+        transactions      → standalone after items removed
+        products          → FK → categories (ON DELETE SET NULL, but clear anyway)
+        inv_items         → standalone
+        categories        → cleared last so products FK is already gone
+
+    After clearing, _ensure_inventory_tables() and _ensure_inv_tables() are
+    called to re-seed default categories and default cup items.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        cur = mysql.connection.cursor()
+
+        # ── count totals for the response summary ──────────────────────────
+        cur.execute("SELECT COUNT(*) FROM transactions")
+        tx_count = int((cur.fetchone() or [0])[0])
+
+        cur.execute("SELECT COUNT(*) FROM products")
+        prod_count = int((cur.fetchone() or [0])[0])
+
+        cur.execute("SELECT COUNT(*) FROM inv_items")
+        inv_count = int((cur.fetchone() or [0])[0])
+
+        # ── delete in FK-safe order ────────────────────────────────────────
+        # 1. inv_log references inv_items.id (no declared FK but child logically)
+        cur.execute("DELETE FROM inv_log")
+        # 2. stock_requests is standalone
+        cur.execute("DELETE FROM stock_requests")
+        # 3. transaction_items is child of transactions
+        cur.execute("DELETE FROM transaction_items")
+        cur.execute("DELETE FROM transactions")
+        # 4. products references categories (ON DELETE SET NULL)
+        cur.execute("DELETE FROM products")
+        # 5. inv_items is standalone
+        cur.execute("DELETE FROM inv_items")
+        # 6. categories — products already gone so FK is satisfied
+        cur.execute("DELETE FROM categories")
+
+        mysql.connection.commit()
+        cur.close()
+
+        app.logger.warning(
+            f"[danger] clear_all_data executed by admin "
+            f"employee_id={session.get('employee_id')} — "
+            f"{tx_count} transactions, {prod_count} products, {inv_count} inv_items deleted"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": (
+                    f"All data cleared: {tx_count} transaction(s), "
+                    f"{prod_count} product(s), {inv_count} inventory item(s) deleted."
+                ),
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[danger] clear_all_data failed: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
@@ -3336,7 +5123,7 @@ def cashier_dashboard():
 
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
-        "SELECT full_name, username, role, contact_number, last_login FROM employees WHERE employee_id=%s",
+        "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
         (session["employee_id"],),
     )
     employee = _dec_emp(cur.fetchone())
@@ -3352,7 +5139,7 @@ def cashier_transactions():
 
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
-        "SELECT full_name, username, role, contact_number, last_login FROM employees WHERE employee_id=%s",
+        "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
         (session["employee_id"],),
     )
     employee = _dec_emp(cur.fetchone())
@@ -3385,29 +5172,7 @@ def admin_sales():
     if not is_admin():
         return redirect(url_for("login"))
 
-    full_name = session.get("full_name")
-    if not full_name:
-        try:
-            cur = mysql.connection.cursor(DictCursor)
-            if session.get("role") == "admin":
-                cur.execute(
-                    "SELECT full_name FROM admins WHERE admin_id=%s",
-                    (session["admin_id"],),
-                )
-                user = _dec_adm(cur.fetchone())
-            else:
-                cur.execute(
-                    "SELECT full_name FROM employees WHERE employee_id=%s",
-                    (session["employee_id"],),
-                )
-                user = _dec_emp(cur.fetchone())
-            full_name = (
-                user["full_name"] if user else session["role"].capitalize()
-            ).strip()
-            cur.close()
-        except Exception:
-            full_name = "Admin"
-
+    full_name = session.get("full_name") or session.get("role", "Admin").capitalize()
     return render_template("admin/admin_sales.html", full_name=full_name)
 
 
@@ -3424,6 +5189,7 @@ def product_management():
 
 
 @app.route("/api/products/upload_image", methods=["POST"])
+@csrf.exempt
 def api_products_upload_image():
     """
     Upload a product image (multipart/form-data, field 'image').
@@ -3525,8 +5291,7 @@ def api_products_pos():
         cur = mysql.connection.cursor(DictCursor)
 
         # Only categories that actually have products
-        cur.execute(
-            """
+        cur.execute("""
             SELECT c.category_id, c.name,
                    COUNT(p.product_id) AS product_count
             FROM   categories c
@@ -3535,8 +5300,7 @@ def api_products_pos():
             GROUP  BY c.category_id
             HAVING product_count > 0
             ORDER  BY c.name
-        """
-        )
+        """)
         categories = [
             {
                 "category_id": c["category_id"],
@@ -3547,8 +5311,7 @@ def api_products_pos():
         ]
 
         # All active products
-        cur.execute(
-            """
+        cur.execute("""
             SELECT p.product_id, p.name, p.description,
                    p.image_url, p.icon, p.cup_eligible, p.price, p.stock, p.unit,
                    c.category_id, c.name AS category_name
@@ -3556,8 +5319,7 @@ def api_products_pos():
             LEFT   JOIN categories c ON c.category_id = p.category_id
             WHERE  p.is_active = 1
             ORDER  BY c.name, p.name
-        """
-        )
+        """)
         items = [
             {
                 "product_id": r["product_id"],
@@ -3592,6 +5354,7 @@ def api_products_pos():
 
 
 @app.route("/api/inventory/categories/<int:category_id>", methods=["PUT"])
+@csrf.exempt
 def api_inventory_categories_update(category_id):
     """Update an existing category's name."""
     if not is_admin():
@@ -3626,6 +5389,7 @@ def api_inventory_categories_update(category_id):
 
 
 @app.route("/api/inventory/categories/<int:category_id>", methods=["DELETE"])
+@csrf.exempt
 def api_inventory_categories_delete(category_id):
     """Delete a category. Products in this category will have their category_id set to NULL."""
     if not is_admin():
@@ -3676,8 +5440,8 @@ def api_my_attendance():
             a.attendance_id,
             DATE_FORMAT(a.attendance_date, '%%Y-%%m-%%d') AS attendance_date,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i:%%s') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i:%%s') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i:%%s %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i:%%s %%p') AS clock_out,
             CASE WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL
                  THEN ROUND(TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out)/60, 2)
                  ELSE NULL END AS hours_worked,
@@ -3688,7 +5452,13 @@ def api_my_attendance():
                 CASE WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE,a.clock_in,a.clock_out)/60.0
                            * COALESCE(e.hourly_rate,0), 2)
-                ELSE NULL END) AS daily_pay
+                ELSE NULL END) AS daily_pay,
+            COALESCE(a.late_minutes,     0) AS late_minutes,
+            COALESCE(a.late_deduction,   0) AS late_deduction,
+            COALESCE(a.deduction_waived, 0) AS deduction_waived,
+            (SELECT ot.status FROM overtime_requests ot
+             WHERE ot.attendance_id = a.attendance_id
+             ORDER BY ot.created_at DESC LIMIT 1) AS ot_status
         FROM attendance a
         JOIN employees e ON e.employee_id = a.employee_id
         WHERE a.employee_id = %s
@@ -3706,7 +5476,7 @@ def api_my_attendance():
             + " AND a.attendance_date BETWEEN %s AND %s ORDER BY a.attendance_date DESC, a.clock_in DESC",
             (employee_id, range_start, range_end),
         )
-        rows = cur.fetchall()
+        rows = [_serialize_row(r) for r in cur.fetchall()]
         cur.close()
         total_hours = round(
             sum(float(r["hours_worked"]) for r in rows if r.get("hours_worked")), 2
@@ -3721,7 +5491,7 @@ def api_my_attendance():
             }
         )
     else:
-        dt = datetime.now().date()
+        dt = datetime.now(PHT).date()
         if date_str:
             try:
                 dt = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -3735,7 +5505,7 @@ def api_my_attendance():
             BASE_SQL + " AND a.attendance_date = %s ORDER BY a.clock_in DESC",
             (employee_id, dt),
         )
-        rows = cur.fetchall()
+        rows = [_serialize_row(r) for r in cur.fetchall()]
         cur.close()
         total_hours = round(
             sum(float(r["hours_worked"]) for r in rows if r.get("hours_worked")), 2
@@ -3755,13 +5525,14 @@ def api_my_attendance():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
-@app.route("/logout")
+@app.route("/logout", methods=["POST"])
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
 
 @app.route("/admin/unlock_account", methods=["POST"])
+@csrf.exempt
 def unlock_account():
     """Clear a login lockout for the given username + role."""
     if not is_admin():
@@ -3815,14 +5586,16 @@ def lockout_status():
 
 
 # ── Secret token that must be submitted with the form ─────────────────────────
-# IMPORTANT: Replace this with a long, random string (e.g. from os.urandom).
-# Keep this value out of version control (use an environment variable in prod).
-ADMIN_SETUP_TOKEN = os.environ.get(
-    "ADMIN_SETUP_TOKEN", "change-me-before-deploying-abc123!"
-)
+# Set ADMIN_SETUP_TOKEN in your Render environment variables.
+# The app refuses to start without it — never falls back to a default.
+_admin_setup_token = os.environ.get("ADMIN_SETUP_TOKEN")
+if not _admin_setup_token:
+    raise RuntimeError("ADMIN_SETUP_TOKEN is not set in the environment — refusing to start.")
+ADMIN_SETUP_TOKEN = _admin_setup_token
 
 
 @app.route("/setup/create-admin-xK9mQ2", methods=["GET", "POST"])
+@csrf.exempt
 def create_admin():
     """
     Hidden page for creating a new admin account.
@@ -3838,6 +5611,7 @@ def create_admin():
     if request.method == "POST":
         submitted_token = request.form.get("setup_token", "").strip()
         full_name = request.form.get("full_name", "").strip()
+        email = request.form.get("email", "").strip()
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
         confirm_password = request.form.get("confirm_password", "").strip()
@@ -3848,8 +5622,13 @@ def create_admin():
             return render_template("admin/create_admin.html")
 
         # ── 2. Validate fields ───────────────────────────────────────────────
-        if not all([full_name, username, password, confirm_password]):
+        if not all([full_name, email, username, password, confirm_password]):
             flash("All fields are required.", "error")
+            return render_template("admin/create_admin.html")
+
+        import re
+        if not re.match(r"^[^@\s]+@gmail\.com$", email, re.IGNORECASE):
+            flash("Only Gmail addresses are accepted (e.g. maria@gmail.com).", "error")
             return render_template("admin/create_admin.html")
 
         if password != confirm_password:
@@ -3876,9 +5655,10 @@ def create_admin():
         # ── 4. Insert new admin (AES-256 encrypted + bcrypt hashed) ─────────
         try:
             cur.execute(
-                "INSERT INTO admins (full_name, username, username_hash, password, password_hash) VALUES (%s, %s, %s, %s, %s)",
+                "INSERT INTO admins (full_name, email, username, username_hash, password, password_hash) VALUES (%s, %s, %s, %s, %s, %s)",
                 (
                     aes_encrypt(full_name),
+                    aes_encrypt(email),
                     aes_encrypt(username),
                     aes_username_hash(username),
                     aes_encrypt(password),
@@ -3951,11 +5731,22 @@ def run_auto_migration():
             except Exception:
                 pass  # column already exists — expected on re-runs
 
+        # STEP 1b: add email column to employees if missing
+        try:
+            cur.execute(
+                "ALTER TABLE `employees` "
+                "ADD COLUMN `email` VARCHAR(255) NOT NULL DEFAULT ''"
+            )
+            conn.commit()
+            app.logger.info("[migration] Added email column to employees")
+        except Exception:
+            pass  # column already exists — expected on re-runs
+
         # STEP 2: widen narrow columns before writing ciphertext
         # AES-256-CBC base64(IV+ciphertext) is always >= 44 chars.
         # VARCHAR(20) / VARCHAR(50) silently truncate the blob.
         widen = [
-            ("employees", "contact_number", "VARCHAR(255)"),
+            ("employees", "email", "VARCHAR(255)"),
             ("employees", "username", "VARCHAR(255)"),
             ("employees", "full_name", "VARCHAR(255)"),
             ("employees", "password", "VARCHAR(255)"),
@@ -3975,21 +5766,19 @@ def run_auto_migration():
 
         # STEPS 3 & 4: repair truncated blobs and encrypt plaintext rows
         cur.execute(
-            "SELECT employee_id, username, full_name, password, contact_number "
+            "SELECT employee_id, username, full_name, password, email "
             "FROM employees"
         )
         for row in cur.fetchall():
             upd = {}
-            for f in ("username", "full_name", "password", "contact_number"):
+            for f in ("username", "full_name", "password", "email"):
                 v = row.get(f)
                 if not v:
                     continue
                 s = str(v).strip()
                 if _is_enc(s):
                     continue
-                import re as _re
-
-                if _re.fullmatch(r"[A-Za-z0-9+/=]+", s) and 16 <= len(s) < 44:
+                if re.fullmatch(r"[A-Za-z0-9+/=]+", s) and 16 <= len(s) < 44:
                     upd[f] = ""
                     app.logger.warning(
                         f"[migration] Cleared truncated ciphertext in "
@@ -4026,9 +5815,7 @@ def run_auto_migration():
                 s = str(v).strip()
                 if _is_enc(s):
                     continue
-                import re as _re
-
-                if _re.fullmatch(r"[A-Za-z0-9+/=]+", s) and 16 <= len(s) < 44:
+                if re.fullmatch(r"[A-Za-z0-9+/=]+", s) and 16 <= len(s) < 44:
                     upd[f] = ""
                     app.logger.warning(
                         f"[migration] Cleared truncated ciphertext in "
@@ -4135,10 +5922,39 @@ def run_auto_migration():
 
     # ── STEP 16: close any missed clock-outs from yesterday (server restart catch) ─
     try:
-        from datetime import timedelta
-        _auto_clockout_missed((datetime.now() - timedelta(days=1)).date())
+        _auto_clockout_missed((datetime.now(PHT) - timedelta(days=1)).date())
     except Exception as exc:
         app.logger.error(f"[migration] Step 16 (startup auto-clockout) failed: {exc}")
+
+    # ── STEP 17: overtime_requests table ─────────────────────────────────────
+    try:
+        _ensure_overtime_requests_table()
+    except Exception as exc:
+        app.logger.error(f"[migration] Step 17 (overtime_requests table) failed: {exc}")
+
+    # ── STEP 18: late-deduction schema (attendance columns + app_settings) ────
+    try:
+        _ensure_late_deduction_schema()
+    except Exception as exc:
+        app.logger.error(f"[migration] Step 18 (late_deduction schema) failed: {exc}")
+
+    # ── STEP 19: stock_requests table (cashier → admin approval flow) ─────────
+    try:
+        _ensure_stock_requests_table()
+    except Exception as exc:
+        app.logger.error(f"[migration] Step 19 (stock_requests table) failed: {exc}")
+
+    # ── STEP 20: add gcash_ref column to transactions ─────────────────────────
+    try:
+        _ensure_gcash_ref_column()
+    except Exception as exc:
+        app.logger.error(f"[migration] Step 20 (gcash_ref column) failed: {exc}")
+
+    # ── STEP 21: password_reset_tokens table (forgot-password flow) ───────────
+    try:
+        _ensure_reset_tokens_table()
+    except Exception as exc:
+        app.logger.error(f"[migration] Step 21 (password_reset_tokens table) failed: {exc}")
 
     app.logger.info("[migration] run_auto_migration complete.")
 
@@ -4170,19 +5986,40 @@ def _ensure_vat_columns():
             except Exception:
                 pass  # column already exists
         # Back-fill existing rows: compute net_sales & vat_amount from total_amount
-        cur.execute(
-            """
+        cur.execute("""
             UPDATE transactions
                SET net_sales  = ROUND(total_amount / 1.12, 2),
                    vat_amount = ROUND(total_amount / 1.12 * 0.12, 2)
              WHERE vat_amount = 0 AND total_amount > 0
-        """
-        )
+        """)
         conn.commit()
         cur.close()
         app.logger.info("[migration] VAT columns ensured on transactions")
     except Exception as exc:
         app.logger.error(f"[migration] _ensure_vat_columns: {exc}")
+
+
+def _ensure_gcash_ref_column():
+    """
+    Idempotent: add gcash_ref VARCHAR(50) to `transactions` if not present.
+    Stores the GCash reference number entered by the cashier at checkout.
+    """
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "ALTER TABLE `transactions` "
+                "ADD COLUMN `gcash_ref` VARCHAR(50) DEFAULT NULL "
+                "AFTER `payment_method`"
+            )
+            conn.commit()
+            app.logger.info("[migration] Added transactions.gcash_ref")
+        except Exception:
+            pass  # column already exists
+        cur.close()
+    except Exception as exc:
+        app.logger.error(f"[migration] _ensure_gcash_ref_column: {exc}")
 
 
 def _ensure_cup_eligible_column():
@@ -4262,8 +6099,7 @@ def _ensure_payroll_tables():
                 pass
 
         # ── payroll_periods — one row per (employee × pay-period) ────────────
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `payroll_periods` (
                 `payroll_id`   INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
                 `employee_id`  INT           NOT NULL,
@@ -4282,21 +6118,22 @@ def _ensure_payroll_tables():
                 CONSTRAINT `payroll_periods_ibfk_1`
                     FOREIGN KEY (`employee_id`) REFERENCES `employees`(`employee_id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
         # Patch existing tables: add unique key if missing (idempotent)
         try:
-            cur.execute(
+            dict_cur = conn.cursor(DictCursor)
+            dict_cur.execute(
                 "SELECT COUNT(*) AS c FROM information_schema.STATISTICS "
                 "WHERE table_schema=DATABASE() AND table_name='payroll_periods' "
                 "AND index_name='uq_emp_period'"
             )
-            if cur.fetchone()["c"] == 0:
+            if dict_cur.fetchone()["c"] == 0:
                 cur.execute(
                     "ALTER TABLE payroll_periods "
                     "ADD UNIQUE KEY uq_emp_period (employee_id, period_start)"
                 )
                 app.logger.info("[payroll] Added uq_emp_period unique key")
+            dict_cur.close()
         except Exception as patch_exc:
             app.logger.warning(f"[payroll] uq_emp_period patch skipped: {patch_exc}")
 
@@ -4383,7 +6220,6 @@ def _compute_period_bounds(ref_date=None):
       • 1st – 15th
       • 16th – last day of month
     """
-    from datetime import date, timedelta
     import calendar as _cal
 
     d = ref_date or date.today()
@@ -4399,20 +6235,7 @@ def payroll():
     """Render the payroll dashboard page."""
     if not is_admin():
         return redirect(url_for("login"))
-    cur = mysql.connection.cursor(DictCursor)
-    if session.get("role") == "admin" and "admin_id" in session:
-        cur.execute(
-            "SELECT full_name FROM admins WHERE admin_id=%s", (session["admin_id"],)
-        )
-        user = _dec_adm(cur.fetchone())
-    else:
-        cur.execute(
-            "SELECT full_name FROM employees WHERE employee_id=%s",
-            (session["employee_id"],),
-        )
-        user = _dec_emp(cur.fetchone())
-    full_name = user["full_name"] if user else session.get("full_name", "Admin")
-    cur.close()
+    full_name = session.get("full_name") or session.get("role", "Admin").capitalize()
     return render_template("admin/payroll.html", full_name=full_name)
 
 
@@ -4438,9 +6261,10 @@ def api_payroll_employees():
 
 
 @app.route("/api/payroll/update_rate", methods=["POST"])
+@csrf.exempt
 def api_payroll_update_rate():
-    """Admin: update an employee's hourly_rate."""
-    if not is_admin():
+    """Admin-only: update an employee's hourly_rate. Managers are not permitted."""
+    if not is_super_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     employee_id = data.get("employee_id")
@@ -4471,12 +6295,8 @@ def api_payroll_daily():
 
     date_str = request.args.get("date")
     try:
-        from datetime import date as _date
-
         dt = (
-            datetime.strptime(date_str, "%Y-%m-%d").date()
-            if date_str
-            else _date.today()
+            datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else date.today()
         )
     except ValueError:
         return jsonify({"success": False, "message": "Invalid date"}), 400
@@ -4490,8 +6310,8 @@ def api_payroll_daily():
             e.full_name,
             e.role,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i %%p') AS clock_out,
             COALESCE(NULLIF(a.hours_worked,0),
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE,a.clock_in,a.clock_out)/60.0,4)
@@ -4563,7 +6383,6 @@ def api_payroll_period():
     if not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
-    from datetime import date as _date, timedelta
     import calendar as _cal
 
     # ── Resolve period bounds ────────────────────────────────────────────────
@@ -4597,7 +6416,10 @@ def api_payroll_period():
             ROUND(SUM(COALESCE(NULLIF(a.daily_earnings,0),
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN (TIMESTAMPDIFF(MINUTE,a.clock_in,a.clock_out)/60.0)*e.hourly_rate
-                ELSE 0 END)),2)                                              AS total_pay
+                ELSE 0 END))
+                - COALESCE(SUM(CASE WHEN COALESCE(a.deduction_waived,0)=0
+                               THEN COALESCE(a.late_deduction,0) ELSE 0 END),0)
+            ,2)                                                              AS total_pay
         FROM employees e
         LEFT JOIN attendance a
             ON a.employee_id = e.employee_id
@@ -4665,8 +6487,8 @@ def api_payroll_period_detail():
         SELECT
             a.attendance_date,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i %%p') AS clock_out,
             COALESCE(NULLIF(a.hours_worked,0),
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE,a.clock_in,a.clock_out)/60.0,2)
@@ -4721,8 +6543,6 @@ def api_payroll_salary_detail():
         return jsonify({"success": False, "message": "Missing parameters"}), 400
 
     try:
-        from datetime import date as _date, timedelta as _td
-
         ps = datetime.strptime(period_start, "%Y-%m-%d").date()
         pe = datetime.strptime(period_end, "%Y-%m-%d").date()
     except ValueError:
@@ -4750,8 +6570,8 @@ def api_payroll_salary_detail():
         SELECT
             a.attendance_date,
             a.shift_type,
-            DATE_FORMAT(a.clock_in,  '%%H:%%i') AS clock_in,
-            DATE_FORMAT(a.clock_out, '%%H:%%i') AS clock_out,
+            DATE_FORMAT(a.clock_in,  '%%h:%%i %%p') AS clock_in,
+            DATE_FORMAT(a.clock_out, '%%h:%%i %%p') AS clock_out,
             COALESCE(NULLIF(a.hours_worked, 0),
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN ROUND(TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out) / 60.0, 2)
@@ -4761,7 +6581,10 @@ def api_payroll_salary_detail():
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN ROUND((TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out) / 60.0) *
                            COALESCE(NULLIF(a.hourly_rate_snapshot, 0), %s, 0), 2)
-                ELSE 0 END)                                         AS daily_pay
+                ELSE 0 END)                                         AS daily_pay,
+            COALESCE(a.late_minutes,     0)                         AS late_minutes,
+            COALESCE(a.late_deduction,   0)                         AS late_deduction,
+            COALESCE(a.deduction_waived, 0)                         AS deduction_waived
         FROM attendance a
         WHERE a.employee_id = %s
           AND a.attendance_date BETWEEN %s AND %s
@@ -4785,6 +6608,9 @@ def api_payroll_salary_detail():
             "hours_worked": float(row["hours_worked"] or 0),
             "hourly_rate": float(row["hourly_rate"] or 0),
             "daily_pay": float(row["daily_pay"] or 0),
+            "late_minutes": int(row.get("late_minutes", 0) or 0),
+            "late_deduction": float(row.get("late_deduction", 0) or 0),
+            "deduction_waived": bool(row.get("deduction_waived", 0)),
         }
 
     # ── Build full calendar grid (every day in the period) ───────────────────
@@ -4805,11 +6631,17 @@ def api_payroll_salary_detail():
                     "hours_worked": 0.0,
                     "hourly_rate": base_rate,
                     "daily_pay": 0.0,
+                    "late_minutes": 0,
+                    "late_deduction": 0.0,
+                    "deduction_waived": False,
                 }
             )
-        current += _td(days=1)
+        current += timedelta(days=1)
 
-    total_income = round(sum(d["daily_pay"] for d in days), 2)
+    total_deductions = round(
+        sum(d["late_deduction"] for d in days if not d["deduction_waived"]), 2
+    )
+    total_income = round(sum(d["daily_pay"] for d in days) - total_deductions, 2)
     total_hours = round(sum(d["hours_worked"] for d in days), 2)
     days_worked = sum(1 for d in days if d["daily_pay"] > 0)
 
@@ -4824,6 +6656,7 @@ def api_payroll_salary_detail():
             "period_end": str(pe),
             "total_income": total_income,
             "total_hours": total_hours,
+            "total_deductions": total_deductions,
             "days_worked": days_worked,
             "days": days,
         }
@@ -4831,6 +6664,7 @@ def api_payroll_salary_detail():
 
 
 @app.route("/api/payroll/generate", methods=["POST"])
+@csrf.exempt
 def api_payroll_generate():
     """
     Compute and upsert payroll_periods rows for a given pay period.
@@ -4868,7 +6702,10 @@ def api_payroll_generate():
             ROUND(SUM(COALESCE(NULLIF(a.daily_earnings,0),
                 CASE WHEN a.clock_out IS NOT NULL
                 THEN (TIMESTAMPDIFF(MINUTE,a.clock_in,a.clock_out)/60.0)*e.hourly_rate
-                ELSE 0 END)),2)                                              AS total_pay
+                ELSE 0 END))
+                - COALESCE(SUM(CASE WHEN COALESCE(a.deduction_waived,0)=0
+                               THEN COALESCE(a.late_deduction,0) ELSE 0 END),0)
+            ,2)                                                              AS total_pay
         FROM employees e
         LEFT JOIN attendance a
             ON a.employee_id = e.employee_id
@@ -4935,8 +6772,7 @@ def api_payroll_history():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     cur = mysql.connection.cursor(DictCursor)
-    cur.execute(
-        """
+    cur.execute("""
         SELECT
             pp.payroll_id, pp.employee_id,
             pp.period_start, pp.period_end,
@@ -4947,8 +6783,7 @@ def api_payroll_history():
         JOIN employees e ON e.employee_id = pp.employee_id
         ORDER BY pp.period_start DESC, e.full_name
         LIMIT 200
-    """
-    )
+    """)
     rows = cur.fetchall()
     cur.close()
 
@@ -4981,16 +6816,15 @@ def api_payroll_periods():
     if not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
-    from datetime import date as _date
     import calendar as _cal
 
     def _bounds(year, month, first_half):
         if first_half:
-            return _date(year, month, 1), _date(year, month, 15)
+            return date(year, month, 1), date(year, month, 15)
         last = _cal.monthrange(year, month)[1]
-        return _date(year, month, 16), _date(year, month, last)
+        return date(year, month, 16), date(year, month, last)
 
-    today = _date.today()
+    today = date.today()
     is_first_half = today.day <= 15
 
     periods = []
@@ -5077,7 +6911,23 @@ def api_payroll_period_summary():
                                         e.hourly_rate, 0)
                         ELSE 0
                     END
-                )), 2)                                                AS gross_pay
+                )), 2)                                                AS gross_earnings,
+                ROUND(COALESCE(SUM(CASE WHEN COALESCE(a.deduction_waived,0)=0
+                               THEN COALESCE(a.late_deduction,0) ELSE 0 END),0)
+                , 2)                                                  AS total_deductions,
+                ROUND(SUM(COALESCE(
+                    NULLIF(a.daily_earnings, 0),
+                    CASE
+                        WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL
+                        THEN (TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out) / 60.0)
+                             * COALESCE(NULLIF(a.hourly_rate_snapshot, 0),
+                                        e.hourly_rate, 0)
+                        ELSE 0
+                    END
+                ))
+                - COALESCE(SUM(CASE WHEN COALESCE(a.deduction_waived,0)=0
+                               THEN COALESCE(a.late_deduction,0) ELSE 0 END),0)
+                , 2)                                                  AS gross_pay
             FROM employees e
             LEFT JOIN attendance a
                 ON  a.employee_id    = e.employee_id
@@ -5103,6 +6953,8 @@ def api_payroll_period_summary():
                 "hourly_rate": float(row["hourly_rate"] or 0),
                 "days_worked": int(row["days_worked"] or 0),
                 "total_hours": float(row["total_hours"] or 0),
+                "gross_earnings": float(row["gross_earnings"] or 0),
+                "total_deductions": float(row["total_deductions"] or 0),
                 "gross_pay": float(row["gross_pay"] or 0),
             }
         )
@@ -5151,20 +7003,17 @@ def _ensure_inventory_tables():
         cur = conn.cursor(DictCursor)
 
         # ── categories ────────────────────────────────────────────────────────
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `categories` (
                 `category_id`  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 `name`         VARCHAR(80)  NOT NULL,
                 `created_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY `uq_category_name` (`name`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
 
         # ── products ──────────────────────────────────────────────────────────
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `products` (
                 `product_id`       INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
                 `category_id`      INT UNSIGNED  DEFAULT NULL,
@@ -5185,8 +7034,7 @@ def _ensure_inventory_tables():
                     FOREIGN KEY (`category_id`) REFERENCES `categories`(`category_id`)
                     ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
         conn.commit()
 
         # ── add icon column if missing (idempotent) ─────────────────────────
@@ -5209,205 +7057,8 @@ def _ensure_inventory_tables():
         except Exception:
             pass  # column already exists
 
-        # ── seed default categories if table is empty ─────────────────────────
-        cur.execute("SELECT COUNT(*) AS cnt FROM `categories`")
-        if cur.fetchone()["cnt"] == 0:
-            defaults = [
-                ("Books",),
-                ("Flowers",),
-                ("Café",),
-                ("Stationery",),
-                ("Gifts",),
-            ]
-            cur.executemany(
-                "INSERT IGNORE INTO `categories` (name) VALUES (%s)", defaults
-            )
-            conn.commit()
-            app.logger.info("[inventory] Seeded default categories")
-
-        # ── seed sample products if table is empty ────────────────────────────
-        cur.execute("SELECT COUNT(*) AS cnt FROM `products`")
-        if cur.fetchone()["cnt"] == 0:
-            cur.execute("SELECT category_id, name FROM categories")
-            cat_map = {r["name"]: r["category_id"] for r in cur.fetchall()}
-            samples = [
-                (
-                    cat_map.get("Books"),
-                    "The Great Gatsby",
-                    "A classic novel by F. Scott Fitzgerald",
-                    "BK-001",
-                    450.00,
-                    200.00,
-                    12,
-                    5,
-                    "pcs",
-                ),
-                (
-                    cat_map.get("Books"),
-                    "Pride & Prejudice",
-                    "Jane Austen timeless romance",
-                    "BK-002",
-                    520.00,
-                    220.00,
-                    10,
-                    5,
-                    "pcs",
-                ),
-                (
-                    cat_map.get("Books"),
-                    "1984 by Orwell",
-                    "Dystopian social science fiction",
-                    "BK-003",
-                    480.00,
-                    210.00,
-                    14,
-                    5,
-                    "pcs",
-                ),
-                (
-                    cat_map.get("Flowers"),
-                    "Rose Bouquet",
-                    "Fresh red roses, dozen",
-                    "FL-001",
-                    850.00,
-                    350.00,
-                    8,
-                    3,
-                    "bunch",
-                ),
-                (
-                    cat_map.get("Flowers"),
-                    "Tulip Bunch",
-                    "Seasonal tulips, mixed colors",
-                    "FL-002",
-                    680.00,
-                    280.00,
-                    4,
-                    3,
-                    "bunch",
-                ),
-                (
-                    cat_map.get("Flowers"),
-                    "Sunflower Bouquet",
-                    "Bright sunflowers, half dozen",
-                    "FL-003",
-                    720.00,
-                    300.00,
-                    3,
-                    3,
-                    "bunch",
-                ),
-                (
-                    cat_map.get("Café"),
-                    "Cappuccino",
-                    "Espresso with steamed milk foam",
-                    "CF-001",
-                    150.00,
-                    40.00,
-                    50,
-                    10,
-                    "cup",
-                ),
-                (
-                    cat_map.get("Café"),
-                    "Latte",
-                    "Espresso with steamed milk",
-                    "CF-002",
-                    140.00,
-                    38.00,
-                    50,
-                    10,
-                    "cup",
-                ),
-                (
-                    cat_map.get("Café"),
-                    "Croissant",
-                    "Buttery French pastry",
-                    "CF-003",
-                    120.00,
-                    45.00,
-                    30,
-                    10,
-                    "pcs",
-                ),
-                (
-                    cat_map.get("Café"),
-                    "Espresso",
-                    "Double shot espresso",
-                    "CF-004",
-                    100.00,
-                    30.00,
-                    0,
-                    10,
-                    "cup",
-                ),
-                (
-                    cat_map.get("Stationery"),
-                    "Notebook Set",
-                    "A5 ruled notebooks, pack of 3",
-                    "ST-001",
-                    280.00,
-                    100.00,
-                    25,
-                    5,
-                    "set",
-                ),
-                (
-                    cat_map.get("Stationery"),
-                    "Bookmark Set",
-                    "Decorative bookmarks, pack of 5",
-                    "ST-002",
-                    150.00,
-                    50.00,
-                    30,
-                    8,
-                    "set",
-                ),
-                (
-                    cat_map.get("Stationery"),
-                    "Fountain Pen",
-                    "Premium writing instrument",
-                    "ST-003",
-                    1200.00,
-                    500.00,
-                    7,
-                    3,
-                    "pcs",
-                ),
-                (
-                    cat_map.get("Gifts"),
-                    "Gift Basket",
-                    "Assorted café and book combo",
-                    "GF-001",
-                    1500.00,
-                    600.00,
-                    5,
-                    2,
-                    "pcs",
-                ),
-                (
-                    cat_map.get("Gifts"),
-                    "Book Light",
-                    "LED clip-on reading light",
-                    "GF-002",
-                    450.00,
-                    180.00,
-                    15,
-                    5,
-                    "pcs",
-                ),
-            ]
-            cur.executemany(
-                """
-                INSERT INTO `products`
-                    (category_id, name, description, sku, price, cost, stock,
-                     reorder_point, unit)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """,
-                samples,
-            )
-            conn.commit()
-            app.logger.info("[inventory] Seeded sample products")
+        # Seeding removed: categories and products are managed entirely
+        # through the admin UI. No default data is inserted on startup.
 
         cur.close()
         app.logger.info("[inventory] Inventory tables ensured")
@@ -5438,8 +7089,7 @@ def _ensure_sales_tables():
         conn = mysql.connection
         cur = conn.cursor()
 
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `transactions` (
                 `transaction_id`   INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
                 `cashier_id`       INT           NOT NULL,
@@ -5459,11 +7109,9 @@ def _ensure_sales_tables():
                 INDEX `idx_created_at` (`created_at`),
                 INDEX `idx_status`     (`status`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
 
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `transaction_items` (
                 `item_id`        INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
                 `transaction_id` INT UNSIGNED  NOT NULL,
@@ -5479,8 +7127,7 @@ def _ensure_sales_tables():
                     REFERENCES `transactions`(`transaction_id`)
                     ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
 
         conn.commit()
         cur.close()
@@ -5493,6 +7140,7 @@ def _ensure_sales_tables():
 
 
 @app.route("/api/pos/checkout", methods=["POST"])
+@csrf.exempt
 def api_pos_checkout():
     """
     Complete a POS sale.
@@ -5536,6 +7184,7 @@ def api_pos_checkout():
         return jsonify({"success": False, "message": "Invalid numeric values"}), 400
 
     note = (data.get("note") or "").strip()[:255] or None
+    gcash_ref = (data.get("gcash_ref") or "").strip()[:50] or None
 
     # ── Resolve cashier info ────────────────────────────────────────────────────
     cashier_id = session.get("employee_id") or session.get("admin_id")
@@ -5570,7 +7219,7 @@ def api_pos_checkout():
         cup_stock_map = {}
         cur.execute(
             "SELECT id, name, unit, stock FROM inv_items "
-            "WHERE unit IN ('8oz','12oz','16oz') AND is_active=1"
+            "WHERE type='packaging' AND is_active=1 AND unit REGEXP '^[0-9]+oz$'"
         )
         for _cr in cur.fetchall():
             cup_stock_map[_cr["unit"]] = {
@@ -5578,6 +7227,7 @@ def api_pos_checkout():
                 "name": _cr["name"],
                 "stock": float(_cr["stock"]),
             }
+        _dynamic_cup_units = set(cup_stock_map.keys()) or CUP_UNITS
 
         # Build validated line items
         line_items = []
@@ -5595,18 +7245,14 @@ def api_pos_checkout():
 
             # cup_size is sent per-item from the cashier POS size picker
             cup_size = (str(raw.get("cup_size") or "")).strip() or None
-            if cup_size and cup_size not in {"8oz", "12oz", "16oz"}:
-                cup_size = None  # reject garbage values
+            if cup_size and cup_size not in _dynamic_cup_units:
+                cup_size = None  # reject unrecognised cup sizes
 
             # ── Stock validation ────────────────────────────────────────────
-            # Step 1: Always check products.stock regardless of cup_eligible.
-            # This prevents negative stock for ALL products, including drinks
-            # that may be sold without a cup size (e.g. bottled, takeaway pack).
-            if prod["stock"] < qty:
-                stock_errors.append(
-                    f"'{prod['name']}' only has {max(0, prod['stock'])} pcs left"
-                )
-                continue
+            # Product-level stock counts are NOT validated at checkout.
+            # Products act as a menu display only — they are always available
+            # for ordering regardless of their stock value.
+            # Only physical cup packaging (inv_items) is validated below.
 
             # Step 2: If this is a cup-eligible drink AND a cup size was chosen,
             # also validate the physical cup packaging from inv_items.
@@ -5714,8 +7360,8 @@ def api_pos_checkout():
             INSERT INTO transactions
                 (cashier_id, cashier_name, subtotal, discount_amount,
                  tax_amount, total_amount, amount_tendered, change_amount,
-                 payment_method, note, discount_type, net_sales, vat_amount)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 payment_method, gcash_ref, note, discount_type, net_sales, vat_amount)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
             (
                 cashier_id,
@@ -5727,6 +7373,7 @@ def api_pos_checkout():
                 amount_tendered,
                 change_amount,
                 payment_method,
+                gcash_ref,
                 note,
                 discount_type_str,
                 net_sales,
@@ -5757,28 +7404,24 @@ def api_pos_checkout():
             ],
         )
 
-        # ── Deduct product stock ────────────────────────────────────────────────
-        # GREATEST(0, ...) is a DB-level safety net against race conditions
-        # where two concurrent checkouts both pass the pre-check above.
-        for li in line_items:
-            cur.execute(
-                "UPDATE products SET stock = GREATEST(0, stock - %s) WHERE product_id = %s",
-                (li["quantity"], li["product_id"]),
-            )
+        # ── Product stock deduction intentionally skipped ──────────────────────
+        # Products function as a menu catalogue only. Stock counts on products
+        # are not decremented on sale. Cup packaging (inv_items) is still
+        # deducted below for drinks that use physical cups.
 
         # ── Auto-deduct cup packaging from inv_items (same transaction) ─────────
         # Runs synchronously inside the open transaction so the packaging deduction
         # is atomic with the sale: either both commit or both roll back.
-        # cup_size ("8oz" / "12oz" / "16oz") was captured at the POS size-picker
-        # and forwarded on every cup-eligible line item.
-        cup_name_map = {"8oz": "8oz Cup", "12oz": "12oz Cup", "16oz": "16oz Cup"}
+        # cup_size is the unit string captured at the POS size-picker (e.g. "8oz",
+        # "12oz", "16oz", "20oz" …) and forwarded on every cup-eligible line item.
         for li in line_items:
             cup_unit = (li.get("cup_size") or "").strip()
-            if not cup_unit or cup_unit not in CUP_UNITS:
+            if not cup_unit or cup_unit not in _dynamic_cup_units:
                 continue  # non-cup item — skip
 
             qty = int(li.get("quantity", 1))
-            cup_display = cup_name_map.get(cup_unit)
+            # Derive a canonical display name from the unit (e.g. "20oz" → "20oz Cup")
+            cup_display = f"{cup_unit} Cup"
 
             # Lookup inv_items row — prefer unit match, fall back to name match
             cur.execute(
@@ -5853,8 +7496,9 @@ def api_pos_checkout():
             "amount_tendered": amount_tendered,
             "change_amount": change_amount,
             "payment_method": payment_method,
+            "gcash_ref": gcash_ref,
             "note": note,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "created_at": datetime.now(PHT).strftime("%Y-%m-%d %H:%M:%S"),
         }
         app.logger.info(
             f"[sales] Transaction #{transaction_id} — "
@@ -5901,11 +7545,9 @@ def api_pos_transactions():
 
         if date_str:
             try:
-                from datetime import date as _date
-
                 datetime.strptime(date_str, "%Y-%m-%d")
-                where.append("DATE(t.created_at) = %s")
-                params.append(date_str)
+                where.append("t.created_at >= %s AND t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)")
+                params.extend([date_str, date_str])
             except ValueError:
                 pass
 
@@ -5913,10 +7555,13 @@ def api_pos_transactions():
             SELECT t.transaction_id, t.cashier_id, t.cashier_name,
                    t.subtotal, t.discount_amount, t.tax_amount, t.total_amount,
                    t.amount_tendered, t.change_amount,
-                   t.payment_method, t.note, t.created_at,
+                   t.payment_method, t.gcash_ref, t.note, t.status, t.created_at,
+                   COALESCE(t.discount_type, 'none')                        AS discount_type,
+                   COALESCE(t.net_sales, ROUND(t.total_amount / 1.12, 2))   AS net_sales,
+                   COALESCE(t.vat_amount, ROUND(t.total_amount / 1.12 * 0.12, 2)) AS vat_amount,
                    COUNT(ti.item_id) AS item_count,
                    e.role            AS cashier_role,
-                   e.contact_number  AS cashier_contact_enc
+                   e.email  AS cashier_contact_enc
             FROM transactions t
             LEFT JOIN transaction_items ti ON ti.transaction_id = t.transaction_id
             LEFT JOIN employees e ON e.employee_id = t.cashier_id
@@ -5950,6 +7595,10 @@ def api_pos_transactions():
                     "change_amount": float(r["change_amount"]),
                     "payment_method": r["payment_method"],
                     "note": r["note"] or "",
+                    "status": r.get("status") or "completed",
+                    "discount_type": r.get("discount_type") or "none",
+                    "net_sales": float(r.get("net_sales") or 0),
+                    "vat_amount": float(r.get("vat_amount") or 0),
                     "item_count": int(r["item_count"]),
                     "created_at": str(r["created_at"]),
                 }
@@ -5981,7 +7630,7 @@ def api_pos_transaction_detail(transaction_id):
                    COALESCE(t.net_sales,  ROUND(t.total_amount / 1.12, 2))        AS net_sales,
                    COALESCE(t.vat_amount, ROUND(t.total_amount / 1.12 * 0.12, 2)) AS vat_amount,
                    e.role           AS cashier_role,
-                   e.contact_number AS cashier_contact_enc
+                   e.email AS cashier_contact_enc
             FROM transactions t
             LEFT JOIN employees e ON e.employee_id = t.cashier_id
             WHERE t.transaction_id = %s
@@ -6033,8 +7682,14 @@ def api_pos_transaction_detail(transaction_id):
                     "status": txn["status"],
                     "created_at": str(txn["created_at"]),
                     "discount_type": txn.get("discount_type") or "none",
-                    "net_sales": float(txn.get("net_sales") or round(float(txn["total_amount"]) / 1.12, 2)),
-                    "vat_amount": float(txn.get("vat_amount") or round(float(txn["total_amount"]) / 1.12 * 0.12, 2)),
+                    "net_sales": float(
+                        txn.get("net_sales")
+                        or round(float(txn["total_amount"]) / 1.12, 2)
+                    ),
+                    "vat_amount": float(
+                        txn.get("vat_amount")
+                        or round(float(txn["total_amount"]) / 1.12 * 0.12, 2)
+                    ),
                     "items": [
                         {
                             "product_name": i["product_name"],
@@ -6096,7 +7751,7 @@ def api_sales_cashflow():
                 SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as cash_payment,
                 SUM(CASE WHEN payment_method != 'cash' THEN total_amount ELSE 0 END) as digital_payment
             FROM transactions
-            WHERE DATE(created_at) BETWEEN %s AND %s
+            WHERE created_at >= %s AND created_at < DATE_ADD(%s, INTERVAL 1 DAY)
               AND status = 'completed'
             GROUP BY DATE(created_at)
             ORDER BY date ASC
@@ -6134,40 +7789,21 @@ def api_sales_cashflow():
 
 def _get_low_stock_items(limit=20):
     """
-    Return a unified list of dicts for items at or below their reorder point,
-    covering BOTH finished products (products table) AND ingredients/packaging
-    (inv_items table).
+    Return a list of dicts for ingredients/packaging (inv_items) at or below
+    their reorder point. Finished products (products table) are intentionally
+    excluded — their stock is not managed the same way and should not trigger
+    low-stock alerts on the dashboard.
 
     Each dict: {
         name, category_or_type, stock, unit, reorder_point,
-        status ('out'|'low'), status_label, source ('product'|'ingredient'|'packaging')
+        status ('out'|'low'), status_label, source ('ingredient'|'packaging')
     }
     Results are sorted: out-of-stock first, then by ascending stock, then name.
-    The combined list is capped at `limit` rows.
+    The list is capped at `limit` rows.
     """
     cur = mysql.connection.cursor(DictCursor)
 
-    # ── 1. Finished products ───────────────────────────────────────────────────
-    cur.execute(
-        """
-        SELECT p.name,
-               COALESCE(c.name, 'Uncategorised') AS category_or_type,
-               p.stock,
-               p.unit,
-               p.reorder_point,
-               'product' AS source
-        FROM   products p
-        LEFT JOIN categories c ON c.category_id = p.category_id
-        WHERE  p.is_active = 1
-          AND  p.stock <= p.reorder_point
-        ORDER  BY p.stock ASC, p.name ASC
-        LIMIT  %s
-        """,
-        (limit,),
-    )
-    product_rows = cur.fetchall()
-
-    # ── 2. Ingredients & packaging (inv_items) ─────────────────────────────────
+    # ── Ingredients & packaging (inv_items) only ───────────────────────────────
     cur.execute(
         """
         SELECT name,
@@ -6187,25 +7823,25 @@ def _get_low_stock_items(limit=20):
     inv_rows = cur.fetchall()
     cur.close()
 
-    # ── 3. Merge, annotate, sort, cap ─────────────────────────────────────────
+    # ── Annotate, sort, cap ────────────────────────────────────────────────────
     items = []
-    for row in list(product_rows) + list(inv_rows):
+    for row in list(inv_rows):
         stock = float(row["stock"])
         reorder = float(row["reorder_point"])
         is_out = stock <= 0
         items.append(
             {
-                "name":             row["name"],
+                "name": row["name"],
                 "category_or_type": row["category_or_type"],
-                "stock":            stock,
-                "unit":             row["unit"],
-                "reorder_point":    reorder,
-                "source":           row["source"],
-                "status":           "out" if is_out else "low",
-                "status_label":     "Out of Stock" if is_out else "Low Stock",
+                "stock": stock,
+                "unit": row["unit"],
+                "reorder_point": reorder,
+                "source": row["source"],
+                "status": "out" if is_out else "low",
+                "status_label": "Out of Stock" if is_out else "Low Stock",
                 # Legacy fields kept for backwards compatibility
-                "category":         row["category_or_type"],
-                "status_class":     "low" if is_out else "medium",
+                "category": row["category_or_type"],
+                "status_class": "out" if is_out else "low",
             }
         )
 
@@ -6254,8 +7890,7 @@ def api_inventory_stats():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     try:
         cur = mysql.connection.cursor(DictCursor)
-        cur.execute(
-            """
+        cur.execute("""
             SELECT
                 COUNT(*)                                        AS total_products,
                 SUM(stock)                                      AS total_units,
@@ -6265,8 +7900,7 @@ def api_inventory_stats():
                 SUM(stock * price)                              AS inventory_value
             FROM products
             WHERE is_active = 1
-        """
-        )
+        """)
         row = cur.fetchone()
         cur.close()
         return jsonify(
@@ -6313,6 +7947,7 @@ def api_inventory_low_stock():
 
 
 @app.route("/api/inventory/categories", methods=["GET", "POST"])
+@csrf.exempt
 def api_inventory_categories():
     if not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
@@ -6320,8 +7955,7 @@ def api_inventory_categories():
     if request.method == "GET":
         try:
             cur = mysql.connection.cursor(DictCursor)
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT c.category_id, c.name,
                        COUNT(p.product_id) AS product_count
                 FROM categories c
@@ -6329,8 +7963,7 @@ def api_inventory_categories():
                     ON p.category_id = c.category_id AND p.is_active = 1
                 GROUP BY c.category_id
                 ORDER BY c.name
-            """
-            )
+            """)
             cats = cur.fetchall()
             cur.close()
             for c in cats:
@@ -6466,6 +8099,7 @@ def api_inventory_items():
 
 
 @app.route("/api/inventory/items", methods=["POST"])
+@csrf.exempt
 def api_inventory_items_create():
     """Create a new product."""
     if not is_admin():
@@ -6517,7 +8151,8 @@ def api_inventory_items_create():
         mysql.connection.commit()
         new_id = cur.lastrowid
         cur.close()
-        # Broadcast the updated catalogue to all live SSE subscribers
+        # Bust POS product cache and broadcast to SSE subscribers
+        _invalidate_pos_cache()
         _threading.Thread(target=_sse_notify_product_change, daemon=True).start()
         return jsonify(
             {
@@ -6535,6 +8170,7 @@ def api_inventory_items_create():
 
 
 @app.route("/api/inventory/items/<int:product_id>", methods=["PUT"])
+@csrf.exempt
 def api_inventory_items_update(product_id):
     """Update an existing product's details."""
     if not is_admin():
@@ -6599,7 +8235,8 @@ def api_inventory_items_update(product_id):
         cur.close()
         if affected == 0:
             return jsonify({"success": False, "message": "Product not found"}), 404
-        # Broadcast the updated catalogue to all live SSE subscribers
+        # Bust POS product cache and broadcast to SSE subscribers
+        _invalidate_pos_cache()
         _threading.Thread(target=_sse_notify_product_change, daemon=True).start()
         return jsonify({"success": True, "message": f'"{name}" updated'})
     except Exception as exc:
@@ -6611,6 +8248,7 @@ def api_inventory_items_update(product_id):
 
 
 @app.route("/api/inventory/items/<int:product_id>", methods=["DELETE"])
+@csrf.exempt
 def api_inventory_items_delete(product_id):
     """Soft-delete a product (sets is_active = 0)."""
     if not is_admin():
@@ -6625,7 +8263,8 @@ def api_inventory_items_delete(product_id):
         cur.close()
         if affected == 0:
             return jsonify({"success": False, "message": "Product not found"}), 404
-        # Broadcast the updated catalogue to all live SSE subscribers
+        # Bust POS product cache and broadcast to SSE subscribers
+        _invalidate_pos_cache()
         _threading.Thread(target=_sse_notify_product_change, daemon=True).start()
         return jsonify({"success": True, "message": "Product removed from inventory"})
     except Exception as exc:
@@ -6637,6 +8276,7 @@ def api_inventory_items_delete(product_id):
 
 
 @app.route("/api/inventory/restock", methods=["POST"])
+@csrf.exempt
 def api_inventory_restock():
     """
     Adjust a product's stock level.
@@ -6687,17 +8327,9 @@ def api_inventory_restock():
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
-_migration_done = False
-
-
 @app.before_request
-def ensure_migration():
-    """Run the DB migration exactly once after the app has a live DB connection."""
-    global _migration_done
-    if not _migration_done:
-        _migration_done = True  # Set first so a crash doesn't cause infinite loops
-        run_auto_migration()
-    # Run the trash purge on every request (rate-limited internally to every 5 min)
+def ensure_purge():
+    """Rate-limited trash purge on every request (at most every 5 min)."""
     _purge_expired_trash()
 
 
@@ -6723,7 +8355,30 @@ def ensure_migration():
 
 # ── Helpers ───────────────────────────────────────────────────
 
-CUP_UNITS = {"8oz", "12oz", "16oz"}  # units that auto-deduct from inv_items
+CUP_UNITS = {"8oz", "12oz", "16oz"}  # legacy fallback — runtime always queries DB
+
+
+def _get_cup_units(cur=None):
+    """
+    Return a set of unit strings for all active cup-packaging items in inv_items.
+    Cup items are identified by type='packaging' AND unit matching the pattern
+    '<digits>oz' (e.g. '8oz', '12oz', '20oz').
+    Falls back to the legacy hardcoded set if the DB query fails.
+    """
+    try:
+        own_cursor = cur is None
+        if own_cursor:
+            cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT DISTINCT unit FROM inv_items "
+            "WHERE type='packaging' AND is_active=1 AND unit REGEXP '^[0-9]+oz$'"
+        )
+        units = {r["unit"] for r in cur.fetchall()}
+        if own_cursor:
+            cur.close()
+        return units if units else CUP_UNITS
+    except Exception:
+        return CUP_UNITS
 
 
 def _log_inv_change(
@@ -6763,22 +8418,21 @@ def _log_inv_change(
 def _deduct_cups_for_sale(transaction_id, items, cashier_name=""):
     """
     Called after a successful checkout.
-    For each cart item that carries a cup_size (8oz / 12oz / 16oz),
-    deduct 1 cup per unit sold from inv_items.
-    The cup_size is chosen at the POS at the time of sale — it is NOT
-    stored on the product record any more.
+    For each cart item that carries a cup_size (any '<N>oz' unit present in
+    inv_items as type='packaging'), deduct 1 cup per unit sold from inv_items.
+    The cup_size is chosen at the POS at the time of sale.
     """
     try:
         cur = mysql.connection.cursor(DictCursor)
+        dynamic_cup_units = _get_cup_units(cur)
         for item in items:
             quantity = int(item.get("quantity", 1))
             # cup_size is passed directly from the POS cart item
             cup_unit = (item.get("cup_size") or "").strip()
-            if not cup_unit or cup_unit not in CUP_UNITS or quantity <= 0:
+            if not cup_unit or cup_unit not in dynamic_cup_units or quantity <= 0:
                 continue
-            # Map cup_unit to the canonical display name used in inv_items
-            cup_name_map = {"8oz": "8oz Cup", "12oz": "12oz Cup", "16oz": "16oz Cup"}
-            cup_display_name = cup_name_map.get(cup_unit)
+            # Derive display name: e.g. "20oz" → "20oz Cup"
+            cup_display_name = f"{cup_unit} Cup"
 
             # Try lookup by unit first, then fall back to name
             cur.execute(
@@ -6787,7 +8441,7 @@ def _deduct_cups_for_sale(transaction_id, items, cashier_name=""):
                 (cup_unit,),
             )
             cup = cur.fetchone()
-            if not cup and cup_display_name:
+            if not cup:
                 # Fallback: match by name (covers edge cases where unit column differs)
                 cur.execute(
                     "SELECT id, name, stock FROM inv_items "
@@ -6834,19 +8488,22 @@ def _deduct_cups_for_sale(transaction_id, items, cashier_name=""):
 
 @app.route("/api/inv_items", methods=["GET"])
 def api_inv_items_list():
-    """Return all active inventory items (ingredients + packaging)."""
-    if not is_admin():
+    """Return all active inventory items (ingredients + packaging).
+
+    GET is accessible to any authenticated session (cashier, manager, admin)
+    so the cashier POS size-picker can fetch live cup stock levels.
+    Mutating methods (POST, PUT, DELETE) remain admin/manager-only.
+    """
+    if "employee_id" not in session and "admin_id" not in session:
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     try:
         cur = mysql.connection.cursor(DictCursor)
-        cur.execute(
-            """
+        cur.execute("""
             SELECT id, name, type, stock, unit, reorder_point, note, updated_at
             FROM inv_items
             WHERE is_active = 1
             ORDER BY type, name
-        """
-        )
+        """)
         items = cur.fetchall()
         cur.close()
         # Attach status label
@@ -6862,10 +8519,165 @@ def api_inv_items_list():
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
+# ── GET /api/inv_items/cup-sizes ─────────────────────────────
+# Returns all cup packaging items (type='packaging', unit matches \d+oz).
+# Used by the inventory frontend to dynamically build the cup cards grid.
+
+
+@app.route("/api/inv_items/cup-sizes", methods=["GET"])
+def api_cup_sizes_list():
+    """Return all active cup-packaging items sorted by ounces ascending."""
+    if "employee_id" not in session and "admin_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("""
+            SELECT id, name, type, stock, unit, reorder_point, note, updated_at
+            FROM inv_items
+            WHERE type = 'packaging' AND is_active = 1
+              AND unit REGEXP '^[0-9]+oz$'
+            ORDER BY CAST(REPLACE(unit,'oz','') AS UNSIGNED)
+            """)
+        items = cur.fetchall()
+        cur.close()
+        for item in items:
+            s = float(item["stock"])
+            r = float(item["reorder_point"])
+            item["status"] = "out" if s <= 0 else ("low" if s <= r else "ok")
+            item["stock"] = float(item["stock"])
+            item["reorder_point"] = float(item["reorder_point"])
+        return jsonify({"success": True, "cups": items})
+    except Exception as exc:
+        app.logger.error(f"[cup-sizes] list: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── POST /api/inv_items/cup-sizes ────────────────────────────
+# Create a new cup size. Validates that the unit is a valid '<N>oz' string
+# and that no active cup item with that unit already exists.
+
+
+@app.route("/api/inv_items/cup-sizes", methods=["POST"])
+@csrf.exempt
+def api_cup_sizes_create():
+    """Add a new cup size to inventory."""
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    raw_unit = (data.get("unit") or "").strip().lower()
+    # Normalise — accept "20", "20oz", "20 oz" etc.
+    m = re.match(r"^(\d+)\s*oz?$", raw_unit)
+    if not m:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Unit must be a number followed by 'oz' (e.g. 20oz)",
+                }
+            ),
+            400,
+        )
+    unit = f"{m.group(1)}oz"
+    name = data.get("name") or f"{unit} Cup"
+    try:
+        stock = max(0, float(data.get("stock", 0) or 0))
+        reorder_point = max(1, float(data.get("reorder_point", 20) or 20))
+    except (TypeError, ValueError):
+        return (
+            jsonify(
+                {"success": False, "message": "Stock and reorder point must be numbers"}
+            ),
+            400,
+        )
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        # Duplicate check
+        cur.execute(
+            "SELECT id FROM inv_items WHERE unit=%s AND type='packaging' AND is_active=1",
+            (unit,),
+        )
+        if cur.fetchone():
+            cur.close()
+            return (
+                jsonify(
+                    {"success": False, "message": f"A cup size '{unit}' already exists"}
+                ),
+                409,
+            )
+        cur.execute(
+            """
+            INSERT INTO inv_items (name, type, stock, unit, reorder_point, note)
+            VALUES (%s, 'packaging', %s, %s, %s, %s)
+            """,
+            (
+                name,
+                stock,
+                unit,
+                reorder_point,
+                "Cup packaging — auto-deducted on sales",
+            ),
+        )
+        new_id = cur.lastrowid
+        mysql.connection.commit()
+        cur.close()
+        return jsonify(
+            {
+                "success": True,
+                "id": new_id,
+                "unit": unit,
+                "name": name,
+                "stock": stock,
+                "reorder_point": reorder_point,
+            }
+        )
+    except Exception as exc:
+        app.logger.error(f"[cup-sizes] create: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── DELETE /api/inv_items/cup-sizes/<id> ─────────────────────
+# Soft-deletes a cup-size packaging item (sets is_active = 0).
+# Only admins may remove cup sizes.
+
+
+@app.route("/api/inv_items/cup-sizes/<int:item_id>", methods=["DELETE"])
+@csrf.exempt
+def api_cup_sizes_delete(item_id):
+    """Soft-delete a cup size entry (sets is_active=0)."""
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        # Confirm the item exists, is a cup-packaging row, and is currently active
+        cur.execute(
+            "SELECT id, name, unit FROM inv_items "
+            "WHERE id=%s AND type='packaging' AND is_active=1 "
+            "  AND unit REGEXP '^[0-9]+oz$'",
+            (item_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            return jsonify({"success": False, "message": "Cup size not found"}), 404
+        cur.execute(
+            "UPDATE inv_items SET is_active=0, updated_at=NOW() WHERE id=%s",
+            (item_id,),
+        )
+        mysql.connection.commit()
+        cur.close()
+        app.logger.info(f"[cup-sizes] deleted id={item_id} unit={row['unit']}")
+        return jsonify({"success": True, "id": item_id, "unit": row["unit"]})
+    except Exception as exc:
+        app.logger.error(f"[cup-sizes] delete: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
 # ── POST /api/inv_items ───────────────────────────────────────
 
 
 @app.route("/api/inv_items", methods=["POST"])
+@csrf.exempt
 def api_inv_items_create():
     """Create a new inventory item."""
     if not is_admin():
@@ -6905,6 +8717,7 @@ def api_inv_items_create():
 
 
 @app.route("/api/inv_items/<int:item_id>", methods=["PUT"])
+@csrf.exempt
 def api_inv_items_update(item_id):
     """Update an existing inventory item."""
     if not is_admin():
@@ -6946,6 +8759,7 @@ def api_inv_items_update(item_id):
 
 
 @app.route("/api/inv_items/<int:item_id>", methods=["DELETE"])
+@csrf.exempt
 def api_inv_items_delete(item_id):
     """Soft-delete an inventory item."""
     if not is_admin():
@@ -6968,6 +8782,7 @@ def api_inv_items_delete(item_id):
 
 
 @app.route("/api/inv_items/adjust", methods=["POST"])
+@csrf.exempt
 def api_inv_items_adjust():
     """
     Manually adjust stock level.
@@ -7026,6 +8841,7 @@ def api_inv_items_adjust():
 
 
 @app.route("/api/inv_items/consume", methods=["POST"])
+@csrf.exempt
 def api_inv_items_consume():
     """
     Record a consumption event for an ingredient or supply.
@@ -7047,7 +8863,7 @@ def api_inv_items_consume():
     item_id = data.get("id")
 
     try:
-        used_qty    = float(data.get("used_qty",    0) or 0)
+        used_qty = float(data.get("used_qty", 0) or 0)
         damaged_qty = float(data.get("damaged_qty", 0) or 0)
     except (TypeError, ValueError):
         return jsonify({"success": False, "message": "Invalid quantities"}), 400
@@ -7056,9 +8872,17 @@ def api_inv_items_consume():
     if not item_id:
         return jsonify({"success": False, "message": "id required"}), 400
     if total <= 0:
-        return jsonify({"success": False, "message": "Total consumed must be greater than 0"}), 400
+        return (
+            jsonify(
+                {"success": False, "message": "Total consumed must be greater than 0"}
+            ),
+            400,
+        )
     if used_qty < 0 or damaged_qty < 0:
-        return jsonify({"success": False, "message": "Quantities cannot be negative"}), 400
+        return (
+            jsonify({"success": False, "message": "Quantities cannot be negative"}),
+            400,
+        )
 
     note = (data.get("note") or "").strip() or None
     created_by = session.get("full_name") or session.get("username") or "Admin"
@@ -7077,10 +8901,15 @@ def api_inv_items_consume():
         current_stock = float(item["stock"])
         if total > current_stock:
             cur.close()
-            return jsonify({
-                "success": False,
-                "message": f"Cannot consume {total} {item['unit']} — only {current_stock} in stock"
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"Cannot consume {total} {item['unit']} — only {current_stock} in stock",
+                    }
+                ),
+                400,
+            )
 
         new_stock = round(current_stock - total, 4)
         cur.execute("UPDATE inv_items SET stock=%s WHERE id=%s", (new_stock, item_id))
@@ -7115,17 +8944,19 @@ def api_inv_items_consume():
 
         mysql.connection.commit()
         cur.close()
-        return jsonify({
-            "success": True,
-            "new_stock": new_stock,
-            "used_qty": used_qty,
-            "damaged_qty": damaged_qty,
-            "message": (
-                f"Consumed {total} {item['unit']} from {item['name']}: "
-                f"{used_qty} used, {damaged_qty} damaged. "
-                f"Remaining: {new_stock} {item['unit']}."
-            ),
-        })
+        return jsonify(
+            {
+                "success": True,
+                "new_stock": new_stock,
+                "used_qty": used_qty,
+                "damaged_qty": damaged_qty,
+                "message": (
+                    f"Consumed {total} {item['unit']} from {item['name']}: "
+                    f"{used_qty} used, {damaged_qty} damaged. "
+                    f"Remaining: {new_stock} {item['unit']}."
+                ),
+            }
+        )
     except Exception as exc:
         app.logger.error(f"[inv_items] consume #{item_id}: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
@@ -7169,22 +9000,25 @@ def api_inv_items_eod_report():
         if date_str:
             report_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         else:
-            report_date = datetime.now().date()
+            report_date = datetime.now(PHT).date()
     except ValueError:
-        return jsonify({"success": False, "message": "Invalid date format — use YYYY-MM-DD"}), 400
+        return (
+            jsonify(
+                {"success": False, "message": "Invalid date format — use YYYY-MM-DD"}
+            ),
+            400,
+        )
 
     try:
         cur = mysql.connection.cursor(DictCursor)
 
         # ── 1. Fetch all active inventory items ──────────────────────────────
-        cur.execute(
-            """
+        cur.execute("""
             SELECT id, name, type, stock AS current_stock, unit, reorder_point
             FROM inv_items
             WHERE is_active = 1
             ORDER BY type, name
-            """
-        )
+            """)
         items = cur.fetchall()
 
         # ── 2. Fetch all inv_log rows for that day ───────────────────────────
@@ -7198,26 +9032,32 @@ def api_inv_items_eod_report():
                 stock_after,
                 created_at
             FROM inv_log
-            WHERE DATE(created_at) = %s
+            WHERE created_at >= %s AND created_at < DATE_ADD(%s, INTERVAL 1 DAY)
             ORDER BY item_id, created_at
             """,
-            (report_date,),
+            (report_date, report_date),
         )
         log_rows = cur.fetchall()
         cur.close()
 
         # ── 3. Bucket log rows per item ──────────────────────────────────────
         from collections import defaultdict
-        buckets = defaultdict(lambda: {
-            "used": 0.0, "damaged": 0.0, "sale": 0.0,
-            "restock": 0.0, "other": 0.0,
-        })
+
+        buckets = defaultdict(
+            lambda: {
+                "used": 0.0,
+                "damaged": 0.0,
+                "sale": 0.0,
+                "restock": 0.0,
+                "other": 0.0,
+            }
+        )
 
         for row in log_rows:
-            iid   = int(row["item_id"])
+            iid = int(row["item_id"])
             delta = float(row["delta"])
-            note  = (row["note"] or "").lower()
-            src   = (row["source"] or "").lower()
+            note = (row["note"] or "").lower()
+            src = (row["source"] or "").lower()
 
             if delta < 0:
                 abs_d = abs(delta)
@@ -7228,37 +9068,47 @@ def api_inv_items_eod_report():
                 elif src == "sale":
                     buckets[iid]["sale"] += abs_d
                 else:
-                    buckets[iid]["other"] += abs_d   # negative other
+                    buckets[iid]["other"] += abs_d  # negative other
             else:
-                if src == "manual" and delta > 0 and "[used]" not in note and "[damaged]" not in note:
+                if (
+                    src == "manual"
+                    and delta > 0
+                    and "[used]" not in note
+                    and "[damaged]" not in note
+                ):
                     buckets[iid]["restock"] += delta
                 else:
-                    buckets[iid]["other"] += delta   # positive other
+                    buckets[iid]["other"] += delta  # positive other
 
         # ── 4. Build report rows ─────────────────────────────────────────────
         report_items = []
         totals = {
-            "beginning": 0.0, "used": 0.0, "damaged": 0.0,
-            "sale": 0.0, "restock": 0.0, "other": 0.0, "ending": 0.0,
+            "beginning": 0.0,
+            "used": 0.0,
+            "damaged": 0.0,
+            "sale": 0.0,
+            "restock": 0.0,
+            "other": 0.0,
+            "ending": 0.0,
         }
 
         for item in items:
-            iid       = int(item["id"])
-            ending    = float(item["current_stock"])
-            b         = buckets[iid]
+            iid = int(item["id"])
+            ending = float(item["current_stock"])
+            b = buckets[iid]
 
-            used      = round(b["used"],    4)
-            damaged   = round(b["damaged"], 4)
-            sale      = round(b["sale"],    4)
-            restock   = round(b["restock"], 4)
-            other_neg = round(b["other"],   4)  # net of positive/negative 'other'
+            used = round(b["used"], 4)
+            damaged = round(b["damaged"], 4)
+            sale = round(b["sale"], 4)
+            restock = round(b["restock"], 4)
+            other_neg = round(b["other"], 4)  # net of positive/negative 'other'
             total_out = used + damaged + sale + max(0, -other_neg)
-            total_in  = restock + max(0, other_neg)
+            total_in = restock + max(0, other_neg)
 
             beginning = round(ending + total_out - total_in, 4)
             beginning = max(0.0, beginning)
 
-            reorder   = float(item["reorder_point"] or 0)
+            reorder = float(item["reorder_point"] or 0)
             if ending <= 0:
                 status = "out"
             elif ending <= reorder:
@@ -7267,44 +9117,48 @@ def api_inv_items_eod_report():
                 status = "ok"
 
             row_data = {
-                "item_id":           iid,
-                "name":              item["name"],
-                "type":              item["type"],
-                "unit":              item["unit"],
-                "reorder_point":     reorder,
-                "beginning_stock":   beginning,
-                "consumed_used":     used,
-                "consumed_damaged":  damaged,
-                "consumed_sale":     sale,
-                "total_consumed":    round(used + damaged + sale, 4),
-                "restocked":         restock,
+                "item_id": iid,
+                "name": item["name"],
+                "type": item["type"],
+                "unit": item["unit"],
+                "reorder_point": reorder,
+                "beginning_stock": beginning,
+                "consumed_used": used,
+                "consumed_damaged": damaged,
+                "consumed_sale": sale,
+                "total_consumed": round(used + damaged + sale, 4),
+                "restocked": restock,
                 "other_adjustments": round(other_neg, 4),
-                "ending_stock":      ending,
-                "status":            status,
-                "has_activity":      any([used, damaged, sale, restock, other_neg]),
+                "ending_stock": ending,
+                "status": status,
+                "has_activity": any([used, damaged, sale, restock, other_neg]),
             }
             report_items.append(row_data)
 
             totals["beginning"] += beginning
-            totals["used"]      += used
-            totals["damaged"]   += damaged
-            totals["sale"]      += sale
-            totals["restock"]   += restock
-            totals["other"]     += other_neg
-            totals["ending"]    += ending
+            totals["used"] += used
+            totals["damaged"] += damaged
+            totals["sale"] += sale
+            totals["restock"] += restock
+            totals["other"] += other_neg
+            totals["ending"] += ending
 
-        return jsonify({
-            "success":     True,
-            "report_date": str(report_date),
-            "items":       report_items,
-            "totals": {k: round(v, 4) for k, v in totals.items()},
-            "counts": {
-                "total":       len(report_items),
-                "with_activity": sum(1 for r in report_items if r["has_activity"]),
-                "low_stock":   sum(1 for r in report_items if r["status"] == "low"),
-                "out_of_stock": sum(1 for r in report_items if r["status"] == "out"),
-            },
-        })
+        return jsonify(
+            {
+                "success": True,
+                "report_date": str(report_date),
+                "items": report_items,
+                "totals": {k: round(v, 4) for k, v in totals.items()},
+                "counts": {
+                    "total": len(report_items),
+                    "with_activity": sum(1 for r in report_items if r["has_activity"]),
+                    "low_stock": sum(1 for r in report_items if r["status"] == "low"),
+                    "out_of_stock": sum(
+                        1 for r in report_items if r["status"] == "out"
+                    ),
+                },
+            }
+        )
 
     except Exception as exc:
         app.logger.error(f"[inv_items] eod-report: {exc}")
@@ -7382,22 +9236,19 @@ def _ensure_employee_applications_table():
     try:
         conn = mysql.connection
         cur = conn.cursor()
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `employee_applications` (
                 `application_id` INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
                 `full_name`      VARCHAR(255) NOT NULL DEFAULT \'\',
                 `email`          VARCHAR(255) NOT NULL DEFAULT \'\',
                 `username`       VARCHAR(255) NOT NULL DEFAULT \'\',
                 `role`           ENUM(\'admin\',\'manager\',\'cashier\') NOT NULL DEFAULT \'cashier\',
-                `contact_number` VARCHAR(255) NOT NULL DEFAULT \'\',
                 `status`         ENUM(\'pending\',\'approved\',\'rejected\') NOT NULL DEFAULT \'pending\',
                 `created_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY `email`    (`email`),
                 UNIQUE KEY `username` (`username`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
         conn.commit()
         cur.close()
         app.logger.info("[migration] employee_applications table ensured")
@@ -7413,8 +9264,7 @@ def _ensure_inv_tables():
     try:
         conn = mysql.connection
         cur = conn.cursor()
-        cur.execute(
-            """
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `inv_items` (
               `id`            int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
               `name`          varchar(120) NOT NULL,
@@ -7428,10 +9278,8 @@ def _ensure_inv_tables():
               `updated_at`    timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
               PRIMARY KEY (`id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
-        cur.execute(
-            """
+        """)
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS `inv_log` (
               `log_id`         int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
               `item_id`        int(10) UNSIGNED NOT NULL,
@@ -7446,11 +9294,10 @@ def _ensure_inv_tables():
               `created_at`     timestamp NOT NULL DEFAULT current_timestamp(),
               PRIMARY KEY (`log_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-        """
-        )
+        """)
         # Seed default cup items if none exist
         cur.execute(
-            "SELECT COUNT(*) AS c FROM inv_items WHERE unit IN ('8oz','12oz','16oz')"
+            "SELECT COUNT(*) AS c FROM inv_items WHERE type='packaging' AND unit REGEXP '^[0-9]+oz$'"
         )
         if cur.fetchone()[0] == 0:
             cur.executemany(
@@ -7466,10 +9313,6 @@ def _ensure_inv_tables():
         app.logger.info("[migration] inv_items + inv_log tables ready")
     except Exception as exc:
         app.logger.error(f"[migration] _ensure_inv_tables: {exc}")
-
-
-
-
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -7511,19 +9354,17 @@ def _sse_notify_product_change():
     """
     try:
         cur = mysql.connection.cursor(DictCursor)
-        cur.execute(
-            """
+        cur.execute("""
             SELECT p.product_id, p.name, p.description, p.sku,
                    p.image_url, p.icon, p.price, p.cost,
-                   p.stock, p.reorder_point, p.unit,
+                   p.stock, p.reorder_point, p.unit, p.cup_eligible,
                    p.is_active,
                    c.category_id, c.name AS category_name
             FROM products p
             LEFT JOIN categories c ON c.category_id = p.category_id
             WHERE p.is_active = 1
             ORDER BY c.name, p.name
-            """
-        )
+            """)
         rows = cur.fetchall()
         cur.close()
         items = [
@@ -7539,6 +9380,7 @@ def _sse_notify_product_change():
                 "stock": int(r["stock"]),
                 "reorder_point": int(r["reorder_point"]),
                 "unit": r["unit"],
+                "cup_eligible": bool(r.get("cup_eligible", 0)),
                 "category_id": r["category_id"],
                 "category_name": r["category_name"] or "Other",
             }
@@ -7617,66 +9459,14 @@ def api_pos_products():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     try:
-        cur = mysql.connection.cursor(DictCursor)
-
-        cur.execute(
-            """
-            SELECT c.category_id, c.name,
-                   COUNT(p.product_id) AS product_count
-            FROM   categories c
-            LEFT   JOIN products p
-                   ON p.category_id = c.category_id AND p.is_active = 1
-            GROUP  BY c.category_id
-            HAVING product_count > 0
-            ORDER  BY c.name
-        """
-        )
-        categories = [
-            {
-                "category_id": c["category_id"],
-                "name": c["name"],
-                "product_count": int(c["product_count"]),
-            }
-            for c in cur.fetchall()
-        ]
-
-        cur.execute(
-            """
-            SELECT p.product_id, p.name, p.description,
-                   p.image_url, p.icon, p.cup_eligible, p.price, p.stock, p.unit,
-                   c.category_id, c.name AS category_name
-            FROM   products p
-            LEFT   JOIN categories c ON c.category_id = p.category_id
-            WHERE  p.is_active = 1
-            ORDER  BY c.name, p.name
-        """
-        )
-        items = [
-            {
-                "product_id": r["product_id"],
-                "name": r["name"],
-                "description": r["description"] or "",
-                "image_url": r["image_url"] or "",
-                "icon": r["icon"] or "📦",
-                "cup_eligible": bool(r.get("cup_eligible", 0)),
-                "price": float(r["price"]),
-                "stock": int(r["stock"]),
-                "unit": r["unit"],
-                "category_id": r["category_id"],
-                "category_name": r["category_name"] or "Other",
-            }
-            for r in cur.fetchall()
-        ]
-        cur.close()
+        d = _get_pos_products()
         # Return both `items` and `products` so old and new frontend code both work
-        return jsonify(
-            {
-                "success": True,
-                "items": items,
-                "products": items,
-                "categories": categories,
-            }
-        )
+        return jsonify({
+            "success":    True,
+            "items":      d["items"],
+            "products":   d["items"],
+            "categories": d["categories"],
+        })
     except Exception as exc:
         app.logger.error(f"[products] api_pos_products: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
@@ -7687,6 +9477,7 @@ def api_pos_products():
 
 
 @app.route("/api/inventory/bulk-action", methods=["POST"])
+@csrf.exempt
 def api_inventory_bulk_action():
     """
     Perform a bulk action on selected inventory items.
@@ -7967,16 +9758,15 @@ def api_sales_summary():
 
     period = (request.args.get("period") or "today").strip().lower()
     period_map = {
-        "today": "DATE(created_at) = CURDATE()",
-        "week": "YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)",
-        "month": "MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())",
+        "today": "created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY",
+        "week":  "created_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) AND created_at < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) + INTERVAL 7 DAY",
+        "month": "created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND created_at < DATE_FORMAT(CURDATE(),'%Y-%m-01') + INTERVAL 1 MONTH",
     }
     where_period = period_map.get(period, period_map["today"])
 
     try:
         cur = mysql.connection.cursor(DictCursor)
-        cur.execute(
-            f"""
+        cur.execute(f"""
             SELECT
                 COUNT(*)                        AS transaction_count,
                 COALESCE(SUM(total_amount), 0)  AS gross_revenue,
@@ -7986,13 +9776,11 @@ def api_sales_summary():
                 SUM(CASE WHEN payment_method != 'cash' THEN 1 ELSE 0 END)  AS digital_count
             FROM transactions
             WHERE {where_period} AND status = 'completed'
-        """
-        )
+        """)
         row = cur.fetchone()
 
         # Top product for the period
-        cur.execute(
-            f"""
+        cur.execute(f"""
             SELECT ti.product_name, SUM(ti.quantity) AS units
             FROM transaction_items ti
             JOIN transactions t ON t.transaction_id = ti.transaction_id
@@ -8000,8 +9788,7 @@ def api_sales_summary():
             GROUP BY ti.product_name
             ORDER BY units DESC
             LIMIT 1
-        """
-        )
+        """)
         top = cur.fetchone()
         cur.close()
 
@@ -8048,7 +9835,7 @@ def api_sales_top_products():
         params = []
         where = ["t.status = 'completed'"]
         if start and end:
-            where.append("DATE(t.created_at) BETWEEN %s AND %s")
+            where.append("t.created_at >= %s AND t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)")
             params += [start, end]
 
         cur.execute(
@@ -8142,9 +9929,14 @@ def api_sales_monthly_product_summary():
         if month_str:
             month_dt = datetime.strptime(month_str, "%Y-%m")
         else:
-            month_dt = datetime.now().replace(day=1)
+            month_dt = datetime.now(PHT).replace(day=1)
     except ValueError:
-        return jsonify({"success": False, "message": "Invalid month format — use YYYY-MM"}), 400
+        return (
+            jsonify(
+                {"success": False, "message": "Invalid month format — use YYYY-MM"}
+            ),
+            400,
+        )
 
     try:
         limit = min(int(request.args.get("limit", 100) or 100), 200)
@@ -8220,21 +10012,24 @@ def api_sales_monthly_product_summary():
         cur.close()
 
         if not current_rows:
-            return jsonify({
-                "success": True,
-                "month": month_str or month_dt.strftime("%Y-%m"),
-                "month_label": month_label,
-                "summary": {
-                    "total_units": 0, "total_revenue": 0,
-                    "total_products": 0,
-                    "best_seller_threshold": 0,
-                    "barely_sold_threshold": 0,
-                },
-                "products": [],
-            })
+            return jsonify(
+                {
+                    "success": True,
+                    "month": month_str or month_dt.strftime("%Y-%m"),
+                    "month_label": month_label,
+                    "summary": {
+                        "total_units": 0,
+                        "total_revenue": 0,
+                        "total_products": 0,
+                        "best_seller_threshold": 0,
+                        "barely_sold_threshold": 0,
+                    },
+                    "products": [],
+                }
+            )
 
         # ── Compute totals + thresholds ───────────────────────────────────────
-        total_units   = sum(int(r["units_sold"]) for r in current_rows)
+        total_units = sum(int(r["units_sold"]) for r in current_rows)
         total_revenue = sum(float(r["revenue"]) for r in current_rows)
         n = len(current_rows)
 
@@ -8249,8 +10044,8 @@ def api_sales_monthly_product_summary():
         products = []
         for rank, r in enumerate(current_rows, 1):
             units = int(r["units_sold"])
-            rev   = float(r["revenue"])
-            prev  = prev_units_map.get(r["name"])
+            rev = float(r["revenue"])
+            prev = prev_units_map.get(r["name"])
 
             units_change_pct = None
             if prev is not None and prev > 0:
@@ -8266,36 +10061,390 @@ def api_sales_monthly_product_summary():
             else:
                 tier = "mid"
 
-            products.append({
-                "rank":              rank,
-                "name":              r["name"],
-                "category":          r["category"] or "—",
-                "units_sold":        units,
-                "revenue":           rev,
-                "avg_price":         float(r["avg_price"] or 0),
-                "revenue_share":     round((rev / total_revenue * 100), 1) if total_revenue else 0,
-                "units_share":       round((units / total_units * 100), 1) if total_units else 0,
-                "tier":              tier,
-                "prev_units":        prev,
-                "units_change_pct":  units_change_pct,
-            })
+            products.append(
+                {
+                    "rank": rank,
+                    "name": r["name"],
+                    "category": r["category"] or "—",
+                    "units_sold": units,
+                    "revenue": rev,
+                    "avg_price": float(r["avg_price"] or 0),
+                    "revenue_share": (
+                        round((rev / total_revenue * 100), 1) if total_revenue else 0
+                    ),
+                    "units_share": (
+                        round((units / total_units * 100), 1) if total_units else 0
+                    ),
+                    "tier": tier,
+                    "prev_units": prev,
+                    "units_change_pct": units_change_pct,
+                }
+            )
 
-        return jsonify({
-            "success":     True,
-            "month":       month_dt.strftime("%Y-%m"),
-            "month_label": month_label,
-            "summary": {
-                "total_units":             total_units,
-                "total_revenue":           round(total_revenue, 2),
-                "total_products":          n,
-                "best_seller_threshold":   best_seller_threshold,
-                "barely_sold_threshold":   barely_sold_threshold,
-            },
-            "products": products,
-        })
+        return jsonify(
+            {
+                "success": True,
+                "month": month_dt.strftime("%Y-%m"),
+                "month_label": month_label,
+                "summary": {
+                    "total_units": total_units,
+                    "total_revenue": round(total_revenue, 2),
+                    "total_products": n,
+                    "best_seller_threshold": best_seller_threshold,
+                    "barely_sold_threshold": barely_sold_threshold,
+                },
+                "products": products,
+            }
+        )
 
     except Exception as exc:
         app.logger.error(f"[sales] monthly-product-summary: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── GET /api/sales/weekly-product-summary ─────────────────────────────────────
+# Per-product sales summary for a given ISO calendar week.
+# Query params:
+#   week  — YYYY-Www  e.g. "2026-W21"  (defaults to current ISO week)
+#   limit — max products (default 100, max 200)
+
+
+@app.route("/api/sales/weekly-product-summary", methods=["GET"])
+def api_sales_weekly_product_summary():
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    week_str = (request.args.get("week") or "").strip()
+    try:
+        limit = min(int(request.args.get("limit", 100) or 100), 200)
+    except (TypeError, ValueError):
+        limit = 100
+
+    try:
+        if week_str:
+            # Parse "YYYY-Www" → Monday of that ISO week
+            week_dt = datetime.strptime(week_str + "-1", "%G-W%V-%u")
+        else:
+            today = datetime.now(PHT).date()
+            iso = today.isocalendar()
+            week_dt = datetime.strptime(f"{iso[0]}-W{iso[1]:02d}-1", "%G-W%V-%u")
+    except ValueError:
+        return (
+            jsonify(
+                {"success": False, "message": "Invalid week format — use YYYY-Www"}
+            ),
+            400,
+        )
+
+    week_start = week_dt.strftime("%Y-%m-%d")
+    week_end_dt = week_dt + timedelta(days=7)
+    week_end = week_end_dt.strftime("%Y-%m-%d")
+
+    # Previous week
+    prev_start_dt = week_dt - timedelta(days=7)
+    prev_start = prev_start_dt.strftime("%Y-%m-%d")
+    prev_end = week_start
+
+    # Friendly label
+    iso_obj = week_dt.isocalendar()
+    week_label = f"Week {iso_obj[1]}, {iso_obj[0]}  ({week_dt.strftime('%b %d')}–{(week_end_dt - timedelta(days=1)).strftime('%b %d, %Y')})"
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        cur.execute(
+            """
+            SELECT
+                ti.product_name                 AS name,
+                COALESCE(ti.category_name, '—') AS category,
+                SUM(ti.quantity)                AS units_sold,
+                SUM(ti.line_total)              AS revenue,
+                ROUND(SUM(ti.line_total) / SUM(ti.quantity), 2) AS avg_price
+            FROM transaction_items ti
+            JOIN transactions t ON t.transaction_id = ti.transaction_id
+            WHERE t.status = 'completed'
+              AND t.created_at >= %s
+              AND t.created_at < %s
+            GROUP BY ti.product_name, ti.category_name
+            ORDER BY units_sold DESC
+            LIMIT %s
+            """,
+            (week_start, week_end, limit),
+        )
+        current_rows = cur.fetchall()
+
+        prev_units_map = {}
+        if current_rows:
+            product_names = [r["name"] for r in current_rows]
+            fmt = ",".join(["%s"] * len(product_names))
+            cur.execute(
+                f"""
+                SELECT ti.product_name AS name, SUM(ti.quantity) AS units_sold
+                FROM transaction_items ti
+                JOIN transactions t ON t.transaction_id = ti.transaction_id
+                WHERE t.status = 'completed'
+                  AND t.created_at >= %s
+                  AND t.created_at < %s
+                  AND ti.product_name IN ({fmt})
+                GROUP BY ti.product_name
+                """,
+                [prev_start, prev_end] + product_names,
+            )
+            for r in cur.fetchall():
+                prev_units_map[r["name"]] = int(r["units_sold"])
+
+        cur.close()
+
+        if not current_rows:
+            return jsonify(
+                {
+                    "success": True,
+                    "week": week_str,
+                    "week_label": week_label,
+                    "summary": {
+                        "total_units": 0,
+                        "total_revenue": 0,
+                        "total_products": 0,
+                        "best_seller_threshold": 0,
+                        "barely_sold_threshold": 0,
+                    },
+                    "products": [],
+                }
+            )
+
+        total_units = sum(int(r["units_sold"]) for r in current_rows)
+        total_revenue = sum(float(r["revenue"]) for r in current_rows)
+        n = len(current_rows)
+        sorted_units = sorted([int(r["units_sold"]) for r in current_rows])
+        p80_idx = max(0, int(n * 0.80) - 1)
+        p20_idx = max(0, int(n * 0.20) - 1)
+        best_seller_threshold = sorted_units[p80_idx] if sorted_units else 0
+        barely_sold_threshold = sorted_units[p20_idx] if sorted_units else 0
+
+        products = []
+        for rank, r in enumerate(current_rows, 1):
+            units = int(r["units_sold"])
+            rev = float(r["revenue"])
+            prev = prev_units_map.get(r["name"])
+            units_change_pct = None
+            if prev is not None and prev > 0:
+                units_change_pct = round(((units - prev) / prev) * 100, 1)
+            tier = (
+                "best_seller"
+                if units >= best_seller_threshold and n >= 3
+                else (
+                    "barely_sold"
+                    if units <= barely_sold_threshold and n >= 3
+                    else "mid"
+                )
+            )
+            products.append(
+                {
+                    "rank": rank,
+                    "name": r["name"],
+                    "category": r["category"] or "—",
+                    "units_sold": units,
+                    "revenue": rev,
+                    "avg_price": float(r["avg_price"] or 0),
+                    "revenue_share": (
+                        round((rev / total_revenue * 100), 1) if total_revenue else 0
+                    ),
+                    "units_share": (
+                        round((units / total_units * 100), 1) if total_units else 0
+                    ),
+                    "tier": tier,
+                    "prev_units": prev,
+                    "units_change_pct": units_change_pct,
+                }
+            )
+
+        return jsonify(
+            {
+                "success": True,
+                "week": week_str,
+                "week_label": week_label,
+                "summary": {
+                    "total_units": total_units,
+                    "total_revenue": round(total_revenue, 2),
+                    "total_products": n,
+                    "best_seller_threshold": best_seller_threshold,
+                    "barely_sold_threshold": barely_sold_threshold,
+                },
+                "products": products,
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[sales] weekly-product-summary: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── GET /api/sales/yearly-product-summary ─────────────────────────────────────
+# Per-product sales summary for a full calendar year.
+# Query params:
+#   year  — YYYY  (defaults to current year)
+#   limit — max products (default 100, max 200)
+
+
+@app.route("/api/sales/yearly-product-summary", methods=["GET"])
+def api_sales_yearly_product_summary():
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    year_str = (request.args.get("year") or "").strip()
+    try:
+        limit = min(int(request.args.get("limit", 100) or 100), 200)
+    except (TypeError, ValueError):
+        limit = 100
+
+    try:
+        year = int(year_str) if year_str else datetime.now(PHT).year
+        if not (2000 <= year <= 2099):
+            raise ValueError
+    except ValueError:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Invalid year — use YYYY between 2000 and 2099",
+                }
+            ),
+            400,
+        )
+
+    year_start = f"{year:04d}-01-01"
+    year_end = f"{year + 1:04d}-01-01"
+    prev_start = f"{year - 1:04d}-01-01"
+    prev_end = year_start
+    year_label = str(year)
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        cur.execute(
+            """
+            SELECT
+                ti.product_name                 AS name,
+                COALESCE(ti.category_name, '—') AS category,
+                SUM(ti.quantity)                AS units_sold,
+                SUM(ti.line_total)              AS revenue,
+                ROUND(SUM(ti.line_total) / SUM(ti.quantity), 2) AS avg_price
+            FROM transaction_items ti
+            JOIN transactions t ON t.transaction_id = ti.transaction_id
+            WHERE t.status = 'completed'
+              AND t.created_at >= %s
+              AND t.created_at < %s
+            GROUP BY ti.product_name, ti.category_name
+            ORDER BY units_sold DESC
+            LIMIT %s
+            """,
+            (year_start, year_end, limit),
+        )
+        current_rows = cur.fetchall()
+
+        prev_units_map = {}
+        if current_rows:
+            product_names = [r["name"] for r in current_rows]
+            fmt = ",".join(["%s"] * len(product_names))
+            cur.execute(
+                f"""
+                SELECT ti.product_name AS name, SUM(ti.quantity) AS units_sold
+                FROM transaction_items ti
+                JOIN transactions t ON t.transaction_id = ti.transaction_id
+                WHERE t.status = 'completed'
+                  AND t.created_at >= %s
+                  AND t.created_at < %s
+                  AND ti.product_name IN ({fmt})
+                GROUP BY ti.product_name
+                """,
+                [prev_start, prev_end] + product_names,
+            )
+            for r in cur.fetchall():
+                prev_units_map[r["name"]] = int(r["units_sold"])
+
+        cur.close()
+
+        if not current_rows:
+            return jsonify(
+                {
+                    "success": True,
+                    "year": year_label,
+                    "year_label": year_label,
+                    "summary": {
+                        "total_units": 0,
+                        "total_revenue": 0,
+                        "total_products": 0,
+                        "best_seller_threshold": 0,
+                        "barely_sold_threshold": 0,
+                    },
+                    "products": [],
+                }
+            )
+
+        total_units = sum(int(r["units_sold"]) for r in current_rows)
+        total_revenue = sum(float(r["revenue"]) for r in current_rows)
+        n = len(current_rows)
+        sorted_units = sorted([int(r["units_sold"]) for r in current_rows])
+        p80_idx = max(0, int(n * 0.80) - 1)
+        p20_idx = max(0, int(n * 0.20) - 1)
+        best_seller_threshold = sorted_units[p80_idx] if sorted_units else 0
+        barely_sold_threshold = sorted_units[p20_idx] if sorted_units else 0
+
+        products = []
+        for rank, r in enumerate(current_rows, 1):
+            units = int(r["units_sold"])
+            rev = float(r["revenue"])
+            prev = prev_units_map.get(r["name"])
+            units_change_pct = None
+            if prev is not None and prev > 0:
+                units_change_pct = round(((units - prev) / prev) * 100, 1)
+            tier = (
+                "best_seller"
+                if units >= best_seller_threshold and n >= 3
+                else (
+                    "barely_sold"
+                    if units <= barely_sold_threshold and n >= 3
+                    else "mid"
+                )
+            )
+            products.append(
+                {
+                    "rank": rank,
+                    "name": r["name"],
+                    "category": r["category"] or "—",
+                    "units_sold": units,
+                    "revenue": rev,
+                    "avg_price": float(r["avg_price"] or 0),
+                    "revenue_share": (
+                        round((rev / total_revenue * 100), 1) if total_revenue else 0
+                    ),
+                    "units_share": (
+                        round((units / total_units * 100), 1) if total_units else 0
+                    ),
+                    "tier": tier,
+                    "prev_units": prev,
+                    "units_change_pct": units_change_pct,
+                }
+            )
+
+        return jsonify(
+            {
+                "success": True,
+                "year": year_label,
+                "year_label": year_label,
+                "summary": {
+                    "total_units": total_units,
+                    "total_revenue": round(total_revenue, 2),
+                    "total_products": n,
+                    "best_seller_threshold": best_seller_threshold,
+                    "barely_sold_threshold": barely_sold_threshold,
+                },
+                "products": products,
+            }
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[sales] yearly-product-summary: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
@@ -8316,25 +10465,22 @@ def api_dashboard_stats():
         cur = mysql.connection.cursor(DictCursor)
 
         # Today sales
-        cur.execute(
-            """
+        cur.execute("""
             SELECT
                 COALESCE(SUM(total_amount), 0) AS today_total,
                 COUNT(*)                        AS today_count
             FROM transactions
-            WHERE DATE(created_at) = CURDATE() AND status = 'completed'
-        """
-        )
+            WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY
+              AND status = 'completed'
+        """)
         sales_row = cur.fetchone()
 
         # Low-stock count
-        cur.execute(
-            """
+        cur.execute("""
             SELECT COUNT(*) AS cnt
             FROM products
             WHERE is_active = 1 AND stock <= reorder_point
-        """
-        )
+        """)
         ls_row = cur.fetchone()
 
         cur.close()
@@ -8357,61 +10503,246 @@ def api_dashboard_stats():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
-
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║               POST /api/admin/change_password  — admin password change       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
 @app.route("/api/admin/change_password", methods=["POST"])
+@csrf.exempt
 def api_admin_change_password():
     """
     Allow the logged-in admin to change their own password.
     Requires JSON body: { current_password, new_password, confirm_password }
     """
-    if not is_admin():
-        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
 
     data = request.get_json(silent=True) or {}
     current_pw = (data.get("current_password") or "").strip()
-    new_pw     = (data.get("new_password")      or "").strip()
-    confirm_pw = (data.get("confirm_password")  or "").strip()
+    new_pw = (data.get("new_password") or "").strip()
+    confirm_pw = (data.get("confirm_password") or "").strip()
 
     if not current_pw or not new_pw or not confirm_pw:
         return jsonify({"success": False, "message": "All fields are required."}), 400
     if new_pw != confirm_pw:
-        return jsonify({"success": False, "message": "New passwords do not match."}), 400
+        return (
+            jsonify({"success": False, "message": "New passwords do not match."}),
+            400,
+        )
     if len(new_pw) < 8:
-        return jsonify({"success": False, "message": "New password must be at least 8 characters."}), 400
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "New password must be at least 8 characters.",
+                }
+            ),
+            400,
+        )
 
-    admin_id = session.get("admin_id") or session.get("user_id")
+    # Determine which table/ID to use based on role
+    role = session.get("role")
+    admin_id = session.get("admin_id")
+    employee_id = session.get("employee_id")
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        if role == "admin" and admin_id:
+            # Classic admin account stored in the admins table
+            cur.execute(
+                "SELECT admin_id, password, password_hash FROM admins WHERE admin_id = %s",
+                (admin_id,),
+            )
+            admin = cur.fetchone()
+            if not admin:
+                cur.close()
+                return (
+                    jsonify({"success": False, "message": "Admin account not found."}),
+                    404,
+                )
+
+            if not _check_login_password(current_pw, admin):
+                cur.close()
+                return (
+                    jsonify(
+                        {"success": False, "message": "Current password is incorrect."}
+                    ),
+                    403,
+                )
+
+            new_hash = hash_password(new_pw)
+            cur.execute(
+                "UPDATE admins SET password_hash = %s WHERE admin_id = %s",
+                (new_hash, admin_id),
+            )
+        elif role == "manager" and employee_id and session.get("is_admin"):
+            # Manager promoted to admin — stored in the employees table
+            cur.execute(
+                "SELECT employee_id, password, password_hash FROM employees WHERE employee_id = %s",
+                (employee_id,),
+            )
+            admin = cur.fetchone()
+            if not admin:
+                cur.close()
+                return (
+                    jsonify(
+                        {"success": False, "message": "Employee account not found."}
+                    ),
+                    404,
+                )
+
+            if not _check_login_password(current_pw, admin):
+                cur.close()
+                return (
+                    jsonify(
+                        {"success": False, "message": "Current password is incorrect."}
+                    ),
+                    403,
+                )
+
+            new_hash = hash_password(new_pw)
+            cur.execute(
+                "UPDATE employees SET password_hash = %s WHERE employee_id = %s",
+                (new_hash, employee_id),
+            )
+        else:
+            return (
+                jsonify(
+                    {"success": False, "message": "Cannot determine account to update."}
+                ),
+                400,
+            )
+
+        mysql.connection.commit()
+        cur.close()
+        app.logger.info(
+            f"[admin] Password changed for {role} (admin_id={admin_id}, employee_id={employee_id})"
+        )
+        return jsonify({"success": True, "message": "Password updated successfully."})
+
+    except Exception as exc:
+        app.logger.error(f"[admin] change_password error: {exc}")
+        return (
+            jsonify({"success": False, "message": "Server error — please try again."}),
+            500,
+        )
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║               POST /api/admin/update_email  — admin email update             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+@app.route("/api/admin/update_email", methods=["POST"])
+@csrf.exempt
+def api_admin_update_email():
+    """
+    Allow the logged-in admin to update their email address.
+    Requires JSON body: { current_password, new_email }
+    Only Gmail addresses are accepted.
+    """
+    import re
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data        = request.get_json(silent=True) or {}
+    current_pw  = (data.get("current_password") or "").strip()
+    new_email   = (data.get("new_email") or "").strip()
+
+    if not current_pw or not new_email:
+        return jsonify({"success": False, "message": "All fields are required."}), 400
+
+    if not re.match(r"^[^@\s]+@gmail\.com$", new_email, re.IGNORECASE):
+        return jsonify({"success": False, "message": "Only Gmail addresses are accepted."}), 400
+
+    role       = session.get("role")
+    admin_id   = session.get("admin_id")
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        if role == "admin" and admin_id:
+            cur.execute(
+                "SELECT admin_id, password, password_hash FROM admins WHERE admin_id=%s",
+                (admin_id,),
+            )
+            admin = cur.fetchone()
+            if not admin:
+                cur.close()
+                return jsonify({"success": False, "message": "Admin account not found."}), 404
+            if not _check_login_password(current_pw, admin):
+                cur.close()
+                return jsonify({"success": False, "message": "Current password is incorrect."}), 403
+            cur.execute(
+                "UPDATE admins SET email=%s WHERE admin_id=%s",
+                (aes_encrypt(new_email), admin_id),
+            )
+        else:
+            cur.close()
+            return jsonify({"success": False, "message": "Cannot determine account to update."}), 400
+
+        mysql.connection.commit()
+        cur.close()
+        app.logger.info(f"[admin] Email updated for admin_id={admin_id}")
+        return jsonify({"success": True, "message": "Email updated successfully.", "new_email": new_email})
+
+    except Exception as exc:
+        app.logger.error(f"[admin] update_email error: {exc}")
+        return jsonify({"success": False, "message": "Server error — please try again."}), 500
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║               POST /api/danger/delete_account  — delete admin account        ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+@app.route("/api/danger/delete_account", methods=["POST"])
+@csrf.exempt
+def api_danger_delete_account():
+    """
+    Permanently delete the currently logged-in admin account.
+    Requires the admin to type their password as final confirmation.
+    Only the admin role can delete their own account.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data       = request.get_json(silent=True) or {}
+    current_pw = (data.get("current_password") or "").strip()
+
+    if not current_pw:
+        return jsonify({"success": False, "message": "Password is required to delete your account."}), 400
+
+    role     = session.get("role")
+    admin_id = session.get("admin_id")
+
+    if role != "admin" or not admin_id:
+        return jsonify({"success": False, "message": "Only admin accounts can be deleted here."}), 403
+
     try:
         cur = mysql.connection.cursor(DictCursor)
         cur.execute(
-            "SELECT admin_id, password, password_hash FROM admins WHERE admin_id = %s",
+            "SELECT admin_id, password, password_hash FROM admins WHERE admin_id=%s",
             (admin_id,),
         )
         admin = cur.fetchone()
         if not admin:
             cur.close()
-            return jsonify({"success": False, "message": "Admin account not found."}), 404
-
+            return jsonify({"success": False, "message": "Account not found."}), 404
         if not _check_login_password(current_pw, admin):
             cur.close()
-            return jsonify({"success": False, "message": "Current password is incorrect."}), 403
+            return jsonify({"success": False, "message": "Incorrect password."}), 403
 
-        new_hash = hash_password(new_pw)
-        cur.execute(
-            "UPDATE admins SET password_hash = %s WHERE admin_id = %s",
-            (new_hash, admin_id),
-        )
+        cur.execute("DELETE FROM admins WHERE admin_id=%s", (admin_id,))
         mysql.connection.commit()
         cur.close()
-        app.logger.info(f"[admin] Password changed for admin #{admin_id}")
-        return jsonify({"success": True, "message": "Password updated successfully."})
+        app.logger.warning(f"[danger] Admin account deleted: admin_id={admin_id}")
+        session.clear()
+        return jsonify({"success": True, "message": "Account deleted. You have been logged out."})
 
     except Exception as exc:
-        app.logger.error(f"[admin] change_password error: {exc}")
+        app.logger.error(f"[danger] delete_account error: {exc}")
         return jsonify({"success": False, "message": "Server error — please try again."}), 500
 
 
@@ -8431,21 +10762,21 @@ def api_sales_export():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     start_date = request.args.get("start")
-    end_date   = request.args.get("end")
+    end_date = request.args.get("end")
 
     try:
         cur = mysql.connection.cursor(DictCursor)
         params = []
-        where  = ["t.status = 'completed'"]
+        where = ["t.status = 'completed'"]
 
         if start_date and end_date:
-            where.append("DATE(t.created_at) BETWEEN %s AND %s")
+            where.append("t.created_at >= %s AND t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)")
             params += [start_date, end_date]
         elif start_date:
-            where.append("DATE(t.created_at) >= %s")
+            where.append("t.created_at >= %s")
             params.append(start_date)
         elif end_date:
-            where.append("DATE(t.created_at) <= %s")
+            where.append("t.created_at < DATE_ADD(%s, INTERVAL 1 DAY)")
             params.append(end_date)
 
         cur.execute(
@@ -8475,31 +10806,44 @@ def api_sales_export():
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow([
-            "Transaction ID", "Date/Time", "Cashier", "Payment Method",
-            "Discount Type", "Subtotal", "Discount Amount",
-            "Net Sales (ex-VAT)", "VAT (12%)", "Total Amount",
-            "Amount Tendered", "Change", "Note",
-        ])
+        writer.writerow(
+            [
+                "Transaction ID",
+                "Date/Time",
+                "Cashier",
+                "Payment Method",
+                "Discount Type",
+                "Subtotal",
+                "Discount Amount",
+                "Net Sales (ex-VAT)",
+                "VAT (12%)",
+                "Total Amount",
+                "Amount Tendered",
+                "Change",
+                "Note",
+            ]
+        )
         for r in rows:
-            writer.writerow([
-                r["transaction_id"],
-                str(r["created_at"]),
-                r["cashier_name"],
-                r["payment_method"],
-                r["discount_type"],
-                f"{float(r['subtotal']):.2f}",
-                f"{float(r['discount_amount']):.2f}",
-                f"{float(r['net_sales']):.2f}",
-                f"{float(r['vat_amount']):.2f}",
-                f"{float(r['total_amount']):.2f}",
-                f"{float(r['amount_tendered']):.2f}",
-                f"{float(r['change_amount']):.2f}",
-                r["note"] or "",
-            ])
+            writer.writerow(
+                [
+                    r["transaction_id"],
+                    str(r["created_at"]),
+                    r["cashier_name"],
+                    r["payment_method"],
+                    r["discount_type"],
+                    f"{float(r['subtotal']):.2f}",
+                    f"{float(r['discount_amount']):.2f}",
+                    f"{float(r['net_sales']):.2f}",
+                    f"{float(r['vat_amount']):.2f}",
+                    f"{float(r['total_amount']):.2f}",
+                    f"{float(r['amount_tendered']):.2f}",
+                    f"{float(r['change_amount']):.2f}",
+                    r["note"] or "",
+                ]
+            )
 
         s = start_date.replace("-", "") if start_date else "all"
-        e = end_date.replace("-", "")   if end_date   else "all"
+        e = end_date.replace("-", "") if end_date else "all"
         filename = f"transactions_{s}_{e}.csv"
 
         return Response(
@@ -8517,6 +10861,7 @@ def api_sales_export():
 # ║          GET /api/attendance/export  — download attendance as CSV           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
+
 @app.route("/api/attendance/export", methods=["GET"])
 def api_attendance_export():
     """
@@ -8528,12 +10873,12 @@ def api_attendance_export():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     start_date = request.args.get("start")
-    end_date   = request.args.get("end")
+    end_date = request.args.get("end")
 
     try:
         cur = mysql.connection.cursor(DictCursor)
         params = []
-        where  = []
+        where = []
 
         if start_date and end_date:
             where.append("DATE(a.clock_in) BETWEEN %s AND %s")
@@ -8556,8 +10901,8 @@ def api_attendance_export():
                 e.full_name,
                 e.role,
                 a.shift_type,
-                DATE_FORMAT(a.clock_in,  '%H:%i:%s') AS clock_in,
-                DATE_FORMAT(a.clock_out, '%H:%i:%s') AS clock_out,
+                DATE_FORMAT(a.clock_in,  '%h:%i:%s %p') AS clock_in,
+                DATE_FORMAT(a.clock_out, '%h:%i:%s %p') AS clock_out,
                 CASE
                     WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL
                     THEN ROUND(TIMESTAMPDIFF(MINUTE, a.clock_in, a.clock_out) / 60, 2)
@@ -8587,28 +10932,48 @@ def api_attendance_export():
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow([
-            "Attendance ID", "Date", "Employee ID", "Employee Name",
-            "Role", "Shift Type", "Clock In", "Clock Out",
-            "Hours Worked", "Hourly Rate", "Daily Pay",
-        ])
+        writer.writerow(
+            [
+                "Attendance ID",
+                "Date",
+                "Employee ID",
+                "Employee Name",
+                "Role",
+                "Shift Type",
+                "Clock In",
+                "Clock Out",
+                "Hours Worked",
+                "Hourly Rate",
+                "Daily Pay",
+            ]
+        )
         for r in rows:
-            writer.writerow([
-                r["attendance_id"],
-                str(r["attendance_date"]),
-                r["employee_id"],
-                r["full_name"],
-                r["role"],
-                r["shift_type"] or "",
-                r["clock_in"] or "",
-                r["clock_out"] or "",
-                f"{float(r['hours_worked']):.2f}" if r["hours_worked"] is not None else "",
-                f"{float(r['hourly_rate']):.2f}",
-                f"{float(r['daily_pay']):.2f}" if r["daily_pay"] is not None else "",
-            ])
+            writer.writerow(
+                [
+                    r["attendance_id"],
+                    str(r["attendance_date"]),
+                    r["employee_id"],
+                    r["full_name"],
+                    r["role"],
+                    r["shift_type"] or "",
+                    r["clock_in"] or "",
+                    r["clock_out"] or "",
+                    (
+                        f"{float(r['hours_worked']):.2f}"
+                        if r["hours_worked"] is not None
+                        else ""
+                    ),
+                    f"{float(r['hourly_rate']):.2f}",
+                    (
+                        f"{float(r['daily_pay']):.2f}"
+                        if r["daily_pay"] is not None
+                        else ""
+                    ),
+                ]
+            )
 
         s = start_date.replace("-", "") if start_date else "all"
-        e = end_date.replace("-", "")   if end_date   else "all"
+        e = end_date.replace("-", "") if end_date else "all"
         filename = f"attendance_{s}_{e}.csv"
 
         return Response(
@@ -8626,6 +10991,7 @@ def api_attendance_export():
 # ║          GET /api/payroll/export  — download payroll periods as CSV         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
+
 @app.route("/api/payroll/export", methods=["GET"])
 def api_payroll_export():
     """
@@ -8637,12 +11003,12 @@ def api_payroll_export():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     start_date = request.args.get("start")
-    end_date   = request.args.get("end")
+    end_date = request.args.get("end")
 
     try:
         cur = mysql.connection.cursor(DictCursor)
         params = []
-        where  = []
+        where = []
 
         if start_date and end_date:
             where.append("pp.period_start >= %s AND pp.period_end <= %s")
@@ -8688,29 +11054,42 @@ def api_payroll_export():
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow([
-            "Payroll ID", "Period Start", "Period End",
-            "Employee ID", "Employee Name", "Role",
-            "Hourly Rate", "Days Worked", "Total Hours", "Total Pay", "Status", "Generated At",
-        ])
+        writer.writerow(
+            [
+                "Payroll ID",
+                "Period Start",
+                "Period End",
+                "Employee ID",
+                "Employee Name",
+                "Role",
+                "Hourly Rate",
+                "Days Worked",
+                "Total Hours",
+                "Total Pay",
+                "Status",
+                "Generated At",
+            ]
+        )
         for r in rows:
-            writer.writerow([
-                r["payroll_id"],
-                str(r["period_start"]),
-                str(r["period_end"]),
-                r["employee_id"],
-                r["full_name"],
-                r["role"],
-                f"{float(r['hourly_rate']):.2f}",
-                r["days_worked"],
-                f"{float(r['total_hours']):.2f}",
-                f"{float(r['total_pay']):.2f}",
-                r["status"],
-                str(r["generated_at"]),
-            ])
+            writer.writerow(
+                [
+                    r["payroll_id"],
+                    str(r["period_start"]),
+                    str(r["period_end"]),
+                    r["employee_id"],
+                    r["full_name"],
+                    r["role"],
+                    f"{float(r['hourly_rate']):.2f}",
+                    r["days_worked"],
+                    f"{float(r['total_hours']):.2f}",
+                    f"{float(r['total_pay']):.2f}",
+                    r["status"],
+                    str(r["generated_at"]),
+                ]
+            )
 
         s = start_date.replace("-", "") if start_date else "all"
-        e = end_date.replace("-", "")   if end_date   else "all"
+        e = end_date.replace("-", "") if end_date else "all"
         filename = f"payroll_{s}_{e}.csv"
 
         return Response(
@@ -8728,6 +11107,7 @@ def api_payroll_export():
 # ║                       AUTO CLOCK-OUT SYSTEM                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
+
 def _auto_clockout_missed(target_date=None):
     """
     Close any attendance rows from target_date (default: yesterday) that still
@@ -8739,10 +11119,9 @@ def _auto_clockout_missed(target_date=None):
     by _midnight_clockout_thread.
     """
     import calendar as _cal
-    from datetime import timedelta
 
     if target_date is None:
-        target_date = (datetime.now() - timedelta(days=1)).date()
+        target_date = (datetime.now(PHT) - timedelta(days=1)).date()
 
     midnight_cutoff = datetime.combine(target_date, datetime.min.time()).replace(
         hour=23, minute=59, second=59
@@ -8773,16 +11152,16 @@ def _auto_clockout_missed(target_date=None):
 
         count = 0
         for row in rows:
-            att_id   = row["attendance_id"]
+            att_id = row["attendance_id"]
             clock_in = row["clock_in"]
-            rate     = float(row["hourly_rate"])
+            rate = float(row["hourly_rate"])
 
             # Cap hours at 23:59:59 so we never credit more than a full day
             clock_out = midnight_cutoff
 
             delta_min = (clock_out - clock_in).total_seconds() / 60.0
-            hours     = round(delta_min / 60.0, 4)
-            earnings  = round(hours * rate, 2)
+            hours = round(delta_min / 60.0, 4)
+            earnings = round(hours * rate, 2)
 
             d = target_date
             if d.day <= 15:
@@ -8812,7 +11191,9 @@ def _auto_clockout_missed(target_date=None):
 
         conn.commit()
         cur.close()
-        app.logger.info(f"[auto-clockout] Closed {count} missed record(s) for {target_date}.")
+        app.logger.info(
+            f"[auto-clockout] Closed {count} missed record(s) for {target_date}."
+        )
         return count
 
     except Exception as exc:
@@ -8827,34 +11208,124 @@ def _midnight_clockout_thread():
     Runs inside the Flask app context so it can access mysql.connection.
     """
     import time as _time
-    from datetime import timedelta
 
     with app.app_context():
         while True:
-            now  = datetime.now()
-            # Next midnight = start of tomorrow
-            next_midnight = datetime.combine(
-                now.date() + timedelta(days=1), datetime.min.time()
-            ) + timedelta(seconds=30)   # +30 s buffer so DB writes from 23:59 flush
+            now = datetime.now(PHT)
+            # Next midnight = start of tomorrow (timezone-aware, matching `now`)
+            next_midnight = PHT.localize(
+                datetime.combine(
+                    now.date() + timedelta(days=1), datetime.min.time()
+                )
+            ) + timedelta(
+                seconds=30
+            )  # +30 s buffer so DB writes from 23:59 flush
             sleep_sec = (next_midnight - now).total_seconds()
             app.logger.info(
                 f"[auto-clockout] Thread sleeping {sleep_sec/3600:.2f}h until {next_midnight}"
             )
             _time.sleep(max(sleep_sec, 1))
-            yesterday = (datetime.now() - timedelta(days=1)).date()
+            yesterday = (datetime.now(PHT) - timedelta(days=1)).date()
             _auto_clockout_missed(yesterday)
 
 
 # Start the midnight thread once (guard against double-start in debug reloader)
 if not getattr(app, "_midnight_thread_started", False):
-    _t = _threading.Thread(target=_midnight_clockout_thread, daemon=True, name="midnight-clockout")
+    _t = _threading.Thread(
+        target=_midnight_clockout_thread, daemon=True, name="midnight-clockout"
+    )
     _t.start()
     app._midnight_thread_started = True
 
 
+# ── Daily Sales Summary thread (fires every night at user-configured time) ────
+
+
+def _get_daily_summary_send_time():
+    """
+    Read daily_summary_time ('HH:MM') from the DB.
+    Falls back to '22:30' if the row is missing or the value is malformed.
+    """
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT daily_summary_time FROM email_alert_settings ORDER BY id LIMIT 1"
+        )
+        row = cur.fetchone()
+        cur.close()
+        if row and row.get("daily_summary_time"):
+            parts = row["daily_summary_time"].split(":")
+            h, m = int(parts[0]), int(parts[1])
+            if 0 <= h <= 23 and 0 <= m <= 59:
+                return h, m
+    except Exception as exc:
+        app.logger.warning(f"[daily_summary] Could not read send time from DB: {exc}")
+    return 22, 30  # safe default
+
+
+def _daily_summary_thread():
+    """
+    Background daemon thread.  Each cycle it reads the scheduled send time from
+    the DB, sleeps until that time, sends the Daily Sales Summary email, then
+    loops. This means changes saved in Settings take effect on the very next
+    night without restarting the server.
+    Runs inside the Flask app context so it can access mysql.connection.
+    """
+    import time as _time
+
+    with app.app_context():
+        while True:
+            send_hour, send_minute = _get_daily_summary_send_time()
+            now = datetime.now(PHT)
+            target = now.replace(
+                hour=send_hour, minute=send_minute, second=0, microsecond=0
+            )
+            missed_by = (now - target).total_seconds()
+            if 0 <= missed_by <= 3600:
+                # Missed the window by up to 1 hour (e.g. server just started,
+                # or schedule was saved after the target time) — send right away.
+                app.logger.info(
+                    f"[daily_summary] Missed window by {missed_by/60:.1f} min; "
+                    "sending now to catch up."
+                )
+                today = datetime.now(PHT).date()
+                try:
+                    _send_daily_sales_summary_email(target_date=today)
+                except Exception as _exc:
+                    app.logger.error(f"[daily_summary] Catch-up send error: {_exc}")
+                # After catch-up, sleep until tomorrow's window
+                target += timedelta(days=1)
+            elif now >= target:
+                # Missed by more than 1 hour — don't send a stale summary,
+                # just wait for tomorrow's window.
+                target += timedelta(days=1)
+
+            sleep_sec = (target - now).total_seconds()
+            app.logger.info(
+                f"[daily_summary] Next send at {target.strftime('%H:%M')} "
+                f"({sleep_sec/3600:.2f}h away)"
+            )
+            _time.sleep(max(sleep_sec, 1))
+            today = datetime.now(PHT).date()
+            try:
+                _send_daily_sales_summary_email(target_date=today)
+            except Exception as _exc:
+                app.logger.error(f"[daily_summary] Nightly send error: {_exc}")
+
+
+if not getattr(app, "_daily_summary_thread_started", False):
+    _dst = _threading.Thread(
+        target=_daily_summary_thread, daemon=True, name="daily-summary"
+    )
+    _dst.start()
+    app._daily_summary_thread_started = True
+
+
 # ── Admin manual clock-out override ──────────────────────────────────────────
 
+
 @app.route("/api/attendance/manual_clockout", methods=["POST"])
+@csrf.exempt
 def api_attendance_manual_clockout():
     """
     Admin/manager override: manually set clock_out for an attendance record.
@@ -8867,18 +11338,27 @@ def api_attendance_manual_clockout():
 
     Recalculates hours_worked, daily_earnings and pay columns after override.
     """
-    if session.get("role") not in ("admin", "manager"):
+    if session.get("role") not in ["admin", "manager"]:
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
-    data       = request.get_json(silent=True) or {}
-    att_id     = data.get("attendance_id")
-    time_str   = (data.get("clock_out") or "").strip()
+    data = request.get_json(silent=True) or {}
+    att_id = data.get("attendance_id")
+    time_str = (data.get("clock_out") or "").strip()
 
     if not att_id or not time_str:
-        return jsonify({"success": False, "message": "attendance_id and clock_out are required"}), 400
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "attendance_id and clock_out are required",
+                }
+            ),
+            400,
+        )
 
     try:
         import calendar as _cal
+
         cur = mysql.connection.cursor(DictCursor)
 
         cur.execute(
@@ -8896,29 +11376,42 @@ def api_attendance_manual_clockout():
         row = cur.fetchone()
         if not row:
             cur.close()
-            return jsonify({"success": False, "message": "Attendance record not found"}), 404
+            return (
+                jsonify({"success": False, "message": "Attendance record not found"}),
+                404,
+            )
 
         # Parse the HH:MM input and anchor it to the record's own date
         try:
             t = datetime.strptime(time_str, "%H:%M").time()
         except ValueError:
             cur.close()
-            return jsonify({"success": False, "message": "Invalid time format — use HH:MM"}), 400
+            return (
+                jsonify(
+                    {"success": False, "message": "Invalid time format — use HH:MM"}
+                ),
+                400,
+            )
 
         clock_out_dt = datetime.combine(row["attendance_date"], t)
-        clock_in_dt  = row["clock_in"]
+        clock_in_dt = row["clock_in"]
 
         if clock_out_dt <= clock_in_dt:
             cur.close()
-            return jsonify({
-                "success": False,
-                "message": f"Clock-out ({time_str}) must be after clock-in ({clock_in_dt.strftime('%H:%M')})"
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"Clock-out ({time_str}) must be after clock-in ({clock_in_dt.strftime('%H:%M')})",
+                    }
+                ),
+                400,
+            )
 
-        rate      = float(row["hourly_rate"])
+        rate = float(row["hourly_rate"])
         delta_min = (clock_out_dt - clock_in_dt).total_seconds() / 60.0
-        hours     = round(delta_min / 60.0, 4)
-        earnings  = round(hours * rate, 2)
+        hours = round(delta_min / 60.0, 4)
+        earnings = round(hours * rate, 2)
 
         d = row["attendance_date"]
         if d.day <= 15:
@@ -8949,17 +11442,1453 @@ def api_attendance_manual_clockout():
             f"'{actor}' → clock_out={clock_out_dt} {hours:.2f}h P{earnings:.2f}"
         )
 
-        return jsonify({
-            "success":      True,
-            "message":      f"Clock-out set to {clock_out_dt.strftime('%H:%M')} — {hours:.2f}h recorded",
-            "hours_worked": hours,
-            "daily_pay":    earnings,
-            "clock_out":    clock_out_dt.strftime("%H:%M:%S"),
-        })
+        return jsonify(
+            {
+                "success": True,
+                "message": f"Clock-out set to {clock_out_dt.strftime('%H:%M')} — {hours:.2f}h recorded",
+                "hours_worked": hours,
+                "daily_pay": earnings,
+                "clock_out": clock_out_dt.strftime("%H:%M:%S"),
+            }
+        )
 
     except Exception as exc:
         app.logger.error(f"[manual-clockout] Error: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                  LATE DEDUCTION SYSTEM                                      ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+def _ensure_late_deduction_schema():
+    """
+    Idempotent DDL bootstrap for the late-deduction feature.
+
+    1. Adds three columns to `attendance`:
+         late_minutes      INT DEFAULT 0       — minutes past shift start at clock-in
+         late_deduction    DECIMAL(10,2) DEFAULT 0.00 — peso amount deducted
+         deduction_waived  TINYINT(1) DEFAULT 0       — 1 when OT approval waives it
+
+    2. Creates `app_settings` key-value table (if absent) and seeds the default
+       late-deduction configuration keys:
+         late_grace_minutes        — grace period before penalty applies (default 10)
+         late_per_minute_rate      — fixed ₱/min rate set by admin (default 0.75)
+                                     formula: late_deduction = per_minute_rate × late_minutes
+    """
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+
+        # ── attendance columns ─────────────────────────────────────────────────
+        for col, defn in [
+            ("late_minutes", "INT           NOT NULL DEFAULT 0"),
+            ("late_deduction", "DECIMAL(10,2) NOT NULL DEFAULT 0.00"),
+            ("deduction_waived", "TINYINT(1)    NOT NULL DEFAULT 0"),
+        ]:
+            try:
+                cur.execute(f"ALTER TABLE `attendance` ADD COLUMN `{col}` {defn}")
+                conn.commit()
+                app.logger.info(f"[late_deduction] Added attendance.{col}")
+            except Exception:
+                pass  # column already exists
+
+        # ── app_settings table ─────────────────────────────────────────────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `app_settings` (
+                `setting_key`   VARCHAR(100) NOT NULL PRIMARY KEY,
+                `setting_value` VARCHAR(500) NOT NULL DEFAULT '',
+                `updated_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                             ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        conn.commit()
+
+        # Seed defaults (INSERT IGNORE so existing values are preserved)
+        cur.execute("""
+            INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES
+                ('late_grace_minutes',   '10'),
+                ('late_per_minute_rate', '0.75')
+        """)
+        conn.commit()
+        cur.close()
+        app.logger.info("[late_deduction] schema ensured")
+    except Exception as exc:
+        app.logger.error(f"[late_deduction] _ensure_late_deduction_schema: {exc}")
+
+
+def _get_late_deduction_settings() -> dict:
+    """
+    Return {grace_minutes: int, per_minute_rate: float} from app_settings.
+
+    Formula applied at every clock-in:
+        late_deduction = round(per_minute_rate * late_minutes, 2)
+
+    Example: per_minute_rate=0.75, 49 min late → ₱0.75 × 49 = ₱36.75
+    """
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT setting_key, setting_value FROM app_settings "
+            "WHERE setting_key IN ('late_grace_minutes', 'late_per_minute_rate')"
+        )
+        rows = {r["setting_key"]: r["setting_value"] for r in cur.fetchall()}
+        cur.close()
+        return {
+            "grace_minutes": int(rows.get("late_grace_minutes", 10)),
+            "per_minute_rate": float(rows.get("late_per_minute_rate", 0.75)),
+        }
+    except Exception:
+        return {"grace_minutes": 10, "per_minute_rate": 0.75}
+
+
+# ── Late-deduction settings API (admin only) ──────────────────────────────────
+
+
+@app.route("/api/settings/late_deduction", methods=["GET"])
+def api_get_late_deduction_settings():
+    """Admin-only: return current late-deduction configuration. Managers are not permitted."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    cfg = _get_late_deduction_settings()
+    return jsonify({"success": True, "settings": cfg})
+
+
+@app.route("/api/settings/late_deduction", methods=["POST"])
+@csrf.exempt
+def api_set_late_deduction_settings():
+    """Admin-only: update grace period and/or deduction amount. Managers are not permitted."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    updates = {}
+
+    if "grace_minutes" in data:
+        try:
+            gm = int(data["grace_minutes"])
+            if not (0 <= gm <= 120):
+                raise ValueError
+            updates["late_grace_minutes"] = str(gm)
+        except (TypeError, ValueError):
+            return (
+                jsonify({"success": False, "message": "grace_minutes must be 0–120"}),
+                400,
+            )
+
+    if "per_minute_rate" in data:
+        try:
+            pmr = float(data["per_minute_rate"])
+            if pmr < 0:
+                raise ValueError
+            updates["late_per_minute_rate"] = f"{pmr:.4f}"
+        except (TypeError, ValueError):
+            return (
+                jsonify({"success": False, "message": "per_minute_rate must be >= 0"}),
+                400,
+            )
+
+    if not updates:
+        return jsonify({"success": False, "message": "No valid fields provided"}), 400
+
+    cur = mysql.connection.cursor()
+    for key, val in updates.items():
+        cur.execute(
+            "INSERT INTO app_settings (setting_key, setting_value) VALUES (%s, %s) "
+            "ON DUPLICATE KEY UPDATE setting_value = %s",
+            (key, val, val),
+        )
+    mysql.connection.commit()
+    cur.close()
+    app.logger.info(f"[late_deduction] Settings updated: {updates}")
+    return jsonify({"success": True, "message": "Late deduction settings updated"})
+
+
+@app.route("/api/attendance/edit_deduction", methods=["POST"])
+@csrf.exempt
+def api_edit_attendance_deduction():
+    """
+    Admin: manually override the late_deduction amount (or waive it) on a
+    specific attendance row.
+
+    POST JSON:
+        { "attendance_id": int, "late_deduction": float, "deduction_waived": bool }
+    """
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    att_id = data.get("attendance_id")
+    if not att_id:
+        return jsonify({"success": False, "message": "attendance_id required"}), 400
+
+    try:
+        new_deduction = float(data.get("late_deduction", 0))
+        if new_deduction < 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return (
+            jsonify({"success": False, "message": "late_deduction must be >= 0"}),
+            400,
+        )
+
+    waived = 1 if data.get("deduction_waived") else 0
+
+    cur = mysql.connection.cursor(DictCursor)
+    cur.execute(
+        "SELECT attendance_id FROM attendance WHERE attendance_id=%s LIMIT 1", (att_id,)
+    )
+    if not cur.fetchone():
+        cur.close()
+        return (
+            jsonify({"success": False, "message": "Attendance record not found"}),
+            404,
+        )
+
+    cur.execute(
+        "UPDATE attendance SET late_deduction=%s, deduction_waived=%s WHERE attendance_id=%s",
+        (new_deduction, waived, att_id),
+    )
+    mysql.connection.commit()
+    cur.close()
+    app.logger.info(
+        f"[late_deduction] Admin manually set deduction=₱{new_deduction:.2f} "
+        f"waived={bool(waived)} on attendance#{att_id}"
+    )
+    return jsonify({"success": True, "message": "Deduction updated"})
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                      OVERTIME REQUEST SYSTEM                                ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+def _ensure_overtime_requests_table():
+    """Idempotent DDL bootstrap for overtime_requests."""
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `overtime_requests` (
+                `request_id`       INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                `employee_id`      INT          NOT NULL,
+                `attendance_id`    INT          DEFAULT NULL,
+                `request_date`     DATE         NOT NULL,
+                `extended_hours`   DECIMAL(4,2) NOT NULL,
+                `reason`           VARCHAR(500) NOT NULL DEFAULT '',
+                `status`           ENUM('pending','approved','denied','cancelled') NOT NULL DEFAULT 'pending',
+                `reviewed_by`      VARCHAR(255) DEFAULT NULL,
+                `reviewed_at`      DATETIME     DEFAULT NULL,
+                `admin_note`       VARCHAR(500) DEFAULT NULL,
+                `created_at`       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY `idx_ot_employee` (`employee_id`),
+                KEY `idx_ot_status`   (`status`),
+                KEY `idx_ot_date`     (`request_date`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            """)
+        conn.commit()
+        # Patch existing table: widen status ENUM to include 'cancelled' if not already present
+        try:
+            cur.execute(
+                """ALTER TABLE `overtime_requests`
+                   MODIFY COLUMN `status`
+                   ENUM('pending','approved','denied','cancelled') NOT NULL DEFAULT 'pending'"""
+            )
+            conn.commit()
+        except Exception:
+            pass  # safe to ignore — column already has the value or table is brand new
+        cur.close()
+        app.logger.info("[migration] overtime_requests table ensured")
+    except Exception as exc:
+        app.logger.error(f"[migration] _ensure_overtime_requests_table: {exc}")
+
+
+@app.route("/api/overtime/request", methods=["POST"])
+@csrf.exempt
+def api_overtime_request_submit():
+    """Cashier submits an overtime request."""
+    if "employee_id" not in session or session.get("role") != "cashier":
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    try:
+        extended_hours = float(data.get("extended_hours", 0))
+    except (TypeError, ValueError):
+        return (
+            jsonify({"success": False, "message": "Invalid extended_hours value"}),
+            400,
+        )
+
+    if extended_hours <= 0 or extended_hours > 12:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Extended hours must be between 0.5 and 12",
+                }
+            ),
+            400,
+        )
+
+    reason = str(data.get("reason", "")).strip()[:500]
+    request_date_str = data.get("request_date", "")
+    try:
+        req_date = (
+            datetime.strptime(request_date_str, "%Y-%m-%d").date()
+            if request_date_str
+            else datetime.now(PHT).date()
+        )
+    except ValueError:
+        return (
+            jsonify({"success": False, "message": "Invalid request_date format"}),
+            400,
+        )
+
+    employee_id = session["employee_id"]
+    cur = mysql.connection.cursor(DictCursor)
+
+    cur.execute(
+        "SELECT request_id FROM overtime_requests WHERE employee_id=%s AND request_date=%s AND status='pending' LIMIT 1",
+        (employee_id, req_date),
+    )
+    if cur.fetchone():
+        cur.close()
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "You already have a pending overtime request for this date",
+                }
+            ),
+            409,
+        )
+
+    cur.execute(
+        "SELECT attendance_id FROM attendance WHERE employee_id=%s AND attendance_date=%s LIMIT 1",
+        (employee_id, req_date),
+    )
+    att_row = cur.fetchone()
+    attendance_id = att_row["attendance_id"] if att_row else None
+
+    cur.execute(
+        """INSERT INTO overtime_requests
+           (employee_id, attendance_id, request_date, extended_hours, reason, status)
+           VALUES (%s, %s, %s, %s, %s, 'pending')""",
+        (employee_id, attendance_id, req_date, extended_hours, reason),
+    )
+    mysql.connection.commit()
+
+    # Fetch employee name for the notification email.
+    # The employees table stores full_name AES-encrypted; there is no first_name/last_name column.
+    cur.execute(
+        "SELECT full_name FROM employees WHERE employee_id=%s LIMIT 1",
+        (employee_id,),
+    )
+    name_row = cur.fetchone()
+    raw_name = name_row["full_name"] if name_row else ""
+    employee_name = aes_decrypt(raw_name) if raw_name else f"Employee #{employee_id}"
+    if not employee_name:
+        employee_name = f"Employee #{employee_id}"
+
+    # Also pre-fetch SMTP settings here (in the request thread) so the background
+    # thread never has to touch flask_mysqldb's thread-local connection.
+    email_cfg = None
+    try:
+        _ensure_email_settings_table()
+        cfg_cur = mysql.connection.cursor(DictCursor)
+        cfg_cur.execute("SELECT * FROM email_alert_settings ORDER BY id LIMIT 1")
+        email_cfg = cfg_cur.fetchone()
+        cfg_cur.close()
+    except Exception as _cfg_exc:
+        app.logger.warning(f"[overtime] Could not pre-fetch email settings: {_cfg_exc}")
+
+    cur.close()
+
+    app.logger.info(
+        f"[overtime] Employee {employee_id} submitted OT request for {req_date} ({extended_hours}h)"
+    )
+
+    # Send email notification in a true background thread.
+    # We pass email_cfg directly so the thread does NOT need a DB connection at all —
+    # flask_mysqldb connections are thread-local and would be None inside a new thread.
+    import threading
+
+    def _send_email_bg(emp_name, emp_id, req_date_str, ext_h, rsn, cfg):
+        try:
+            _send_overtime_request_email_with_cfg(
+                emp_name, emp_id, req_date_str, ext_h, rsn, cfg
+            )
+        except Exception as _ex:
+            app.logger.error(f"[overtime_email_thread] Unhandled error: {_ex}")
+
+    threading.Thread(
+        target=_send_email_bg,
+        args=(
+            employee_name,
+            employee_id,
+            str(req_date),
+            extended_hours,
+            reason,
+            email_cfg,
+        ),
+        daemon=True,
+    ).start()
+
+    return jsonify(
+        {"success": True, "message": "Overtime request submitted successfully"}
+    )
+
+
+@app.route("/api/overtime/my_requests", methods=["GET"])
+def api_overtime_my_requests():
+    """Returns the logged-in cashier's own overtime requests."""
+    if "employee_id" not in session or session.get("role") != "cashier":
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    cur = mysql.connection.cursor(DictCursor)
+    cur.execute(
+        """SELECT request_id,
+                  DATE_FORMAT(request_date,'%%Y-%%m-%%d') AS request_date,
+                  extended_hours, reason, status, admin_note,
+                  DATE_FORMAT(reviewed_at,'%%Y-%%m-%%d %%H:%%i') AS reviewed_at
+           FROM overtime_requests
+           WHERE employee_id=%s
+           ORDER BY created_at DESC
+           LIMIT 50""",
+        (session["employee_id"],),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    return jsonify({"success": True, "requests": rows})
+
+
+@app.route("/api/overtime/cancel/<int:request_id>", methods=["POST"])
+@csrf.exempt
+def api_overtime_cancel(request_id):
+    """Cashier cancels their own pending overtime request."""
+    if "employee_id" not in session or session.get("role") != "cashier":
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    employee_id = session["employee_id"]
+    cur = mysql.connection.cursor(DictCursor)
+    cur.execute(
+        "SELECT * FROM overtime_requests WHERE request_id=%s LIMIT 1", (request_id,)
+    )
+    req_row = cur.fetchone()
+    if not req_row:
+        cur.close()
+        return jsonify({"success": False, "message": "Request not found"}), 404
+    if req_row["employee_id"] != employee_id:
+        cur.close()
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    if req_row["status"] != "pending":
+        cur.close()
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": f"Cannot cancel a request that is already {req_row['status']}",
+                }
+            ),
+            409,
+        )
+
+    cur.execute(
+        "UPDATE overtime_requests SET status='cancelled' WHERE request_id=%s",
+        (request_id,),
+    )
+    mysql.connection.commit()
+    cur.close()
+    app.logger.info(
+        f"[overtime] Employee {employee_id} cancelled OT request #{request_id}"
+    )
+    return jsonify({"success": True, "message": "Overtime request cancelled"})
+
+
+@app.route("/api/overtime/requests", methods=["GET"])
+def api_overtime_requests_list():
+    """Admin/Manager: list all overtime requests, optionally filtered by status."""
+    if session.get("role") not in ["admin", "manager"]:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    status_filter = request.args.get("status", "")
+    cur = mysql.connection.cursor(DictCursor)
+
+    sql = """
+        SELECT r.request_id,
+               r.employee_id,
+               e.full_name AS encrypted_name,
+               DATE_FORMAT(r.request_date,'%%Y-%%m-%%d') AS request_date,
+               r.extended_hours,
+               r.reason,
+               r.status,
+               r.admin_note,
+               r.reviewed_by,
+               DATE_FORMAT(r.reviewed_at,'%%Y-%%m-%%d %%H:%%i') AS reviewed_at,
+               DATE_FORMAT(r.created_at,'%%Y-%%m-%%d %%H:%%i') AS created_at
+        FROM overtime_requests r
+        JOIN employees e ON e.employee_id = r.employee_id
+    """
+    params = []
+    if status_filter in ("pending", "approved", "denied"):
+        sql += " WHERE r.status = %s"
+        params.append(status_filter)
+    sql += " ORDER BY r.created_at DESC LIMIT 200"
+
+    cur.execute(sql, params)
+    rows = cur.fetchall()
+    for row in rows:
+        try:
+            row["employee_name"] = (
+                aes_decrypt(row["encrypted_name"]) or row["encrypted_name"]
+            )
+        except Exception:
+            row["employee_name"] = row["encrypted_name"] or "—"
+        del row["encrypted_name"]
+    cur.close()
+    return jsonify({"success": True, "requests": rows})
+
+
+@app.route("/api/overtime/review/<int:request_id>", methods=["POST"])
+@csrf.exempt
+def api_overtime_review(request_id):
+    """Admin/Manager approves or denies an overtime request."""
+    if session.get("role") not in ["admin", "manager"]:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    action = data.get("action", "")
+    if action not in ("approve", "deny"):
+        return (
+            jsonify(
+                {"success": False, "message": "action must be 'approve' or 'deny'"}
+            ),
+            400,
+        )
+
+    admin_note = str(data.get("admin_note", "")).strip()[:500]
+    new_status = "approved" if action == "approve" else "denied"
+
+    reviewer = (
+        session.get("full_name")
+        or session.get("username")
+        or session["role"].capitalize()
+    )
+
+    cur = mysql.connection.cursor(DictCursor)
+    cur.execute(
+        "SELECT * FROM overtime_requests WHERE request_id=%s LIMIT 1", (request_id,)
+    )
+    req_row = cur.fetchone()
+    if not req_row:
+        cur.close()
+        return jsonify({"success": False, "message": "Request not found"}), 404
+    if req_row["status"] != "pending":
+        cur.close()
+        return (
+            jsonify(
+                {"success": False, "message": f"Request already {req_row['status']}"}
+            ),
+            409,
+        )
+
+    cur.execute(
+        """UPDATE overtime_requests
+           SET status=%s, reviewed_by=%s, reviewed_at=NOW(), admin_note=%s
+           WHERE request_id=%s""",
+        (new_status, reviewer, admin_note, request_id),
+    )
+
+    # ── When approved: waive the late deduction on the linked attendance row ──
+    if new_status == "approved" and req_row.get("attendance_id"):
+        try:
+            cur.execute(
+                "UPDATE attendance SET deduction_waived=1, late_deduction=0.00 "
+                "WHERE attendance_id=%s",
+                (req_row["attendance_id"],),
+            )
+            app.logger.info(
+                f"[late_deduction] Waived late deduction on attendance#{req_row['attendance_id']} "
+                f"(OT request #{request_id} approved by {reviewer})"
+            )
+        except Exception as waive_exc:
+            app.logger.warning(
+                f"[late_deduction] Could not waive deduction: {waive_exc}"
+            )
+
+    mysql.connection.commit()
+    cur.close()
+    app.logger.info(
+        f"[overtime] {reviewer} {new_status} OT request #{request_id} "
+        f"(emp#{req_row['employee_id']} {req_row['extended_hours']}h)"
+    )
+    return jsonify(
+        {
+            "success": True,
+            "message": f"Request {new_status} successfully",
+            "new_status": new_status,
+        }
+    )
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║              CASHIER INVENTORY / SUPPLY MONITOR MODULE                       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+def _is_cashier():
+    """Return True only when a cashier is logged in via the employee session."""
+    return "employee_id" in session and session.get("role") == "cashier"
+
+
+@app.route("/cashier/inventory")
+def cashier_inventory():
+    """Render the cashier Supply Monitor page."""
+    if not _is_cashier():
+        return redirect(url_for("login"))
+    employee = None
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT employee_id, full_name, username, role "
+            "FROM employees WHERE employee_id = %s LIMIT 1",
+            (session["employee_id"],),
+        )
+        row = cur.fetchone()
+        cur.close()
+        if row:
+            full_name = aes_decrypt(row["full_name"]) if row.get("full_name") else ""
+            username = aes_decrypt(row["username"]) if row.get("username") else ""
+            employee = {
+                "employee_id": row["employee_id"],
+                "full_name": full_name or username,
+                "username": username,
+                "role": row["role"],
+            }
+    except Exception as exc:
+        app.logger.error(f"[cashier_inventory] employee lookup: {exc}")
+    return render_template("cashier/cashier_inventory.html", employee=employee)
+
+
+@app.route("/api/cashier/me", methods=["GET"])
+def api_cashier_me():
+    """Return the current cashier's display name and role."""
+    if not _is_cashier():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT employee_id, full_name, username, role "
+            "FROM employees WHERE employee_id = %s LIMIT 1",
+            (session["employee_id"],),
+        )
+        row = cur.fetchone()
+        cur.close()
+        if not row:
+            return jsonify({"success": False, "message": "Employee not found"}), 404
+        full_name = aes_decrypt(row["full_name"]) if row.get("full_name") else ""
+        username = aes_decrypt(row["username"]) if row.get("username") else ""
+        return jsonify(
+            {
+                "success": True,
+                "user": {
+                    "employee_id": row["employee_id"],
+                    "full_name": full_name or username,
+                    "username": username,
+                    "role": row["role"],
+                },
+            }
+        )
+    except Exception as exc:
+        app.logger.error(f"[cashier_inv] api_cashier_me: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/cashier/inv/items", methods=["GET"])
+def api_cashier_inv_items():
+    """
+    Cashier-safe read-only item list.
+    Returns id, name, type, stock, unit, reorder_point, note, status, updated_at.
+    Cost and price fields are intentionally excluded.
+    """
+    if not _is_cashier():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("""
+            SELECT id, name, type, stock, unit, reorder_point, note,
+                   DATE_FORMAT(updated_at, '%%b %%d, %%Y %%h:%%i %%p') AS updated_at
+            FROM   inv_items
+            WHERE  is_active = 1
+            ORDER  BY type, name
+            """)
+        rows = cur.fetchall()
+        cur.close()
+        items = []
+        for r in rows:
+            stock = float(r["stock"])
+            reorder = float(r["reorder_point"])
+            if stock <= 0:
+                status = "out"
+            elif stock <= reorder:
+                status = "low"
+            else:
+                status = "ok"
+            items.append(
+                {
+                    "id": r["id"],
+                    "name": r["name"],
+                    "type": r["type"],
+                    "stock": stock,
+                    "unit": r["unit"],
+                    "reorder_point": reorder,
+                    "note": r["note"] or "",
+                    "status": status,
+                    "updated_at": r["updated_at"],
+                }
+            )
+        return jsonify({"success": True, "items": items, "total": len(items)})
+    except Exception as exc:
+        app.logger.error(f"[cashier_inv] api_cashier_inv_items: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/cashier/inv/consume", methods=["POST"])
+@csrf.exempt
+def api_cashier_inv_consume():
+    """
+    Cashier logs how much of a supply was used and/or damaged during a shift.
+
+    Body JSON:
+        id          – inv_items.id  (required)
+        used_qty    – float >= 0    (units actually used/consumed)
+        damaged_qty – float >= 0    (units wasted/damaged/spoiled)
+        note        – string        (optional reason, max 200 chars)
+
+    Both used_qty and damaged_qty may be 0, but their sum must be > 0.
+    Stock is decremented by (used_qty + damaged_qty).
+    Two separate inv_log rows are written: one tagged [Used], one tagged [Damaged].
+    """
+    if not _is_cashier():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    item_id = data.get("id")
+    try:
+        used_qty = float(data.get("used_qty", 0) or 0)
+        damaged_qty = float(data.get("damaged_qty", 0) or 0)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid quantities"}), 400
+    if not item_id:
+        return jsonify({"success": False, "message": "id is required"}), 400
+    if used_qty < 0 or damaged_qty < 0:
+        return (
+            jsonify({"success": False, "message": "Quantities cannot be negative"}),
+            400,
+        )
+    total = used_qty + damaged_qty
+    if total <= 0:
+        return (
+            jsonify(
+                {"success": False, "message": "Total consumed must be greater than 0"}
+            ),
+            400,
+        )
+    note = (data.get("note") or "").strip()[:200] or None
+    created_by = (
+        aes_decrypt(session.get("full_name", ""))
+        or aes_decrypt(session.get("username", ""))
+        or "Cashier"
+    )
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT id, name, stock, unit FROM inv_items WHERE id = %s AND is_active = 1",
+            (item_id,),
+        )
+        item = cur.fetchone()
+        if not item:
+            cur.close()
+            return jsonify({"success": False, "message": "Item not found"}), 404
+        current_stock = float(item["stock"])
+        if total > current_stock:
+            cur.close()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": (
+                            f"Cannot consume {total} {item['unit']} — "
+                            f"only {current_stock} {item['unit']} in stock."
+                        ),
+                    }
+                ),
+                400,
+            )
+        new_stock = round(current_stock - total, 4)
+        cur.execute(
+            "UPDATE inv_items SET stock = %s WHERE id = %s", (new_stock, item_id)
+        )
+        if used_qty > 0:
+            _log_inv_change(
+                cur,
+                item_id=item["id"],
+                item_name=item["name"],
+                unit=item["unit"],
+                delta=-used_qty,
+                stock_after=new_stock,
+                source="manual",
+                note=f"[Used] {note}" if note else "[Used] Consumed by staff",
+                created_by=created_by,
+            )
+        if damaged_qty > 0:
+            _log_inv_change(
+                cur,
+                item_id=item["id"],
+                item_name=item["name"],
+                unit=item["unit"],
+                delta=-damaged_qty,
+                stock_after=new_stock,
+                source="manual",
+                note=f"[Damaged] {note}" if note else "[Damaged] Waste/spoilage",
+                created_by=created_by,
+            )
+        mysql.connection.commit()
+        cur.close()
+        app.logger.info(
+            f"[cashier_inv] {created_by} consumed {total} {item['unit']} "
+            f"of '{item['name']}' (used={used_qty}, damaged={damaged_qty}) "
+            f"→ remaining {new_stock}"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "new_stock": new_stock,
+                "used_qty": used_qty,
+                "damaged_qty": damaged_qty,
+                "message": (
+                    f"Logged: {total} {item['unit']} removed from {item['name']} "
+                    f"({used_qty} used, {damaged_qty} damaged). "
+                    f"Remaining: {new_stock} {item['unit']}."
+                ),
+            }
+        )
+    except Exception as exc:
+        app.logger.error(f"[cashier_inv] consume item#{item_id}: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/cashier/inv/restock", methods=["POST"])
+@csrf.exempt
+def api_cashier_inv_restock():
+    """
+    Cashier logs a restock event (delivery received, transfer from storage, etc.).
+
+    Body JSON:
+        id   – inv_items.id  (required)
+        qty  – float > 0     (units added to stock)
+        note – string        (optional, max 200 chars)
+
+    Stock is incremented by qty.
+    One inv_log row is written, tagged [Restock].
+    """
+    if not _is_cashier():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    item_id = data.get("id")
+    try:
+        qty = float(data.get("qty", 0) or 0)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid quantity"}), 400
+    if not item_id:
+        return jsonify({"success": False, "message": "id is required"}), 400
+    if qty <= 0:
+        return (
+            jsonify({"success": False, "message": "Quantity must be greater than 0"}),
+            400,
+        )
+    note = (data.get("note") or "").strip()[:200] or None
+    created_by = (
+        aes_decrypt(session.get("full_name", ""))
+        or aes_decrypt(session.get("username", ""))
+        or "Cashier"
+    )
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT id, name, stock, unit FROM inv_items WHERE id = %s AND is_active = 1",
+            (item_id,),
+        )
+        item = cur.fetchone()
+        if not item:
+            cur.close()
+            return jsonify({"success": False, "message": "Item not found"}), 404
+        new_stock = round(float(item["stock"]) + qty, 4)
+        cur.execute(
+            "UPDATE inv_items SET stock = %s WHERE id = %s", (new_stock, item_id)
+        )
+        _log_inv_change(
+            cur,
+            item_id=item["id"],
+            item_name=item["name"],
+            unit=item["unit"],
+            delta=qty,
+            stock_after=new_stock,
+            source="manual",
+            note=f"[Restock] {note}" if note else "[Restock] Stock received by staff",
+            created_by=created_by,
+        )
+        mysql.connection.commit()
+        cur.close()
+        app.logger.info(
+            f"[cashier_inv] {created_by} restocked '{item['name']}' "
+            f"+{qty} {item['unit']} → total {new_stock}"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "new_stock": new_stock,
+                "qty": qty,
+                "message": (
+                    f"Restocked {item['name']}: +{qty} {item['unit']} added. "
+                    f"New total: {new_stock} {item['unit']}."
+                ),
+            }
+        )
+    except Exception as exc:
+        app.logger.error(f"[cashier_inv] restock item#{item_id}: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/cashier/inv/log", methods=["GET"])
+def api_cashier_inv_log():
+    """
+    Return recent inv_log entries for the cashier activity log view.
+    Query params: limit (int, max 100, default 40)
+    """
+    if not _is_cashier():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    try:
+        limit = min(int(request.args.get("limit", 40) or 40), 100)
+    except (TypeError, ValueError):
+        limit = 40
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            """
+            SELECT log_id, item_name, unit, delta, stock_after, source,
+                   note, created_by,
+                   DATE_FORMAT(created_at, '%%b %%d, %%Y %%h:%%i %%p') AS created_at
+            FROM   inv_log
+            ORDER  BY log_id DESC
+            LIMIT  %s
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        for row in rows:
+            row["delta"] = float(row["delta"])
+            row["stock_after"] = float(row["stock_after"])
+        return jsonify({"success": True, "log": rows})
+    except Exception as exc:
+        app.logger.error(f"[cashier_inv] api_cashier_inv_log: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                     STOCK REQUEST FEATURE                                   ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+def _ensure_stock_requests_table():
+    """
+    Create stock_requests table if it doesn't exist.
+    Cashiers submit new-item requests; admins approve or reject them.
+    """
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `stock_requests` (
+              `id`            int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+              `item_name`     varchar(120) NOT NULL,
+              `item_type`     enum('ingredient','packaging') NOT NULL DEFAULT 'ingredient',
+              `quantity`      decimal(12,2) NOT NULL DEFAULT 0,
+              `unit`          varchar(20) NOT NULL DEFAULT 'pcs',
+              `note`          varchar(255) DEFAULT NULL,
+              `requested_by`  varchar(80) NOT NULL,
+              `requested_at`  timestamp NOT NULL DEFAULT current_timestamp(),
+              `status`        enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+              `reviewed_by`   varchar(80) DEFAULT NULL,
+              `reviewed_at`   timestamp NULL DEFAULT NULL,
+              `review_note`   varchar(255) DEFAULT NULL,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            """)
+        conn.commit()
+        app.logger.info("[migration] stock_requests table ready.")
+    except Exception as exc:
+        app.logger.error(f"[migration] _ensure_stock_requests_table failed: {exc}")
+
+
+# ── Cashier: submit a new stock request ──────────────────────────────────────
+@app.route("/api/cashier/inv/request", methods=["POST"])
+@csrf.exempt
+def api_cashier_inv_request():
+    """Cashier submits a request to add a new inventory item."""
+    if not _is_cashier():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    try:
+        data = request.get_json(force=True) or {}
+        item_name = (data.get("item_name") or "").strip()
+        item_type = data.get("item_type", "ingredient")
+        quantity = float(data.get("quantity", 0))
+        unit = (data.get("unit") or "pcs").strip()
+        note = (data.get("note") or "").strip()
+
+        if not item_name:
+            return jsonify({"success": False, "message": "Item name is required."}), 400
+        if quantity <= 0:
+            return (
+                jsonify(
+                    {"success": False, "message": "Quantity must be greater than 0."}
+                ),
+                400,
+            )
+        if item_type not in ("ingredient", "packaging"):
+            item_type = "ingredient"
+
+        emp_id = session.get("employee_id")
+        emp_name = session.get("full_name") or f"Cashier#{emp_id}"
+
+        conn = mysql.connection
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO stock_requests
+               (item_name, item_type, quantity, unit, note, requested_by)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (item_name, item_type, quantity, unit, note or None, emp_name),
+        )
+        conn.commit()
+        return jsonify(
+            {
+                "success": True,
+                "message": f"Request for '{item_name}' submitted. Awaiting admin approval.",
+            }
+        )
+    except Exception as exc:
+        app.logger.error(f"[stock_request] submit: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── Cashier: view own requests ────────────────────────────────────────────────
+@app.route("/api/cashier/inv/my_requests", methods=["GET"])
+def api_cashier_inv_my_requests():
+    """Return the logged-in cashier's own stock requests."""
+    if not _is_cashier():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    try:
+        emp_name = session.get("full_name") or f"Cashier#{session.get('employee_id')}"
+        conn = mysql.connection
+        cur = conn.cursor(DictCursor)
+        cur.execute(
+            """SELECT id, item_name, item_type, quantity, unit, note,
+                      requested_at, status, reviewed_by, reviewed_at, review_note
+               FROM stock_requests
+               WHERE requested_by = %s
+               ORDER BY requested_at DESC
+               LIMIT 50""",
+            (emp_name,),
+        )
+        rows = list(cur.fetchall())
+        for r in rows:
+            if r.get("requested_at"):
+                r["requested_at"] = r["requested_at"].strftime("%b %d, %Y %I:%M %p")
+            if r.get("reviewed_at"):
+                r["reviewed_at"] = r["reviewed_at"].strftime("%b %d, %Y %I:%M %p")
+            r["quantity"] = float(r["quantity"])
+        return jsonify({"success": True, "requests": rows})
+    except Exception as exc:
+        app.logger.error(f"[stock_request] my_requests: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── Admin: list all pending/all requests ─────────────────────────────────────
+@app.route("/api/admin/stock_requests", methods=["GET"])
+def api_admin_stock_requests():
+    """Return all stock requests (admin only). ?status=pending|all"""
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    try:
+        status_filter = request.args.get("status", "all")
+        conn = mysql.connection
+        cur = conn.cursor(DictCursor)
+        if status_filter == "pending":
+            cur.execute("""SELECT id, item_name, item_type, quantity, unit, note,
+                          requested_by, requested_at, status,
+                          reviewed_by, reviewed_at, review_note
+                   FROM stock_requests WHERE status = 'pending'
+                   ORDER BY requested_at ASC""")
+        else:
+            cur.execute("""SELECT id, item_name, item_type, quantity, unit, note,
+                          requested_by, requested_at, status,
+                          reviewed_by, reviewed_at, review_note
+                   FROM stock_requests
+                   ORDER BY requested_at DESC
+                   LIMIT 100""")
+        rows = list(cur.fetchall())
+        for r in rows:
+            if r.get("requested_at"):
+                r["requested_at"] = r["requested_at"].strftime("%b %d, %Y %I:%M %p")
+            if r.get("reviewed_at"):
+                r["reviewed_at"] = r["reviewed_at"].strftime("%b %d, %Y %I:%M %p")
+            r["quantity"] = float(r["quantity"])
+        return jsonify({"success": True, "requests": rows})
+    except Exception as exc:
+        app.logger.error(f"[stock_request] admin_list: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── Admin: approve or reject a request ───────────────────────────────────────
+@app.route("/api/admin/stock_requests/<int:req_id>/review", methods=["POST"])
+@csrf.exempt
+def api_admin_stock_request_review(req_id):
+    """
+    Approve or reject a stock request.
+    Body: { action: 'approve'|'reject', review_note: '...' }
+    On approve: creates the inv_items row automatically.
+    """
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    try:
+        data = request.get_json(force=True) or {}
+        action = data.get("action", "").lower()
+        review_note = (data.get("review_note") or "").strip() or None
+
+        if action not in ("approve", "reject"):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "action must be 'approve' or 'reject'",
+                    }
+                ),
+                400,
+            )
+
+        admin_name = session.get("admin_username") or "Admin"
+        conn = mysql.connection
+        cur = conn.cursor(DictCursor)
+
+        cur.execute("SELECT * FROM stock_requests WHERE id = %s LIMIT 1", (req_id,))
+        req_row = cur.fetchone()
+        if not req_row:
+            return jsonify({"success": False, "message": "Request not found."}), 404
+        if req_row["status"] != "pending":
+            return (
+                jsonify({"success": False, "message": "Request already reviewed."}),
+                409,
+            )
+
+        new_status = "approved" if action == "approve" else "rejected"
+        cur.execute(
+            """UPDATE stock_requests
+               SET status=%s, reviewed_by=%s, reviewed_at=NOW(), review_note=%s
+               WHERE id=%s""",
+            (new_status, admin_name, review_note, req_id),
+        )
+
+        if action == "approve":
+            cur.execute(
+                """INSERT INTO inv_items (name, type, stock, unit, reorder_point, note)
+                   VALUES (%s, %s, %s, %s, 10, %s)""",
+                (
+                    req_row["item_name"],
+                    req_row["item_type"],
+                    req_row["quantity"],
+                    req_row["unit"],
+                    f"Added via cashier request by {req_row['requested_by']}",
+                ),
+            )
+
+        conn.commit()
+        msg = (
+            f"'{req_row['item_name']}' approved and added to inventory."
+            if action == "approve"
+            else f"Request for '{req_row['item_name']}' rejected."
+        )
+        return jsonify({"success": True, "message": msg})
+    except Exception as exc:
+        app.logger.error(f"[stock_request] review req#{req_id}: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── Admin: pending count (for badge) ─────────────────────────────────────────
+@app.route("/api/admin/stock_requests/pending_count", methods=["GET"])
+def api_admin_stock_requests_pending_count():
+    """Return the count of pending stock requests."""
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    try:
+        conn = mysql.connection
+        cur = conn.cursor(DictCursor)
+        cur.execute("SELECT COUNT(*) AS c FROM stock_requests WHERE status = 'pending'")
+        count = cur.fetchone()["c"]
+        return jsonify({"success": True, "count": int(count)})
+    except Exception as exc:
+        app.logger.error(f"[stock_request] pending_count: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                       BACKUP & DATA EXPORT ROUTES                           ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# ── Table definitions for each export type ────────────────────────────────────
+# Each entry is a list of (table_name, [columns_to_export]).
+# Using an explicit column list avoids accidentally exporting sensitive blobs
+# (e.g. face_embedding) and keeps the JSON file a reasonable size.
+_BACKUP_TABLES = {
+    "full": [
+        # Parent tables first so FK constraints are satisfied on both
+        # export (logical grouping) and import (insert order).
+        ("categories",           ["category_id", "name", "created_at"]),
+        ("products",             ["product_id", "category_id", "name", "description", "sku", "price", "cost", "stock", "reorder_point", "unit", "icon", "image_url", "is_active", "cup_eligible", "created_at"]),
+        ("transactions",         ["transaction_id", "cashier_id", "cashier_name", "subtotal", "discount_amount", "tax_amount", "total_amount", "amount_tendered", "change_amount", "payment_method", "gcash_ref", "note", "status", "discount_type", "net_sales", "vat_amount", "created_at"]),
+        ("transaction_items",    ["item_id", "transaction_id", "product_id", "product_name", "category_name", "unit_price", "quantity", "line_total"]),
+        ("inv_items",            ["id", "name", "type", "stock", "unit", "reorder_point", "note", "is_active", "created_at"]),
+        ("employees",            ["employee_id", "full_name", "role", "hourly_rate", "created_at"]),
+        ("app_settings",         ["setting_key", "setting_value"]),
+        ("email_alert_settings", ["id", "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_use_tls", "alert_recipient", "low_stock_enabled", "low_stock_threshold", "daily_summary_enabled", "daily_summary_time", "overtime_request_enabled"]),
+    ],
+    "sales": [
+        ("transactions",      ["transaction_id", "cashier_id", "cashier_name", "subtotal", "discount_amount", "tax_amount", "total_amount", "amount_tendered", "change_amount", "payment_method", "gcash_ref", "note", "status", "discount_type", "net_sales", "vat_amount", "created_at"]),
+        ("transaction_items", ["item_id", "transaction_id", "product_id", "product_name", "category_name", "unit_price", "quantity", "line_total"]),
+    ],
+    "products": [
+        # categories (parent) before products (child) so inserts succeed
+        # in FK-respecting order even without FOREIGN_KEY_CHECKS = 0.
+        ("categories", ["category_id", "name", "created_at"]),
+        ("products",   ["product_id", "category_id", "name", "description", "sku", "price", "cost", "stock", "reorder_point", "unit", "icon", "image_url", "is_active", "cup_eligible", "created_at"]),
+        ("inv_items",  ["id", "name", "type", "stock", "unit", "reorder_point", "note", "is_active", "created_at"]),
+    ],
+}
+
+
+def _serialize_row(row: dict) -> dict:
+    """Convert a MySQLdb DictCursor row to a JSON-serialisable dict."""
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, (datetime, date)):
+            out[k] = v.isoformat()
+        elif isinstance(v, Decimal):
+            out[k] = float(v)
+        elif hasattr(v, "item"):          # numpy scalar
+            out[k] = v.item()
+        elif isinstance(v, (bytes, bytearray)):
+            out[k] = base64.b64encode(v).decode()
+        else:
+            out[k] = v
+    return out
+
+
+@app.route("/api/backup/export", methods=["GET"])
+@csrf.exempt
+def api_backup_export():
+    """
+    Stream a JSON backup file for the requested export type.
+    Query param:  ?type=full|sales|products   (default: full)
+    Auth:         super-admin only
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    export_type = request.args.get("type", "full").lower()
+    if export_type not in _BACKUP_TABLES:
+        return jsonify({"success": False, "message": f"Unknown export type '{export_type}'"}), 400
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        tables_data = {}
+
+        for table_name, columns in _BACKUP_TABLES[export_type]:
+            col_list = ", ".join(f"`{c}`" for c in columns)
+            try:
+                cur.execute(f"SELECT {col_list} FROM `{table_name}`")
+                rows = cur.fetchall()
+                tables_data[table_name] = [_serialize_row(r) for r in rows]
+            except Exception as exc:
+                # Table may not exist yet (e.g. fresh install missing optional tables) —
+                # log and continue so the rest of the export is not blocked.
+                app.logger.warning(f"[backup] export: skipping table '{table_name}': {exc}")
+                tables_data[table_name] = []
+
+        cur.close()
+
+        payload = {
+            "backup_meta": {
+                "type":        export_type,
+                "exported_at": datetime.now(PHT).isoformat(timespec="seconds"),
+                "exported_by": session.get("admin_username") or f"admin#{session.get('admin_id')}",
+                "version":     1,
+            },
+            "tables": tables_data,
+        }
+
+        ts       = datetime.now(PHT).strftime("%Y%m%d-%H%M%S")
+        filename = f"books-blooms-{export_type}-backup-{ts}.json"
+
+        app.logger.info(
+            f"[backup] export '{export_type}' by admin_id={session.get('admin_id')} "
+            f"— {sum(len(v) for v in tables_data.values())} total rows"
+        )
+
+        return Response(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            mimetype="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    except Exception as exc:
+        app.logger.error(f"[backup] export failed: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/backup/import", methods=["POST"])
+@csrf.exempt
+def api_backup_import():
+    """
+    Restore data from a previously exported JSON backup.
+    Body:  the exact JSON produced by /api/backup/export
+    Auth:  super-admin only
+
+    Strategy: for each table present in the payload, DELETE existing rows
+    then INSERT the backup rows inside a single transaction so the database
+    is never left half-restored on error.
+    """
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    # ── Payload size guard (reject over ~20 MB) ───────────────────────────────
+    content_length = request.content_length or 0
+    if content_length > 20 * 1024 * 1024:
+        return jsonify({"success": False, "message": "Backup file is too large (max 20 MB)."}), 413
+
+    try:
+        payload = request.get_json(force=True, silent=True)
+    except Exception:
+        payload = None
+
+    if not payload or "backup_meta" not in payload or "tables" not in payload:
+        return jsonify({"success": False, "message": "Invalid or missing backup payload."}), 400
+
+    meta   = payload["backup_meta"]
+    tables = payload["tables"]          # { table_name: [ {col: val, …}, … ] }
+
+    # Whitelist — only allow tables we actually manage (prevents arbitrary table drops)
+    allowed_tables: set[str] = set()
+    for tbl_list in _BACKUP_TABLES.values():
+        for tbl_name, _ in tbl_list:
+            allowed_tables.add(tbl_name)
+
+    try:
+        conn = mysql.connection
+        cur  = conn.cursor()
+
+        total_inserted = 0
+        tables_restored: list[str] = []
+
+        # Disable FK checks for the duration of the restore so that table
+        # order in the backup JSON doesn't cause constraint violations
+        # (e.g. products inserted before categories, or child rows deleted
+        # before parent rows).  FK checks are always re-enabled in the
+        # finally block, even on error, so the session is never left unsafe.
+        cur.execute("SET FOREIGN_KEY_CHECKS = 0")
+
+        try:
+            for table_name, rows in tables.items():
+                if table_name not in allowed_tables:
+                    app.logger.warning(f"[backup] import: skipping non-whitelisted table '{table_name}'")
+                    continue
+                if not rows:
+                    continue
+
+                # Build INSERT from the keys present in the first row
+                columns = list(rows[0].keys())
+                col_sql = ", ".join(f"`{c}`" for c in columns)
+                ph_sql  = ", ".join(["%s"] * len(columns))
+
+                # Clear existing rows for this table
+                cur.execute(f"DELETE FROM `{table_name}`")
+
+                for row in rows:
+                    values = [row.get(c) for c in columns]
+                    cur.execute(
+                        f"INSERT INTO `{table_name}` ({col_sql}) VALUES ({ph_sql})",
+                        values,
+                    )
+                    total_inserted += 1
+
+                tables_restored.append(table_name)
+
+            conn.commit()
+
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+
+        finally:
+            # Always restore FK checks before closing the cursor
+            try:
+                cur.execute("SET FOREIGN_KEY_CHECKS = 1")
+                conn.commit()
+            except Exception:
+                pass
+            cur.close()
+
+        app.logger.warning(
+            f"[backup] import '{meta.get('type', '?')}' "
+            f"by admin_id={session.get('admin_id')} — "
+            f"{total_inserted} rows restored across {tables_restored}"
+        )
+
+        return jsonify({
+            "success": True,
+            "message": (
+                f"Restore complete — {total_inserted:,} rows imported "
+                f"across {len(tables_restored)} table(s): {', '.join(tables_restored)}."
+            ),
+            "tables_restored": tables_restored,
+            "rows_imported":   total_inserted,
+        })
+
+    except Exception as exc:
+        app.logger.error(f"[backup] import failed: {exc}")
+        return jsonify({"success": False, "message": f"Restore failed: {exc}"}), 500
+
+
+# ── Run DB migration in a background thread at startup ────────────────────────
+# Mirrors the _preload_embedding_cache pattern above: daemon thread +
+# app.app_context() lets Flask-MySQLdb open a connection without needing a
+# live HTTP request. gunicorn can finish starting and pass the /ping healthcheck
+# while migration runs in the background. Migration is fully idempotent.
+def _run_migration_thread():
+    import time as _time
+    _time.sleep(3)  # let gunicorn workers fully start before touching the DB
+    try:
+        with app.app_context():
+            run_auto_migration()
+    except Exception as _mig_exc:
+        app.logger.error(f"[startup] run_auto_migration failed: {_mig_exc}")
+
+threading.Thread(target=_run_migration_thread, daemon=True, name="auto-migration").start()
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
