@@ -37,6 +37,7 @@ import base64, time, hashlib, bcrypt, json, secrets, re
 import csv, io
 from flask import Response
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 import threading
 import requests as http_requests
 
@@ -107,6 +108,15 @@ def _send_email_resend(
 
 
 app = Flask(__name__)
+
+# ── Reverse-proxy fix (Railway / Render / any HTTPS-terminating proxy) ───────────
+# Railway sits behind a load-balancer that terminates TLS and forwards plain HTTP
+# to gunicorn.  Flask sees http:// and refuses to set Secure cookies, so the session
+# cookie is never sent back to the browser — CSRF token in the session is lost and
+# every POST gets "tokens do not match."
+# ProxyFix reads X-Forwarded-Proto: https and makes Flask treat the request as HTTPS.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 _secret = os.environ.get("FLASK_SECRET_KEY")
 if not _secret:
     raise RuntimeError("FLASK_SECRET_KEY is not set in .env — refusing to start.")
@@ -117,6 +127,9 @@ app.secret_key = _secret
 # with JSON bodies) are exempted with @csrf.exempt below their @app.route line.
 # Only HTML form-submitting routes need the token.
 csrf = CSRFProtect(app)
+# Never expire CSRF tokens — avoids "token expired" errors when Railway restarts a
+# container while a browser tab with the login form is already open.
+app.config["WTF_CSRF_TIME_LIMIT"] = None
 
 # ── File upload size limit (5 MB) ───────────────────────────────────────────────
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
@@ -828,7 +841,9 @@ threading.Thread(target=_preload_embedding_cache, daemon=True).start()
 # ── Session cookie security flags ────────────────────────────────────────
 app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # CSRF mitigation
-app.config["SESSION_COOKIE_SECURE"]   = True   # HTTPS only (set False for local HTTP dev)
+# True only on Railway (RAILWAY_ENVIRONMENT is injected automatically by Railway).
+# Local dev runs on plain HTTP, so Secure=True would silently drop the session cookie.
+app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
 
 # ── HTTP security headers ─────────────────────────────────────────────────
 @app.after_request
@@ -838,6 +853,8 @@ def set_security_headers(response):
     response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
     return response
+
+
 
 # ── Performance caches ──────────────────────────────────────────────────────────
 embedding_cache = {}  # { employee_id: embedding_vector }
