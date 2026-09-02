@@ -698,6 +698,10 @@ face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
+# ── Liveness session store ──────────────────────────────────────────────────────
+# Tracks head-nod challenge state per employee during verification
+liveness_sessions = {}
+
 # ── Registration capture store ─────────────────────────────────────────────────
 # Temporarily holds multi-frame embeddings during face registration
 reg_sessions = (
@@ -708,6 +712,17 @@ reg_sessions = (
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║                         HELPER FUNCTIONS                                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+def reset_liveness(emp_id):
+    """Reset the liveness (anti-spoofing) challenge for an employee."""
+    liveness_sessions[emp_id] = {
+        "step": "center",  # center → up → down (nod)
+        "last_y": None,
+        "passed": False,
+        "start_time": datetime.now(),
+        "stable": 0,  # frames without movement (photo-detection)
+    }
 
 
 def is_admin():
@@ -1129,6 +1144,7 @@ def commit_face_registration():
 def verify_face():
     """
     Verify a live webcam frame against the employee's registered face embedding.
+    Includes liveness detection (head-nod challenge) to prevent photo spoofing.
 
     POST JSON:
         { "employee_id": str|int, "image": "data:image/jpeg;base64,..." }
@@ -1145,8 +1161,8 @@ def verify_face():
 
     # ── Session-binding: the requester may ONLY verify their own face ─────────
     # This closes the bypass where an admin/manager selects another employee
-    # in the dropdown, passes face verification with their own face, and clocks
-    # in as someone else because the comparison runs against the selected
+    # in the dropdown, completes liveness with their own face, and clocks in
+    # as someone else because the face comparison runs against the selected
     # employee's stored FaceID rather than the logged-in user's FaceID.
     _srole = session.get("role", "")
     _semp_id = session.get("employee_id")
@@ -1229,7 +1245,7 @@ def verify_face():
     except ValueError as e:
         return jsonify({"success": False, "message": str(e)})
 
-    # ── Rate-limit: update timestamp before face matching ───────────────────
+    # ── Rate-limit: update timestamp here so it applies during liveness too ─
     last_frame_time[employee_id] = now
 
     # ── Server-side mismatch lockout ─────────────────────────────────────────
@@ -1245,6 +1261,78 @@ def verify_face():
                 "locked": True,
             }
         )
+
+    # ── Liveness challenge (head-nod: up → down) ─────────────────────────────
+    if employee_id not in liveness_sessions:
+        reset_liveness(employee_id)
+
+    s = liveness_sessions[employee_id]
+
+    # Expire challenge after 20 s
+    if (now - s["start_time"]).seconds > 20:
+        reset_liveness(employee_id)
+        return jsonify(
+            {
+                "success": False,
+                "message": "\u23f1\ufe0f Challenge expired – look at camera and try again",
+            }
+        )
+
+    center_y = y + h // 2
+
+    if s["last_y"] is None:
+        s["last_y"] = center_y
+        return jsonify(
+            {
+                "success": False,
+                "message": "\u2b06\ufe0f Please move your head UP slowly",
+            }
+        )
+
+    move = center_y - s["last_y"]  # negative = moved up, positive = moved down
+
+    # Anti-photo: reject if face has been perfectly static for >6 frames
+    if abs(move) < 3:
+        s["stable"] += 1
+    else:
+        s["stable"] = 0
+
+    if s["stable"] > 6:
+        return jsonify(
+            {
+                "success": False,
+                "message": "\U0001f6ab Static image detected – please move your head",
+            }
+        )
+
+    # ── Always update last_y so movement is measured frame-to-frame ─────────
+    s["last_y"] = center_y
+
+    if s["step"] == "center":
+        if move < -8:
+            s["step"] = "up"
+            return jsonify(
+                {
+                    "success": False,
+                    "message": "\u2b07\ufe0f Good! Now move your head DOWN",
+                }
+            )
+        return jsonify({"success": False, "message": "\u2b06\ufe0f Move your head UP"})
+
+    elif s["step"] == "up":
+        if move > 8:
+            s["passed"] = True
+
+    if not s["passed"]:
+        return jsonify(
+            {"success": False, "message": "\u2b07\ufe0f Keep moving your head DOWN"}
+        )
+
+    # ── Liveness passed — reset BEFORE any return below ─────────────────────
+    # Resetting here ensures that embedding errors, DB errors, or any early
+    # return cannot leave passed=True. Without this, the next frame would skip
+    # liveness entirely and go straight to face matching.
+    reset_liveness(employee_id)
 
     # ── Perform face match ───────────────────────────────────────────────────
     try:
@@ -1397,6 +1485,21 @@ def api_face_mismatch_log():
 def handle_500(e):
     """Return JSON for any unhandled 500 error so the server stays up."""
     return jsonify({"success": False, "message": f"Internal server error: {e}"}), 500
+
+
+@app.route("/reset_liveness", methods=["POST"])
+def reset_liveness_route():
+    """
+    Called by the frontend when the user enters Step 3 (Face Verify).
+    Clears any stale liveness session so the challenge always starts fresh
+    — prevents a user from getting stuck in a partial challenge state from
+    a previous attempt.
+    """
+    data = request.get_json(silent=True) or {}
+    employee_id = str(data.get("employee_id", ""))
+    if employee_id and employee_id in liveness_sessions:
+        reset_liveness(employee_id)
+    return jsonify({"success": True})
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗

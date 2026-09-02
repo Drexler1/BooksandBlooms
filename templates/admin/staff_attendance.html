@@ -1352,7 +1352,7 @@
                     <div class="camera-wrap">
                         <div class="camera-viewport">
                             <video id="cameraFeed" autoplay playsinline muted></video>
-                            <!-- Live face match feedback -->
+                            <!-- Live liveness / match feedback -->
                             <div class="verify-overlay" id="verifyOverlay">Position your face in frame</div>
                         </div>
                         <div class="camera-overlay-corners"></div>
@@ -1363,7 +1363,7 @@
                         </button>
                     </div>
                     <p class="face-tip">
-                        💡 Look directly at the camera. The system will automatically match your face against your registered profile.
+                        💡 <strong>Liveness check:</strong> When prompted, slowly nod your head <strong>UP</strong> then <strong>DOWN</strong> to confirm you are present. The system will then match your face automatically.
                     </p>
                 </div>
             </div>
@@ -1571,10 +1571,20 @@ document.addEventListener("DOMContentLoaded", () => {
         state.currentStep = step;
 
         if (step === 3) {
-            // Reset overlay message when entering Face Verify step
+            // Reset overlay message and liveness state when entering Face Verify step
             const overlay = document.getElementById("verifyOverlay");
-            if (overlay) overlay.textContent = "Position your face in frame";
+            if (overlay) overlay.textContent = "⬆️ Move your head UP";
             lastCaptureTime = 0;   // allow immediate first send
+
+            // Tell backend to clear any stale liveness session for this employee
+            const empId = document.getElementById("employeeSelect")?.value;
+            if (empId) {
+                fetch("/reset_liveness", {
+                    method:  "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body:    JSON.stringify({ employee_id: empId })
+                }).catch(() => {});
+            }
 
             setTimeout(() => { startCamera(); }, 300);
         } else {
@@ -2158,9 +2168,10 @@ let isMismatchLocked = false;   // true after a confirmed face mismatch — halt
  * Captures one frame from the live camera, sends it to /verify_face,
  * and on success calls saveAttendance() to record clock-in/out.
  * 
- * The backend performs cosine-distance face matching via Facenet-512.
- * Feedback messages are shown in the camera overlay until the face
- * is confirmed.
+ * The backend implements liveness detection (head-nod challenge) and
+ * cosine-distance face matching via Facenet-512.  Feedback messages
+ * like "Move head UP / DOWN" are shown in the camera overlay until
+ * the liveness check passes and the face is confirmed.
  */
 async function verifyIdentity() {
 
@@ -2187,7 +2198,7 @@ async function verifyIdentity() {
         // (unmirrored) orientation — the backend flips them back itself.
         // Previously this flip was being applied here AND the backend was
         // also flipping, causing double-flip = wrong orientation for Haar
-        // detection → "No face detected" → face matching never started.
+        // detection → "No face detected" → liveness challenge never started.
         ctx.drawImage(cameraFeed, 0, 0);
 
         const imageData = canvas.toDataURL("image/jpeg", 0.92);  // higher quality = higher blur score
@@ -2222,6 +2233,15 @@ async function verifyIdentity() {
                 const lockMs    = lockMatch ? parseInt(lockMatch[1]) * 1000 : 30000;
                 setTimeout(async () => {
                     isMismatchLocked = false;
+                    // Tell the backend to clear the liveness session too
+                    const empId = document.getElementById("employeeSelect").value;
+                    if (empId) {
+                        await fetch("/reset_liveness", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ employee_id: empId })
+                        }).catch(() => {});
+                    }
                     if (overlayEl) { overlayEl.textContent = ""; overlayEl.style.color = ""; }
                     if (btn) {
                         btn.disabled    = false;
@@ -2238,9 +2258,17 @@ async function verifyIdentity() {
                     btn.textContent = "🚫 Face Mismatch";
                     btn.style.background = "#c0392b";
                 }
-                // Auto-unlock after 5 s
+                // Auto-unlock after 5 s and reset liveness on backend too
                 setTimeout(async () => {
                     isMismatchLocked = false;
+                    const empId = document.getElementById("employeeSelect").value;
+                    if (empId) {
+                        await fetch("/reset_liveness", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ employee_id: empId })
+                        }).catch(() => {});
+                    }
                     if (overlayEl) { overlayEl.textContent = ""; overlayEl.style.color = ""; }
                     if (btn) {
                         btn.disabled    = false;
@@ -2249,7 +2277,7 @@ async function verifyIdentity() {
                     }
                 }, 5000);
             }
-            // Keep loop running for non-mismatch failures (e.g. no face detected)
+            // Keep loop running for liveness instructions (non-mismatch failures)
             return;
         }
 
@@ -2271,8 +2299,9 @@ async function verifyIdentity() {
  * autoVerifyLoop()
  * ─────────────────
  * Runs while the user is on Step 3 (Face Verify).
- * Sends a frame every 2.5 seconds; the backend matches the face against
- * the registered template and attendance is recorded automatically on success.
+ * Sends a frame every 2.5 seconds; the backend's liveness challenge
+ * guides the user (UP → DOWN nod) until liveness passes and the face
+ * is matched, then attendance is recorded automatically.
  *
  * Interval is intentionally generous (2.5 s) so the server has time to
  * finish the DeepFace embedding call before the next frame arrives —
