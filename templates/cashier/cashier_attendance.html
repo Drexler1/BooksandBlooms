@@ -2045,7 +2045,7 @@
                         <button class="period-tab" data-period="week">This Week</button>
                         <button class="period-tab" data-period="custom">Custom</button>
                     </div>
-                    <div id="customDateRange" style="display:none; gap:0.5rem; align-items:center; display:none;">
+                    <div id="customDateRange" style="display:none; gap:0.5rem; align-items:center;">
                         <input type="date" class="date-input" id="customStart">
                         <span style="color:#aaa;">–</span>
                         <input type="date" class="date-input" id="customEnd">
@@ -2625,7 +2625,6 @@
         window.loadMyAttendance = async function loadMyAttendance() {
             const body = document.getElementById('attendanceTableBody');
             const count = document.getElementById('recordCount');
-            if (count) count.textContent = 'Loading…';
 
             let qs;
             let isSingleDay = false;
@@ -2644,20 +2643,23 @@
                 qs = new URLSearchParams({ range_start: range.start, range_end: range.end });
             }
 
+            if (count) count.textContent = 'Loading…';
+
             // Return cached result if same query fetched within last 45 seconds
             const cacheKey = qs.toString();
             const _cached = _attCache[cacheKey];
-            if (_cached && (Date.now() - _cached.ts) < 45000) {
-                if (count) count.textContent = `${(_cached.data.records||[]).length} record(s)`;
-                return;
-            }
 
             try {
-                const res = await fetch('/api/my_attendance?' + qs.toString());
-                const data = await res.json();
-                if (!data.success) { if (count) count.textContent = data.message || 'Error'; return; }
-                // Store in cache for 45s
-                _attCache[cacheKey] = { ts: Date.now(), data };
+                let data;
+                if (_cached && (Date.now() - _cached.ts) < 45000) {
+                    data = _cached.data;
+                } else {
+                    const res = await fetch('/api/my_attendance?' + qs.toString());
+                    data = await res.json();
+                    if (!data.success) { if (count) count.textContent = data.message || 'Error'; return; }
+                    // Store in cache for 45s
+                    _attCache[cacheKey] = { ts: Date.now(), data };
+                }
 
                 const records = data.records || [];
                 if (count) count.textContent = `${records.length} record(s)`;
@@ -2676,7 +2678,7 @@
                 records.forEach(r => {
                     const isComplete = !!r.clock_out;
                     const fulfill = r.fulfill_working_hours === 'YES';
-                    const hours = r.hours_worked != null ? r.hours_worked + ' h' : '—';
+                    const hours = r.hours_worked != null ? parseFloat(r.hours_worked).toFixed(2) + ' h' : '—';
                     const dateStr = r.attendance_date
                         ? new Date(r.attendance_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                         : '—';
@@ -2707,13 +2709,13 @@
                             : '<span class="badge badge-inprog">In Progress</span>'}</td>
                         <td class="time-cell">${r.clock_in || '<span class="time-cell missing">—</span>'}</td>
                         <td class="time-cell">${r.clock_out || '<span class="time-cell missing">—</span>'}</td>
-                        <td><span class="hours-chip ${fulfill ? 'over' : (r.hours_worked ? 'short' : '')}">${hours}</span></td>
+                        <td><span class="hours-chip ${fulfill ? 'over' : (isComplete && r.hours_worked ? 'short' : '')}">${hours}</span></td>
                         <td>${fulfill
                             ? '<span class="badge badge-present">✅ Yes</span>'
                             : '<span class="badge" style="background:#ffebee;color:#c62828;">No</span>'}</td>
                         <td>${lateMin > 0
-                            ? `<span class="badge" style="background:#fff3e0;color:#e65100;">${lateMin}m late</span>`
-                            : '<span class="badge badge-present">On time</span>'}</td>
+                            ? `<span class="badge" style="background:#fff3e0;color:#e65100;">${lateMin}M LATE</span>`
+                            : '<span class="badge badge-present">ON TIME</span>'}</td>
                         <td>${deductCell}</td>
                     </tr>`);
                 });
@@ -2726,17 +2728,22 @@
 
         /* ── Stat card updater ── */
         function updateSummaryCards(records, totalHours) {
-            const completed = records.filter(r => r.clock_out);
-            const inProgress = records.find(r => r.clock_in && !r.clock_out);
+            const todayStr = new Date().toISOString().slice(0, 10);
+            // Always compute "today's status" from today's records, regardless of period
+            const todayRecords  = records.filter(r => r.attendance_date === todayStr);
+            const inProgress    = todayRecords.find(r => r.clock_in && !r.clock_out);
+            const todayComplete = todayRecords.filter(r => r.clock_out);
+            // For period summary (full shift count uses all records in view)
+            const completed  = records.filter(r => r.clock_out);
             const fullShifts = records.filter(r => r.fulfill_working_hours === 'YES').length;
 
             const setEl = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
 
-            // Today's status
+            // Today's status card — always reflects today, not the whole period
             if (inProgress) {
                 setEl('statStatus', 'In');
                 setEl('statStatusSub', `clocked in at ${inProgress.clock_in || '—'}`);
-            } else if (completed.length) {
+            } else if (todayComplete.length) {
                 setEl('statStatus', '✓ Done');
                 setEl('statStatusSub', 'shift completed');
             } else {
@@ -2744,14 +2751,23 @@
                 setEl('statStatusSub', 'not clocked in');
             }
 
-            // Hours today (only makes sense on single-day view)
-            const todayHours = records.filter(r => r.hours_worked).reduce((s, r) => s + parseFloat(r.hours_worked), 0);
+            // Hours Today — sum of today's completed hours only
+            const todayHours = todayRecords
+                .filter(r => r.hours_worked)
+                .reduce((s, r) => s + parseFloat(r.hours_worked), 0);
             setEl('statHoursToday', todayHours ? todayHours.toFixed(2) + 'h' : '—');
-            setEl('statPeriodHours', totalHours ? totalHours.toFixed(2) + 'h' : '—');
+
+            // Period Hours — total across all records in the selected period
+            setEl('statPeriodHours', totalHours ? parseFloat(totalHours).toFixed(2) + 'h' : '—');
+
+            // Period label reflects the active view
+            const periodLabels = { today: 'today', week: 'this week', custom: 'selected range' };
+            const periodSub = document.getElementById('statPeriodSub');
+            if (periodSub) periodSub.textContent = periodLabels[currentPeriod] || 'this period';
 
             // Side panel summary
             setEl('summaryDays', completed.length || 0);
-            setEl('summaryHours', totalHours ? totalHours.toFixed(2) + ' h' : '—');
+            setEl('summaryHours', totalHours ? parseFloat(totalHours).toFixed(2) + ' h' : '—');
             setEl('summaryFull', fullShifts || 0);
         }
 
