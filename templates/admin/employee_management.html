@@ -1454,7 +1454,6 @@
             <li><a href="{{ url_for('product_management') }}">Product Management</a></li>
             {% if session.get('role') == 'admin' %}
             <li><a href="{{ url_for('admin_settings') }}">Settings</a></li>
-            <li><a href="{{ url_for('developer.dashboard') }}" style="color: var(--gold); font-weight: 600;">⚡ Dev Console</a></li>
             {% endif %}
             <li><a href="{{ url_for('employee_management') }}" class="active">Employee Management</a></li>
             <li><a href="{{ url_for('payroll') }}">Payroll</a></li>
