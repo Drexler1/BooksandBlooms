@@ -1,14 +1,18 @@
 import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress TensorFlow CPU warnings
-# Limit TensorFlow/numpy thread usage to reduce memory on Render free tier
-os.environ["TF_NUM_INTEROP_THREADS"] = "1"
-os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
-os.environ["OMP_NUM_THREADS"] = "1"
+import base64
+import time
+import hashlib
+import bcrypt
+import json
+import secrets
+import re
+import csv
+import io
+import threading
+from datetime import datetime, timedelta, date
+from decimal import Decimal
 
 from dotenv import load_dotenv
-
-load_dotenv()
-
 from flask import (
     Flask,
     render_template,
@@ -18,28 +22,36 @@ from flask import (
     session,
     url_for,
     jsonify,
+    Response,
 )
-from decimal import Decimal
 from flask_mysqldb import MySQL
 from MySQLdb.cursors import DictCursor
 from flask_wtf.csrf import CSRFProtect, CSRFError
+from flask_compress import Compress
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
+import pytz
+import requests as http_requests
+
+from developer.routes import init_developer_bp
+
+# ── Environment & Thread tuning ─────────────────────────────────────────────
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress TensorFlow CPU warnings
+# Limit TensorFlow/numpy thread usage to reduce memory on Render free tier
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+
+load_dotenv()
+
 # DeepFace, cv2, and numpy are intentionally NOT imported at the top level.
 # tensorflow-cpu alone uses ~500MB which exceeds Render's 512MB free limit.
 # They are imported lazily inside _get_deepface() / _get_cv2_np() below
 # so the rest of the app starts normally, and face-verify loads them on demand.
-from datetime import datetime, timedelta, date
-import pytz
 
 PHT = pytz.timezone("Asia/Manila")
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
-import base64, time, hashlib, bcrypt, json, secrets, re
-import csv, io
-from flask import Response
-from werkzeug.utils import secure_filename
-from werkzeug.middleware.proxy_fix import ProxyFix
-import threading
-import requests as http_requests
 
 # ── Lazy-load helpers for heavy ML deps ─────────────────────────────────────
 _deepface_lock = threading.Lock()
@@ -781,8 +793,10 @@ app.config["MYSQL_READ_TIMEOUT"]    = 30   # prevent hung queries blocking threa
 app.config["MYSQL_WRITE_TIMEOUT"]   = 30
 
 mysql = MySQL(app)
-from flask_compress import Compress
 Compress(app)
+
+# ── Super Admin / Developer Monitoring Blueprint ─────────────────────────
+init_developer_bp(app, mysql)
 
 # ── Warm DeepFace/Facenet at startup so first face-verify is fast ──────────
 def _warm_deepface():

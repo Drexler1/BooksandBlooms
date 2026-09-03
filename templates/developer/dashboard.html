@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Books & Blooms — Developer & Super Admin Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0c0e12;
+            --bg-surface: #141820;
+            --bg-card: #1c212d;
+            --bg-card-hover: #242a3a;
+            --border: #283042;
+            --border-highlight: #3b4660;
+            
+            --gold: #c9a961;
+            --gold-hover: #e0c27b;
+            --gold-glow: rgba(201, 169, 97, 0.25);
+            
+            --cyan: #38bdf8;
+            --cyan-glow: rgba(56, 189, 248, 0.2);
+            --emerald: #34d399;
+            --emerald-glow: rgba(52, 211, 153, 0.2);
+            --amber: #fbbf24;
+            --rose: #f87171;
+            --rose-glow: rgba(248, 113, 113, 0.2);
+            
+            --text-main: #f3f4f6;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            
+            --font-serif: 'Cormorant Garamond', serif;
+            --font-sans: 'DM Sans', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation Bar */
+        header {
+            background: rgba(20, 24, 32, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0.85rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .brand-badge {
+            background: linear-gradient(135deg, #2b2311, #47381b);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 0.25rem 0.6rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .brand-title {
+            font-family: var(--font-serif);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .brand-title span {
+            color: var(--gold);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(52, 211, 153, 0.1);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            color: var(--emerald);
+            padding: 0.35rem 0.8rem;
+            border-radius: 9999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--emerald);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--emerald);
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.45rem 0.95rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid transparent;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-gold {
+            background: var(--gold);
+            color: #000;
+        }
+
+        .btn-gold:hover {
+            background: var(--gold-hover);
+            box-shadow: 0 0 15px var(--gold-glow);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-muted);
+            border-color: var(--border);
+        }
+
+        .btn-outline:hover {
+            color: #fff;
+            border-color: var(--border-highlight);
+            background: var(--bg-card);
+        }
+
+        .btn-danger {
+            background: rgba(248, 113, 113, 0.15);
+            border-color: rgba(248, 113, 113, 0.4);
+            color: var(--rose);
+        }
+
+        .btn-danger:hover {
+            background: rgba(248, 113, 113, 0.25);
+        }
+
+        /* App Container */
+        .container {
+            max-width: 1440px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem 2rem 4rem 2rem;
+            flex: 1;
+        }
+
+        /* Top Hero / Meta Banner */
+        .hero-banner {
+            background: linear-gradient(135deg, rgba(28, 33, 45, 0.7), rgba(20, 24, 32, 0.9));
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero-info h1 {
+            font-family: var(--font-serif);
+            font-size: 1.85rem;
+            color: #fff;
+            margin-bottom: 0.3rem;
+        }
+
+        .hero-info p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .hero-quick-meta {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .meta-stat {
+            text-align: right;
+        }
+
+        .meta-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .meta-stat-val {
+            font-family: var(--font-mono);
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--gold);
+        }
+
+        /* Tabs Nav */
+        .tab-nav {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-family: var(--font-sans);
+            font-size: 0.92rem;
+            font-weight: 600;
+            padding: 0.75rem 1.4rem;
+            cursor: pointer;
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+        }
+
+        .tab-btn.active {
+            color: var(--gold);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--gold);
+            box-shadow: 0 0 10px var(--gold);
+        }
+
+        /* Tab Panels */
+        .tab-panel {
+            display: none;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Metric Cards Grid */
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .m-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.4rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .m-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-highlight);
+        }
+
+        .m-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .m-card-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .m-card-icon {
+            font-size: 1.25rem;
+        }
+
+        .m-card-value {
+            font-family: var(--font-mono);
+            font-size: 1.85rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .m-card-sub {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* Progress Bars inside cards */
+        .progress-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: #232938;
+            border-radius: 999px;
+            margin-top: 0.75rem;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--gold);
+            border-radius: 999px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .progress-bar-fill.cyan { background: var(--cyan); }
+        .progress-bar-fill.emerald { background: var(--emerald); }
+        .progress-bar-fill.rose { background: var(--rose); }
+
+        /* Panels / Sections */
+        .panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        /* Data Tables */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+
+        table.data-table th {
+            text-align: left;
+            padding: 0.8rem 1rem;
+            background: rgba(28, 33, 45, 0.6);
+            color: var(--text-dim);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        table.data-table td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid rgba(40, 48, 66, 0.4);
+            color: var(--text-main);
+        }
+
+        table.data-table tr:hover td {
+            background: rgba(36, 42, 58, 0.5);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.55rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+
+        .badge-info { background: rgba(56, 189, 248, 0.15); color: var(--cyan); }
+        .badge-warn { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+        .badge-err { background: rgba(248, 113, 113, 0.15); color: var(--rose); }
+        .badge-ok { background: rgba(52, 211, 153, 0.15); color: var(--emerald); }
+
+        /* Terminal-Style Log Viewer */
+        .terminal-box {
+            background: #090b0e;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            height: 520px;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .terminal-line {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.35rem 0.5rem;
+            border-radius: 4px;
+            line-height: 1.4;
+            transition: background 0.15s;
+        }
+
+        .terminal-line:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .log-ts {
+            color: var(--text-dim);
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .log-lvl {
+            flex-shrink: 0;
+            font-weight: 700;
+            width: 72px;
+        }
+
+        .log-lvl.INFO { color: var(--cyan); }
+        .log-lvl.WARNING { color: var(--amber); }
+        .log-lvl.ERROR, .log-lvl.CRITICAL { color: var(--rose); }
+
+        .log-msg {
+            color: #e2e8f0;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+
+        /* Search input & filters */
+        .filter-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .input-dark {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 0.45rem 0.9rem;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .input-dark:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 10px var(--gold-glow);
+        }
+
+        .toast-notify {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--gold);
+            color: #fff;
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--radius-md);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            font-size: 0.88rem;
+            z-index: 99999;
+            display: none;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-brand">
+            <span class="brand-badge">Super Admin</span>
+            <div class="brand-title">Books & Blooms <span>System Telemetry</span></div>
+        </div>
+
+        <div class="header-actions">
+            <div class="status-pill">
+                <span class="status-dot"></span>
+                <span>Telemetry Online</span>
+            </div>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">← Back to Admin</a>
+            <form method="POST" action="{{ url_for('logout') }}" style="display:inline; margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger">Logout</button>
+            </form>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Hero Meta Banner -->
+        <div class="hero-banner">
+            <div class="hero-info">
+                <h1>Developer & System Health Console</h1>
+                <p>Real-time infrastructure metrics, application logs, database telemetry, and security monitoring.</p>
+            </div>
+            <div class="hero-quick-meta">
+                <div class="meta-stat">
+                    <div class="meta-stat-label">Server Uptime</div>
+                    <div class="meta-stat-val" id="bannerUptime">—</div>
+                </div>
+                <div class="meta-stat">
+                    <div class="meta-stat-label">MySQL Latency</div>
+                    <div class="meta-stat-val" id="bannerDbLatency">—</div>
+                </div>
+                <div class="meta-stat">
+                    <div class="meta-stat-label">RAM Consumption</div>
+                    <div class="meta-stat-val" id="bannerRam">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Controls -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('system')">⚡ System Telemetry</button>
+            <button class="tab-btn" onclick="switchTab('logs')">📜 Live Application Logs</button>
+            <button class="tab-btn" onclick="switchTab('database')">🗄️ Database Health</button>
+            <button class="tab-btn" onclick="switchTab('security')">🛡️ Security & Audit</button>
+        </nav>
+
+        <!-- ============================================================ -->
+        <!-- TAB 1: SYSTEM TELEMETRY -->
+        <!-- ============================================================ -->
+        <div id="tab-system" class="tab-panel active">
+            <div class="grid-cards">
+                <!-- Memory Card -->
+                <div class="m-card">
+                    <div class="m-card-top">
+                        <div class="m-card-title">Process Memory (RSS)</div>
+                        <div class="m-card-icon">🧠</div>
+                    </div>
+                    <div class="m-card-value" id="rssVal">— MB</div>
+                    <div class="m-card-sub" id="rssSub">Free Tier Cap: 512 MB</div>
+                    <div class="progress-bar-bg">
+                        <div id="rssBar" class="progress-bar-fill cyan" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Disk Storage Card -->
+                <div class="m-card">
+                    <div class="m-card-top">
+                        <div class="m-card-title">Disk Storage</div>
+                        <div class="m-card-icon">💾</div>
+                    </div>
+                    <div class="m-card-value" id="diskVal">— %</div>
+                    <div class="m-card-sub" id="diskSub">— GB free of — GB</div>
+                    <div class="progress-bar-bg">
+                        <div id="diskBar" class="progress-bar-fill emerald" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Active Threads Card -->
+                <div class="m-card">
+                    <div class="m-card-top">
+                        <div class="m-card-title">Active Threads</div>
+                        <div class="m-card-icon">🧵</div>
+                    </div>
+                    <div class="m-card-value" id="threadsVal">—</div>
+                    <div class="m-card-sub" id="threadsSub">Python Concurrency</div>
+                </div>
+
+                <!-- Database Status Card -->
+                <div class="m-card">
+                    <div class="m-card-top">
+                        <div class="m-card-title">Database Ping</div>
+                        <div class="m-card-icon">⚡</div>
+                    </div>
+                    <div class="m-card-value" id="dbPingVal">— ms</div>
+                    <div class="m-card-sub" id="dbStatusSub">State: Checking...</div>
+                </div>
+            </div>
+
+            <!-- Server Specs & Runtime Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">🖥️ Server Runtime Information</div>
+                    <button class="btn btn-outline" onclick="triggerGC()">🧹 Run Garbage Collection</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <tbody>
+                            <tr>
+                                <th style="width: 250px;">Operating System</th>
+                                <td id="specOs">—</td>
+                            </tr>
+                            <tr>
+                                <th>Python Environment</th>
+                                <td id="specPython">—</td>
+                            </tr>
+                            <tr>
+                                <th>Server Start & Uptime</th>
+                                <td id="specUptime">—</td>
+                            </tr>
+                            <tr>
+                                <th>Tracked GC Objects</th>
+                                <td id="specGc">—</td>
+                            </tr>
+                            <tr>
+                                <th>Telemetry Engine</th>
+                                <td id="specEngine">—</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TAB 2: APPLICATION LOGS -->
+        <!-- ============================================================ -->
+        <div id="tab-logs" class="tab-panel">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">📜 Real-time Application Log Stream</div>
+                    <div class="filter-row">
+                        <input type="text" id="logSearch" class="input-dark" placeholder="Search log text..." onkeyup="filterLogs()">
+                        <select id="logLevel" class="input-dark" onchange="fetchLogs()">
+                            <option value="ALL">All Levels</option>
+                            <option value="ERROR">Errors Only</option>
+                            <option value="WARNING">Warnings</option>
+                            <option value="INFO">Info</option>
+                        </select>
+                        <button class="btn btn-outline" onclick="emitTestLog('INFO')">+ Test INFO</button>
+                        <button class="btn btn-outline" onclick="emitTestLog('WARNING')">+ Test WARN</button>
+                        <button class="btn btn-danger" onclick="emitTestLog('ERROR')">+ Test ERR</button>
+                        <button class="btn btn-outline" onclick="clearLogs()">Clear Buffer</button>
+                    </div>
+                </div>
+
+                <div id="terminalStream" class="terminal-box">
+                    <div class="terminal-line"><span class="log-ts">Connecting to log stream...</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TAB 3: DATABASE HEALTH -->
+        <!-- ============================================================ -->
+        <div id="tab-database" class="tab-panel">
+            <div class="grid-cards">
+                <div class="m-card">
+                    <div class="m-card-top">
+                        <div class="m-card-title">Database Name</div>
+                        <div class="m-card-icon">🗄️</div>
+                    </div>
+                    <div class="m-card-value" id="dbNameVal">—</div>
+                    <div class="m-card-sub" id="dbEngineSub">MySQL / MariaDB</div>
+                </div>
+                <div class="m-card">
+                    <div class="m-card-top">
+                        <div class="m-card-title">Total Database Size</div>
+                        <div class="m-card-icon">📊</div>
+                    </div>
+                    <div class="m-card-value" id="dbSizeVal">— MB</div>
+                    <div class="m-card-sub">Data + Indices</div>
+                </div>
+                <div class="m-card">
+                    <div class="m-card-top">
+                        <div class="m-card-title">Total Tables</div>
+                        <div class="m-card-icon">📑</div>
+                    </div>
+                    <div class="m-card-value" id="dbTableCountVal">—</div>
+                    <div class="m-card-sub" id="dbRowsSub">— Total Records</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">📑 MySQL Table Statistics (information_schema)</div>
+                    <button class="btn btn-outline" onclick="fetchDbHealth()">🔄 Refresh Tables</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Table Name</th>
+                                <th>Rows</th>
+                                <th>Data Size</th>
+                                <th>Index Size</th>
+                                <th>Total Size</th>
+                                <th>Storage Engine</th>
+                                <th>Collation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dbTableRows">
+                            <tr><td colspan="7" style="text-align: center; color: var(--text-dim);">Loading table statistics...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TAB 4: SECURITY & AUDIT -->
+        <!-- ============================================================ -->
+        <div id="tab-security" class="tab-panel">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">🔒 Account Lockouts & Failed Login Attempts</div>
+                    <button class="btn btn-outline" onclick="fetchSecurityAudit()">🔄 Refresh Audit</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Attempt Key</th>
+                                <th>Fail Count</th>
+                                <th>Lock Status</th>
+                                <th>Locked Until</th>
+                                <th>Last Failed Attempt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lockoutTableRows">
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-dim);">Checking login attempts...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">👤 Biometric Face Recognition Mismatch Events</div>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Employee</th>
+                                <th>Distance Score</th>
+                                <th>IP Address</th>
+                                <th>User Agent</th>
+                            </tr>
+                        </thead>
+                        <tbody id="faceMismatchTableRows">
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-dim);">Loading biometric mismatch audit...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast-notify">Action performed successfully</div>
+
+    <script>
+        const CSRF = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.display = 'block';
+            setTimeout(() => { t.style.display = 'none'; }, 3000);
+        }
+
+        // Tab Switching
+        function switchTab(name) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+            const panel = document.getElementById(`tab-${name}`);
+            if (panel) panel.classList.add('active');
+
+            // Find clicked button
+            const buttons = document.querySelectorAll('.tab-btn');
+            if (name === 'system') buttons[0].classList.add('active');
+            if (name === 'logs') { buttons[1].classList.add('active'); fetchLogs(); }
+            if (name === 'database') { buttons[2].classList.add('active'); fetchDbHealth(); }
+            if (name === 'security') { buttons[3].classList.add('active'); fetchSecurityAudit(); }
+        }
+
+        // Fetch System Metrics
+        async function fetchMetrics() {
+            try {
+                const res = await fetch('/developer/api/metrics');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                // Banner
+                document.getElementById('bannerUptime').innerText = data.server.uptime;
+                document.getElementById('bannerDbLatency').innerText = data.database.latency_ms !== null ? `${data.database.latency_ms} ms` : 'N/A';
+                
+                // Cards
+                const rss = data.resources.process_rss_mb || data.resources.memory_used_mb || 0;
+                document.getElementById('rssVal').innerText = `${rss} MB`;
+                document.getElementById('bannerRam').innerText = `${rss} MB`;
+                
+                // Render 512MB bar
+                const rssPct = Math.min(100, Math.round((rss / 512) * 100));
+                const rssBar = document.getElementById('rssBar');
+                rssBar.style.width = `${rssPct}%`;
+                if (rssPct > 80) rssBar.className = 'progress-bar-fill rose';
+                else rssBar.className = 'progress-bar-fill cyan';
+
+                // Disk
+                document.getElementById('diskVal').innerText = `${data.resources.disk_percent}%`;
+                document.getElementById('diskSub').innerText = `${data.resources.disk_free_gb} GB free of ${data.resources.disk_total_gb} GB`;
+                document.getElementById('diskBar').style.width = `${data.resources.disk_percent}%`;
+
+                // Threads & DB
+                document.getElementById('threadsVal').innerText = data.server.active_threads;
+                document.getElementById('dbPingVal').innerText = data.database.latency_ms !== null ? `${data.database.latency_ms} ms` : 'Err';
+                document.getElementById('dbStatusSub').innerText = `State: ${data.database.status}`;
+
+                // Runtime Table
+                document.getElementById('specOs').innerText = data.server.os;
+                document.getElementById('specPython').innerText = data.server.python;
+                document.getElementById('specUptime').innerText = `${data.server.uptime} (${data.server.uptime_seconds}s)`;
+                document.getElementById('specGc').innerText = `${data.server.gc_objects.toLocaleString()} objects`;
+                document.getElementById('specEngine').innerText = data.resources.has_psutil ? 'Full Telemetry (psutil active)' : 'Standard Telemetry (fallback engine)';
+            } catch (err) {
+                console.error('Metrics fetch error:', err);
+            }
+        }
+
+        // Fetch Live Logs
+        let cachedLogs = [];
+        async function fetchLogs() {
+            try {
+                const level = document.getElementById('logLevel').value;
+                const res = await fetch(`/developer/api/logs?level=${encodeURIComponent(level)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                cachedLogs = data.logs || [];
+                renderLogs();
+            } catch (err) {
+                console.error('Logs fetch error:', err);
+            }
+        }
+
+        function renderLogs() {
+            const stream = document.getElementById('terminalStream');
+            const q = document.getElementById('logSearch').value.toLowerCase();
+            
+            const filtered = cachedLogs.filter(l => {
+                if (!q) return true;
+                return l.message.toLowerCase().includes(q) || l.name.toLowerCase().includes(q);
+            });
+
+            if (filtered.length === 0) {
+                stream.innerHTML = '<div class="terminal-line"><span class="log-ts">No log entries matching filter.</span></div>';
+                return;
+            }
+
+            stream.innerHTML = filtered.map(item => `
+                <div class="terminal-line">
+                    <span class="log-ts">${item.timestamp}</span>
+                    <span class="log-lvl ${item.level}">[${item.level}]</span>
+                    <span class="log-msg">${escapeHtml(item.message)}</span>
+                </div>
+            `).join('');
+        }
+
+        function filterLogs() {
+            renderLogs();
+        }
+
+        async function emitTestLog(level) {
+            try {
+                const res = await fetch('/developer/api/test-log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF() },
+                    body: JSON.stringify({ level: level, message: `Manual test log triggered from Super Admin UI at ${new Date().toLocaleTimeString()}` })
+                });
+                const data = await res.json();
+                showToast(data.message);
+                fetchLogs();
+            } catch (err) {
+                showToast('Failed to emit test log');
+            }
+        }
+
+        async function clearLogs() {
+            try {
+                const res = await fetch('/developer/api/clear-logs', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': CSRF() }
+                });
+                showToast('Log buffer cleared');
+                fetchLogs();
+            } catch (err) {
+                showToast('Failed to clear logs');
+            }
+        }
+
+        // Garbage Collection Trigger
+        async function triggerGC() {
+            try {
+                showToast('Running garbage collection...');
+                const res = await fetch('/developer/api/run-gc', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': CSRF() }
+                });
+                const data = await res.json();
+                showToast(data.message);
+                fetchMetrics();
+            } catch (err) {
+                showToast('Failed to trigger GC');
+            }
+        }
+
+        // Fetch DB Health
+        async function fetchDbHealth() {
+            try {
+                const res = await fetch('/developer/api/db-health');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                document.getElementById('dbNameVal').innerText = data.database_name;
+                document.getElementById('dbSizeVal').innerText = `${data.total_size_mb} MB`;
+                document.getElementById('dbTableCountVal').innerText = data.table_count;
+                document.getElementById('dbRowsSub').innerText = `${data.total_rows.toLocaleString()} Total Records`;
+
+                const tbody = document.getElementById('dbTableRows');
+                tbody.innerHTML = data.tables.map(t => `
+                    <tr>
+                        <td><strong>${escapeHtml(t.table_name)}</strong></td>
+                        <td>${(t.table_rows || 0).toLocaleString()}</td>
+                        <td>${t.data_mb} MB</td>
+                        <td>${t.index_mb} MB</td>
+                        <td><span class="badge badge-info">${t.total_mb} MB</span></td>
+                        <td>${t.engine || 'InnoDB'}</td>
+                        <td><span style="color: var(--text-dim); font-size: 0.8rem;">${t.collation || 'utf8mb4'}</span></td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error('DB health fetch error:', err);
+            }
+        }
+
+        // Fetch Security Audit
+        async function fetchSecurityAudit() {
+            try {
+                const res = await fetch('/developer/api/security-audit');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                // Lockouts
+                const lBody = document.getElementById('lockoutTableRows');
+                if (!data.lockouts || data.lockouts.length === 0) {
+                    lBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--emerald);">✓ No recorded failed attempts or account lockouts.</td></tr>';
+                } else {
+                    lBody.innerHTML = data.lockouts.map(l => `
+                        <tr>
+                            <td><code>${escapeHtml(l.attempt_key)}</code></td>
+                            <td><span class="badge ${l.fail_count > 3 ? 'badge-err' : 'badge-warn'}">${l.fail_count} fails</span></td>
+                            <td>${l.is_currently_locked ? '<span class="badge badge-err">LOCKED</span>' : '<span class="badge badge-ok">Normal</span>'}</td>
+                            <td>${l.locked_until || '—'}</td>
+                            <td>${l.last_attempt || '—'}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Face mismatches
+                const fBody = document.getElementById('faceMismatchTableRows');
+                if (!data.face_mismatches || data.face_mismatches.length === 0) {
+                    fBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--emerald);">✓ No biometric mismatches recorded.</td></tr>';
+                } else {
+                    fBody.innerHTML = data.face_mismatches.map(m => `
+                        <tr>
+                            <td>${m.attempted_at}</td>
+                            <td><strong>${escapeHtml(m.full_name || 'Emp #' + m.employee_id)}</strong> <span style="color: var(--text-dim);">(${m.role || 'employee'})</span></td>
+                            <td><span class="badge badge-err">${m.distance_score !== null ? m.distance_score.toFixed(4) : 'N/A'}</span></td>
+                            <td><code>${escapeHtml(m.ip_address || 'unknown')}</code></td>
+                            <td><span style="font-size: 0.78rem; color: var(--text-dim);">${escapeHtml(m.user_agent || '—')}</span></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Security audit fetch error:', err);
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Initialize polling
+        fetchMetrics();
+        setInterval(fetchMetrics, 5000);
+        setInterval(() => {
+            if (document.getElementById('tab-logs').classList.contains('active')) {
+                fetchLogs();
+            }
+        }, 3000);
+    </script>
+</body>
+</html>
