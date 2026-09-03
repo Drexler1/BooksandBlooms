@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import hmac
 import platform
 import shutil
 import threading
@@ -22,6 +23,12 @@ developer_bp = Blueprint(
 # Record server boot time
 _SERVER_START_TIME = time.time()
 _mysql_ref = None
+
+# -- PIN brute-force tracking (in-memory, per IP) ----------------------------
+# { ip: {"attempts": int, "lockout_until": float | None} }
+_pin_attempts = {}
+_PIN_MAX_ATTEMPTS = 5
+_PIN_LOCKOUT_SECONDS = 600  # 10 minutes
 
 # Optional psutil for detailed RAM/CPU tracking
 try:
@@ -55,25 +62,109 @@ def init_developer_bp(app, mysql_instance=None):
     return developer_bp
 
 
+def _get_correct_pin():
+    """Return the configured DEV_CONSOLE_PIN from env."""
+    return str(os.environ.get("DEV_CONSOLE_PIN", "")).strip()
+
+
+def _pin_check(submitted):
+    """Constant-time comparison of submitted PIN against the configured PIN."""
+    correct = _get_correct_pin()
+    if not correct or len(correct) != 6 or not correct.isdigit():
+        return False
+    return hmac.compare_digest(submitted, correct)
+
+
+def _ip_lockout_state(ip):
+    """Return the brute-force state for the given IP."""
+    state = _pin_attempts.get(ip, {"attempts": 0, "lockout_until": None})
+    if state["lockout_until"] and time.time() > state["lockout_until"]:
+        state = {"attempts": 0, "lockout_until": None}
+        _pin_attempts[ip] = state
+    return state
+
+
+def _is_dev_authenticated():
+    """Check that the current session has a valid developer authentication token."""
+    return session.get("dev_authenticated") is True
+
+
+# -- Before-request guard -----------------------------------------------------
 @developer_bp.before_request
-def require_super_admin():
+def require_dev_auth():
     """
-    Strict security check: only authenticated super admins can access developer routes.
-    Cashiers and managers are blocked.
+    Gate every /developer route behind the Developer PIN session.
+    The regular admin/manager session is irrelevant here.
     """
-    is_super = session.get("role") == "admin" and "admin_id" in session
-    if not is_super:
+    if request.endpoint in ("developer.dev_login", "developer.dev_logout"):
+        return
+
+    if not _is_dev_authenticated():
         if request.path.startswith("/developer/api/"):
-            return jsonify({"status": "error", "message": "Super Admin access required."}), 403
-        return redirect(url_for("login"))
+            return jsonify({"status": "error", "message": "Developer authentication required."}), 403
+        return redirect(url_for("developer.dev_login"))
 
 
+# -- PIN Login ----------------------------------------------------------------
+@developer_bp.route("/login", methods=["GET", "POST"])
+def dev_login():
+    """Dedicated 6-digit PIN login for the Developer Console."""
+    if _is_dev_authenticated():
+        return redirect(url_for("developer.dashboard"))
+
+    error = None
+    ip = request.remote_addr or "unknown"
+
+    if request.method == "POST":
+        state = _ip_lockout_state(ip)
+
+        if state["lockout_until"] and time.time() < state["lockout_until"]:
+            remaining = int(state["lockout_until"] - time.time())
+            mins = remaining // 60
+            secs = remaining % 60
+            error = "Too many failed attempts. Try again in {}m {}s.".format(mins, secs)
+        else:
+            digits = "".join(
+                request.form.get("d{}".format(i), "").strip() for i in range(1, 7)
+            )
+            if _pin_check(digits):
+                session["dev_authenticated"] = True
+                session.permanent = True
+                _pin_attempts.pop(ip, None)
+                current_app.logger.info("[developer] Console unlocked from IP {}".format(ip))
+                return redirect(url_for("developer.dashboard"))
+            else:
+                state["attempts"] = state.get("attempts", 0) + 1
+                if state["attempts"] >= _PIN_MAX_ATTEMPTS:
+                    state["lockout_until"] = time.time() + _PIN_LOCKOUT_SECONDS
+                    error = "Too many failed attempts. Locked for {} minutes.".format(_PIN_LOCKOUT_SECONDS // 60)
+                    current_app.logger.warning(
+                        "[developer] PIN brute-force lockout triggered for IP {}".format(ip)
+                    )
+                else:
+                    remaining_tries = _PIN_MAX_ATTEMPTS - state["attempts"]
+                    plural = "s" if remaining_tries != 1 else ""
+                    error = "Incorrect PIN. {} attempt{} remaining.".format(remaining_tries, plural)
+                _pin_attempts[ip] = state
+
+    return render_template("dev_login.html", error=error)
+
+
+# -- PIN Logout ---------------------------------------------------------------
+@developer_bp.route("/logout", methods=["POST"])
+def dev_logout():
+    """Clear the developer session and return to the PIN login screen."""
+    session.pop("dev_authenticated", None)
+    current_app.logger.info("[developer] Developer Console session ended.")
+    return redirect(url_for("developer.dev_login"))
+
+
+# -- Main Console -------------------------------------------------------------
 @developer_bp.route("")
 @developer_bp.route("/")
 def dashboard():
-    """Render the Developer & Super Admin Monitoring Dashboard."""
-    full_name = session.get("full_name") or "Super Admin"
-    return render_template("dashboard.html", admin_name=full_name)
+    """Render the Developer Super Admin Monitoring Dashboard."""
+    return render_template("dashboard.html")
 
 
 @developer_bp.route("/api/metrics", methods=["GET"])

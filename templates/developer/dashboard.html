@@ -567,10 +567,9 @@
                 <span class="status-dot"></span>
                 <span>Telemetry Online</span>
             </div>
-            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">← Back to Admin</a>
-            <form method="POST" action="{{ url_for('logout') }}" style="display:inline; margin:0;">
+            <form method="POST" action="{{ url_for('developer.dev_logout') }}" style="display:inline; margin:0;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-danger">Logout</button>
+                <button type="submit" class="btn btn-danger">🔒 Lock Console</button>
             </form>
         </div>
     </header>
