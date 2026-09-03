@@ -42,11 +42,15 @@
             font-family: var(--sans);
             background: var(--bg);
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
+            padding: 24px 16px;
+            overflow-x: hidden;
+            overflow-y: auto;
             position: relative;
+            box-sizing: border-box;
         }
 
         /* ── Animated background mesh ── */
@@ -54,6 +58,7 @@
             position: fixed;
             inset: 0;
             z-index: 0;
+            pointer-events: none;
             background:
                 radial-gradient(ellipse 60% 50% at 20% 30%,  rgba(201,169,97,.07) 0%, transparent 70%),
                 radial-gradient(ellipse 50% 40% at 80% 70%,  rgba(56,189,248,.06) 0%, transparent 70%),
@@ -71,6 +76,7 @@
             position: fixed;
             inset: 0;
             z-index: 0;
+            pointer-events: none;
             background-image:
                 linear-gradient(rgba(201,169,97,.04) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(201,169,97,.04) 1px, transparent 1px);
@@ -81,28 +87,29 @@
         /* ── Corner accent lines ── */
         .corner {
             position: fixed;
-            width: 80px; height: 80px;
+            width: 60px; height: 60px;
             z-index: 1;
-            opacity: .4;
+            opacity: .35;
+            pointer-events: none;
         }
         .corner::before, .corner::after {
             content: '';
             position: absolute;
             background: var(--gold-dim);
         }
-        .corner.tl { top:24px; left:24px; }
-        .corner.tr { top:24px; right:24px; }
-        .corner.bl { bottom:24px; left:24px; }
-        .corner.br { bottom:24px; right:24px; }
+        .corner.tl { top:20px; left:20px; }
+        .corner.tr { top:20px; right:20px; }
+        .corner.bl { bottom:20px; left:20px; }
+        .corner.br { bottom:20px; right:20px; }
 
-        .corner.tl::before { width:1px; height:40px; top:0; left:0; }
-        .corner.tl::after  { width:40px; height:1px; top:0; left:0; }
-        .corner.tr::before { width:1px; height:40px; top:0; right:0; }
-        .corner.tr::after  { width:40px; height:1px; top:0; right:0; }
-        .corner.bl::before { width:1px; height:40px; bottom:0; left:0; }
-        .corner.bl::after  { width:40px; height:1px; bottom:0; left:0; }
-        .corner.br::before { width:1px; height:40px; bottom:0; right:0; }
-        .corner.br::after  { width:40px; height:1px; bottom:0; right:0; }
+        .corner.tl::before { width:1px; height:30px; top:0; left:0; }
+        .corner.tl::after  { width:30px; height:1px; top:0; left:0; }
+        .corner.tr::before { width:1px; height:30px; top:0; right:0; }
+        .corner.tr::after  { width:30px; height:1px; top:0; right:0; }
+        .corner.bl::before { width:1px; height:30px; bottom:0; left:0; }
+        .corner.bl::after  { width:30px; height:1px; bottom:0; left:0; }
+        .corner.br::before { width:1px; height:30px; bottom:0; right:0; }
+        .corner.br::after  { width:30px; height:1px; bottom:0; right:0; }
 
         /* ── Main card ── */
         .card {
@@ -110,19 +117,20 @@
             z-index: 10;
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 44px 40px 40px;
+            border-radius: 18px;
+            padding: 30px 26px 22px;
             width: 100%;
-            max-width: 420px;
+            max-width: 360px;
+            margin: auto;
             box-shadow:
-                0 0 0 1px rgba(201,169,97,.05),
-                0 40px 80px rgba(0,0,0,.6),
-                0 0 60px rgba(201,169,97,.04) inset;
-            animation: cardIn .5s cubic-bezier(.22,1,.36,1) both;
+                0 0 0 1px rgba(201,169,97,.06),
+                0 30px 60px rgba(0,0,0,.65),
+                0 0 50px rgba(201,169,97,.03) inset;
+            animation: cardIn .45s cubic-bezier(.22,1,.36,1) both;
         }
 
         @keyframes cardIn {
-            from { opacity:0; transform:translateY(24px) scale(.97); }
+            from { opacity:0; transform:translateY(16px) scale(.98); }
             to   { opacity:1; transform:none; }
         }
 
@@ -130,35 +138,36 @@
         .card::before {
             content:'';
             position: absolute;
-            top: 0; left: 40px; right: 40px; height: 1px;
+            top: 0; left: 30px; right: 30px; height: 1px;
             background: linear-gradient(90deg, transparent, var(--gold), transparent);
-            opacity: .6;
+            opacity: .7;
             border-radius: 1px;
         }
 
         /* ── Brand header ── */
         .brand {
             text-align: center;
-            margin-bottom: 32px;
+            margin-bottom: 18px;
         }
 
         .brand-icon {
-            width: 52px; height: 52px;
-            border-radius: 14px;
+            width: 44px; height: 44px;
+            border-radius: 12px;
             border: 1px solid var(--border-hi);
             background: linear-gradient(135deg, var(--bg-panel), var(--bg-card));
             display: flex; align-items:center; justify-content:center;
-            margin: 0 auto 16px;
-            font-size: 1.4rem;
-            box-shadow: 0 0 20px var(--gold-glow2);
+            margin: 0 auto 10px;
+            font-size: 1.25rem;
+            box-shadow: 0 0 18px var(--gold-glow2);
         }
 
         .brand-name {
             font-family: var(--serif);
-            font-size: 1.45rem;
+            font-size: 1.35rem;
             color: var(--text);
             letter-spacing: .5px;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
+            line-height: 1.2;
         }
 
         .brand-name em {
@@ -168,22 +177,22 @@
 
         .brand-sub {
             font-family: var(--mono);
-            font-size: .68rem;
-            letter-spacing: 2.5px;
+            font-size: .65rem;
+            letter-spacing: 2.2px;
             text-transform: uppercase;
             color: var(--muted);
         }
 
         /* ── Divider ── */
         .divider {
-            display: flex; align-items:center; gap:12px;
-            margin-bottom: 28px;
+            display: flex; align-items:center; gap:10px;
+            margin-bottom: 16px;
         }
         .divider-line { flex:1; height:1px; background:var(--border); }
         .divider-label {
             font-family: var(--mono);
-            font-size: .65rem;
-            letter-spacing: 2px;
+            font-size: .62rem;
+            letter-spacing: 1.8px;
             text-transform: uppercase;
             color: var(--dim);
         }
@@ -193,11 +202,11 @@
             display: flex;
             justify-content: center;
             gap: 12px;
-            margin-bottom: 28px;
+            margin-bottom: 18px;
         }
 
         .pin-dot {
-            width: 16px; height: 16px;
+            width: 14px; height: 14px;
             border-radius: 50%;
             border: 2px solid var(--dim);
             background: transparent;
@@ -227,18 +236,18 @@
         .keypad {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin-bottom: 14px;
         }
 
         .key {
-            aspect-ratio: 1;
+            height: 50px;
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 10px;
             background: var(--bg-panel);
             color: var(--text);
             font-family: var(--mono);
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             font-weight: 500;
             cursor: pointer;
             transition: all .15s ease;
@@ -246,6 +255,7 @@
             user-select: none;
             position: relative;
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .key::after {
@@ -261,23 +271,23 @@
             border-color: var(--border-hi);
             background: #1a2030;
             transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(0,0,0,.3);
+            box-shadow: 0 4px 14px rgba(0,0,0,.3);
         }
 
         .key:hover::after { opacity:1; }
 
         .key:active {
-            transform: scale(.94);
+            transform: scale(.95);
             background: #1e2840;
             border-color: var(--gold-dim);
-            box-shadow: 0 0 12px var(--gold-glow);
+            box-shadow: 0 0 10px var(--gold-glow);
         }
 
         .key.key-zero { grid-column: 2; }
 
         .key.key-del {
             color: var(--muted);
-            font-size: 1rem;
+            font-size: .95rem;
         }
 
         .key.key-del:hover { color: var(--rose); border-color: rgba(248,113,113,.3); }
@@ -285,32 +295,32 @@
         /* ── Submit button ── */
         .btn-submit {
             width: 100%;
-            padding: 14px;
+            padding: 12px;
             background: linear-gradient(135deg, #b8923a, var(--gold), #d4b06a);
             background-size: 200% 200%;
             background-position: 0% 50%;
             border: none;
-            border-radius: var(--radius);
+            border-radius: 10px;
             color: #0c0e12;
             font-family: var(--mono);
-            font-size: .85rem;
+            font-size: .82rem;
             font-weight: 700;
             letter-spacing: 2px;
             text-transform: uppercase;
             cursor: pointer;
-            transition: all .3s ease;
-            box-shadow: 0 4px 20px rgba(201,169,97,.2);
-            margin-bottom: 12px;
+            transition: all .25s ease;
+            box-shadow: 0 4px 18px rgba(201,169,97,.2);
+            margin-bottom: 10px;
         }
 
         .btn-submit:hover {
             background-position: 100% 50%;
-            box-shadow: 0 6px 28px rgba(201,169,97,.35);
+            box-shadow: 0 6px 24px rgba(201,169,97,.35);
             transform: translateY(-1px);
         }
 
         .btn-submit:active { transform:scale(.98); }
-        .btn-submit:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+        .btn-submit:disabled { opacity:.35; cursor:not-allowed; transform:none; }
 
         /* ── Error message ── */
         .error-box {
@@ -320,8 +330,8 @@
             background: rgba(248,113,113,.08);
             border: 1px solid rgba(248,113,113,.25);
             border-radius: 10px;
-            padding: 12px 14px;
-            margin-bottom: 16px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
             animation: shakeIn .4s ease;
         }
 
@@ -333,10 +343,10 @@
             100%{ transform:translateX(0); }
         }
 
-        .error-icon { font-size:1rem; flex-shrink:0; }
+        .error-icon { font-size:.95rem; flex-shrink:0; }
 
         .error-text {
-            font-size: .82rem;
+            font-size: .8rem;
             color: var(--rose);
             line-height: 1.4;
         }
@@ -345,11 +355,10 @@
         .footer-note {
             text-align: center;
             font-family: var(--mono);
-            font-size: .62rem;
-            letter-spacing: 1.5px;
+            font-size: .6rem;
+            letter-spacing: 1.3px;
             text-transform: uppercase;
             color: var(--dim);
-            margin-top: 8px;
         }
 
         /* ── Hidden digit inputs (submitted via form) ── */
@@ -366,6 +375,113 @@
             60% { transform:translateX(-5px); }
             80% { transform:translateX(5px); }
             100%{ transform:translateX(0); }
+        }
+
+        /* ── Responsive: Mobile Devices (<= 480px width) ── */
+        @media (max-width: 480px) {
+            body {
+                padding: 16px 12px;
+            }
+            .corner {
+                display: none;
+            }
+            .card {
+                max-width: 100%;
+                padding: 24px 18px 18px;
+                border-radius: 16px;
+            }
+            .card::before {
+                left: 20px; right: 20px;
+            }
+            .brand {
+                margin-bottom: 14px;
+            }
+            .brand-icon {
+                width: 40px; height: 40px;
+                font-size: 1.15rem;
+                margin-bottom: 8px;
+            }
+            .brand-name {
+                font-size: 1.25rem;
+            }
+            .divider {
+                margin-bottom: 14px;
+            }
+            .pin-display {
+                margin-bottom: 16px;
+                gap: 10px;
+            }
+            .pin-dot {
+                width: 12px; height: 12px;
+            }
+            .keypad {
+                gap: 7px;
+                margin-bottom: 12px;
+            }
+            .key {
+                height: 46px;
+                font-size: 1.1rem;
+            }
+            .btn-submit {
+                padding: 11px;
+                font-size: .78rem;
+                margin-bottom: 8px;
+            }
+        }
+
+        /* ── Responsive: Compact Viewport Height (<= 680px height) ── */
+        @media (max-height: 680px) {
+            body {
+                padding: 10px 12px;
+            }
+            .corner {
+                display: none;
+            }
+            .card {
+                padding: 18px 20px 14px;
+            }
+            .brand {
+                margin-bottom: 10px;
+            }
+            .brand-icon {
+                width: 34px; height: 34px;
+                font-size: 1rem;
+                margin-bottom: 5px;
+            }
+            .brand-name {
+                font-size: 1.15rem;
+                margin-bottom: 2px;
+            }
+            .brand-sub {
+                font-size: .58rem;
+                letter-spacing: 1.5px;
+            }
+            .divider {
+                margin-bottom: 10px;
+            }
+            .pin-display {
+                margin-bottom: 12px;
+                gap: 8px;
+            }
+            .pin-dot {
+                width: 11px; height: 11px;
+            }
+            .keypad {
+                gap: 6px;
+                margin-bottom: 8px;
+            }
+            .key {
+                height: 40px;
+                font-size: 1rem;
+            }
+            .btn-submit {
+                padding: 9px;
+                font-size: .72rem;
+                margin-bottom: 6px;
+            }
+            .footer-note {
+                font-size: .54rem;
+            }
         }
     </style>
 </head>
