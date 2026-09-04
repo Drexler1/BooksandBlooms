@@ -855,9 +855,13 @@ threading.Thread(target=_preload_embedding_cache, daemon=True).start()
 # ── Session cookie security flags ────────────────────────────────────────
 app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS cannot read the cookie
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # CSRF mitigation
-# True only on Railway (RAILWAY_ENVIRONMENT is injected automatically by Railway).
+# True on Railway / production (detects Railway's environment variables).
 # Local dev runs on plain HTTP, so Secure=True would silently drop the session cookie.
-app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+app.config["SESSION_COOKIE_SECURE"] = bool(
+    os.environ.get("RAILWAY_ENVIRONMENT")
+    or os.environ.get("RAILWAY_ENVIRONMENT_NAME")
+    or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+)
 
 # ── HTTP security headers ─────────────────────────────────────────────────
 @app.after_request
@@ -866,6 +870,11 @@ def set_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
+    # Prevent browsers from caching login forms with stale CSRF tokens
+    if request.path in ("/login", "/", "/developer/login"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"]        = "no-cache"
+        response.headers["Expires"]       = "0"
     return response
 
 
@@ -1744,8 +1753,8 @@ def handle_csrf_error(e):
             jsonify({"success": False, "message": "CSRF token missing or invalid"}),
             400,
         )
-    flash("Session expired or invalid request. Please try again.", "danger")
-    return redirect(url_for("login")), 400
+    flash("Session expired or security token mismatch. Please sign in again.", "danger")
+    return redirect(url_for("login"))
 
 
 @app.errorhandler(413)
