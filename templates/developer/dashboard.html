@@ -1534,6 +1534,7 @@
                             <button class="btn btn-outline" onclick="emitTestLog('WARNING')">+ Test WARN</button>
                             <button class="btn btn-danger" onclick="emitTestLog('ERROR')">+ Test ERR</button>
                             <button class="btn btn-outline" onclick="clearLogs()">Clear Buffer</button>
+                            <button class="btn btn-outline" id="copyLogBtn" onclick="copyLogs()" title="Copy visible log entries to clipboard">📋 Copy Log</button>
                         </div>
                     </div>
 
@@ -1982,6 +1983,43 @@
                 fetchLogs();
             } catch (err) {
                 showToast('Failed to clear logs');
+            }
+        }
+
+        async function copyLogs() {
+            const q = document.getElementById('logSearch').value.toLowerCase();
+            const filtered = cachedLogs.filter(l => {
+                if (!q) return true;
+                return l.message.toLowerCase().includes(q) || l.name.toLowerCase().includes(q);
+            });
+
+            if (filtered.length === 0) {
+                showToast('No log entries to copy.');
+                return;
+            }
+
+            const text = filtered.map(item =>
+                `${item.timestamp} [${item.level}] ${item.message}`
+            ).join('\n');
+
+            try {
+                await navigator.clipboard.writeText(text);
+                const btn = document.getElementById('copyLogBtn');
+                const original = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                btn.disabled = true;
+                setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 2000);
+                showToast(`Copied ${filtered.length} log entr${filtered.length === 1 ? 'y' : 'ies'} to clipboard.`);
+            } catch (err) {
+                // Fallback for browsers/contexts where clipboard API is unavailable
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast(`Copied ${filtered.length} log entr${filtered.length === 1 ? 'y' : 'ies'} to clipboard.`);
             }
         }
 
