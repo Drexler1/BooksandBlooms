@@ -153,26 +153,13 @@ def _is_logged_in_as_non_dev_staff():
 def require_dev_auth():
     """
     Gate every /developer route behind the Developer PIN session.
-    Regular store administrators, managers, and staff are strictly restricted.
+    Regular store administrators, managers, and staff cannot access without the developer PIN.
     """
-    # 1. Enforce that regular store staff cannot access the developer console
-    if _is_logged_in_as_non_dev_staff():
-        current_app.logger.warning(
-            f"[developer] Blocked unauthorized store account (role={session.get('role')}, admin_id={session.get('admin_id')}) from developer console."
-        )
-        if request.path.startswith("/developer/api/"):
-            return jsonify({
-                "status": "error",
-                "message": "Access restricted: Only the primary developer has access to the Developer Console."
-            }), 403
-        flash("Access Denied: The Developer Console is strictly restricted to the primary developer. Regular administrators do not have access.", "danger")
-        return redirect(url_for("dashboard"))
-
-    # 2. Allow login and logout endpoints through
+    # 1. Allow login and logout endpoints through
     if request.endpoint in ("developer.dev_login", "developer.dev_logout"):
         return
 
-    # 3. Require valid 6-digit PIN authentication
+    # 2. Require valid 6-digit PIN authentication
     if not _is_dev_authenticated():
         if request.path.startswith("/developer/api/"):
             return jsonify({"status": "error", "message": "Developer authentication required."}), 403
@@ -183,10 +170,6 @@ def require_dev_auth():
 @developer_bp.route("/login", methods=["GET", "POST"])
 def dev_login():
     """Dedicated 6-digit PIN login for the Developer Console."""
-    if _is_logged_in_as_non_dev_staff():
-        flash("Access Denied: The Developer Console is strictly restricted to the primary developer. Regular administrators do not have access.", "danger")
-        return redirect(url_for("dashboard"))
-
     if _is_dev_authenticated():
         return redirect(url_for("developer.dashboard"))
 
