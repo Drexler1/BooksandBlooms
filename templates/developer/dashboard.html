@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Books & Blooms — Developer & Super Admin Console</title>
+    <title>Books & Blooms — Developer Console</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1174,7 +1174,7 @@
     <div class="mobile-header">
         <div class="mobile-brand">
             <button class="mobile-toggle-btn" onclick="toggleSidebar(true)" aria-label="Open navigation menu">☰</button>
-            <span class="brand-badge" style="margin:0; font-size: 0.62rem;">Super Admin</span>
+            <span class="brand-badge" style="margin:0; font-size: 0.62rem;">Developer Console</span>
             <span class="mobile-brand-title">Books & Blooms</span>
         </div>
         <div style="display: flex; align-items: center; gap: 0.65rem;">
@@ -1196,7 +1196,7 @@
             <div class="sidebar-header">
                 <div class="sidebar-brand-row">
                     <div>
-                        <span class="brand-badge">Super Admin</span>
+                        <span class="brand-badge">Developer Console</span>
                         <div class="brand-title">Books & Blooms <span>Console</span></div>
                         <div class="brand-subtitle">System Telemetry & Control</div>
                     </div>
@@ -1304,11 +1304,11 @@
                         <div class="role-card">
                             <div class="role-card-header">
                                 <div class="role-icon-box gold">👑</div>
-                                <div class="role-status-tag gold">SUPER ADMIN</div>
+                                <div class="role-status-tag gold">ADMIN</div>
                             </div>
                             <div class="role-count" id="activeAdminsVal">—</div>
                             <div class="role-name">Active Admins</div>
-                            <div class="role-desc">Full Developer Console & System Privileges</div>
+                            <div class="role-desc">Store Administration & Management Privileges</div>
                         </div>
 
                         <!-- Managers -->
@@ -1769,7 +1769,7 @@
                 const res = await fetch('/developer/api/test-log', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF() },
-                    body: JSON.stringify({ level: level, message: `Manual test log triggered from Super Admin UI at ${new Date().toLocaleTimeString()}` })
+                    body: JSON.stringify({ level: level, message: `Manual test log triggered from Developer UI at ${new Date().toLocaleTimeString()}` })
                 });
                 const data = await res.json();
                 showToast(data.message);

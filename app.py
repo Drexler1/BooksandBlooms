@@ -795,7 +795,7 @@ app.config["MYSQL_WRITE_TIMEOUT"]   = 30
 mysql = MySQL(app)
 Compress(app)
 
-# ── Super Admin / Developer Monitoring Blueprint ─────────────────────────
+# ── Developer Monitoring Blueprint ──────────────────────────────────────
 init_developer_bp(app, mysql)
 
 # ── Warm DeepFace/Facenet at startup so first face-verify is fast ──────────
@@ -936,7 +936,7 @@ def is_admin():
       2. Admin via Manager tab — role='manager' AND is_admin=True
       3. Regular manager login — role='manager' AND is_admin=False
          (employees table row with role='manager'; has access to all
-          management pages but is NOT a super-admin)
+          management pages but is NOT a store admin)
 
     All page/API routes use this helper so both admin and manager paths
     are covered without duplicating logic.
@@ -950,14 +950,18 @@ def is_admin():
     return False
 
 
-def is_super_admin():
+def is_admin_user():
     """
-    Return True only for true admin accounts (not managers).
+    Return True only for true admin accounts in the admins table (not managers).
 
     Used to restrict sensitive configuration routes — like hourly rate
     edits and late-deduction settings — that managers must not access.
     """
     return session.get("role") == "admin" and "admin_id" in session
+
+
+# Standard role alias: 'super_admin' role standardized to 'admin'
+is_super_admin = is_admin_user
 
 
 def decode_base64_image(image_data: str):
@@ -1815,6 +1819,7 @@ def login():
             if user and _check_login_password(password, user):
                 session.clear()
                 session["admin_id"] = user["admin_id"]
+                session["username"] = (user.get("username") or "").strip()
                 session["role"] = "admin"
                 session["is_admin"] = True
                 session["full_name"] = (user.get("full_name") or "Admin").strip()
@@ -1833,6 +1838,7 @@ def login():
             if employee and _check_login_password(password, employee):
                 session.clear()
                 session["employee_id"] = employee["employee_id"]
+                session["username"] = (employee.get("username") or "").strip()
                 session["role"] = "manager"
                 session["is_admin"] = False
                 session["full_name"] = (employee.get("full_name") or "Manager").strip()
@@ -1854,6 +1860,7 @@ def login():
                 if admin and _check_login_password(password, admin):
                     session.clear()
                     session["admin_id"] = admin["admin_id"]
+                    session["username"] = (admin.get("username") or "").strip()
                     session["role"] = "admin"
                     session["is_admin"] = True
                     session["full_name"] = (admin.get("full_name") or "Admin").strip()
@@ -1872,6 +1879,7 @@ def login():
             if user and _check_login_password(password, user):
                 session.clear()
                 session["employee_id"] = user["employee_id"]
+                session["username"] = (user.get("username") or "").strip()
                 session["role"] = "cashier"
                 session["is_admin"] = False
                 session["full_name"] = (user.get("full_name") or "Cashier").strip()
@@ -3820,7 +3828,7 @@ def api_attendance():
 
 @app.route("/admin_settings")
 def admin_settings():
-    # Settings are restricted to super-admins only; managers are not permitted.
+    # Settings are restricted to admins only; managers are not permitted.
     if not is_super_admin():
         return redirect(url_for("login"))
 
@@ -4111,7 +4119,7 @@ def _ensure_email_settings_table():
 # ── GET  /api/settings/email ──────────────────────────────────────────────────
 @app.route("/api/settings/email", methods=["GET"])
 def api_get_email_settings():
-    """Return the current email / alert configuration (password masked). Super-admin only."""
+    """Return the current email / alert configuration (password masked). Admin only."""
     if not is_super_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 403
     _ensure_email_settings_table()
@@ -4417,7 +4425,7 @@ def api_send_daily_summary():
     Manually trigger the Daily Sales Summary email right now.
     Useful when the scheduled send time was already missed (e.g. server was
     just started after the target hour, or the admin wants a test run).
-    Super-admin only.
+    Admin only.
     """
     if not is_super_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 403
@@ -12713,7 +12721,7 @@ def api_backup_export():
     """
     Stream a JSON backup file for the requested export type.
     Query param:  ?type=full|sales|products   (default: full)
-    Auth:         super-admin only
+    Auth:         admin only
     """
     if not is_super_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 403
@@ -12778,7 +12786,7 @@ def api_backup_import():
     """
     Restore data from a previously exported JSON backup.
     Body:  the exact JSON produced by /api/backup/export
-    Auth:  super-admin only
+    Auth:  admin only
 
     Strategy: for each table present in the payload, DELETE existing rows
     then INSERT the backup rows inside a single transaction so the database

@@ -7,7 +7,7 @@ import shutil
 import threading
 import gc
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for, current_app
+from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for, current_app, flash
 from MySQLdb.cursors import DictCursor
 
 from developer import log_buffer
@@ -89,16 +89,90 @@ def _is_dev_authenticated():
     return session.get("dev_authenticated") is True
 
 
+def _get_primary_dev_username():
+    """Return the configured primary developer username (case-insensitive)."""
+    return str(os.environ.get("PRIMARY_DEV_USERNAME", "drexler")).strip().lower()
+
+
+def _is_logged_in_as_non_dev_staff():
+    """
+    Return True if the current browser session has a store staff login (admin, manager, cashier)
+    that does NOT belong to the designated primary developer.
+    """
+    role = session.get("role")
+    admin_id = session.get("admin_id")
+    emp_id = session.get("employee_id")
+
+    # If no store staff session is active at all, allow direct developer PIN authentication
+    if not role and not admin_id and not emp_id:
+        return False
+
+    # Store managers and cashiers are never developer accounts
+    if role in ("manager", "cashier") or emp_id:
+        return True
+
+    # If logged in as an admin, verify if this account is the primary developer
+    primary_dev = _get_primary_dev_username()
+    session_user = str(session.get("username") or "").strip().lower()
+
+    if session_user:
+        return session_user != primary_dev
+
+    # If username is not directly in the session, look it up from the admins table
+    if admin_id:
+        try:
+            mysql = get_db()
+            if mysql:
+                cur = mysql.connection.cursor()
+                cur.execute("SELECT username FROM admins WHERE admin_id=%s", (admin_id,))
+                row = cur.fetchone()
+                cur.close()
+                if row and row[0]:
+                    raw_u = row[0]
+                    # Check if plaintext or AES encrypted
+                    raw_key = os.environ.get("AES_SECRET_KEY", "")
+                    if raw_key and len(raw_u) >= 44:
+                        import hashlib, base64
+                        from Crypto.Cipher import AES
+                        from Crypto.Util.Padding import unpad
+                        k = hashlib.sha256(raw_key.encode()).digest()
+                        raw = base64.b64decode(raw_u)
+                        iv, ct = raw[:16], raw[16:]
+                        dec_u = unpad(AES.new(k, AES.MODE_CBC, iv).decrypt(ct), AES.block_size).decode("utf-8", errors="ignore")
+                        return dec_u.strip().lower() != primary_dev
+                    return str(raw_u).strip().lower() != primary_dev
+        except Exception as e:
+            current_app.logger.warning(f"[developer] Failed resolving admin username for dev check: {e}")
+
+    # Default: if an admin session exists but cannot be verified as the primary dev, treat as restricted
+    return True
+
+
 # -- Before-request guard -----------------------------------------------------
 @developer_bp.before_request
 def require_dev_auth():
     """
     Gate every /developer route behind the Developer PIN session.
-    The regular admin/manager session is irrelevant here.
+    Regular store administrators, managers, and staff are strictly restricted.
     """
+    # 1. Enforce that regular store staff cannot access the developer console
+    if _is_logged_in_as_non_dev_staff():
+        current_app.logger.warning(
+            f"[developer] Blocked unauthorized store account (role={session.get('role')}, admin_id={session.get('admin_id')}) from developer console."
+        )
+        if request.path.startswith("/developer/api/"):
+            return jsonify({
+                "status": "error",
+                "message": "Access restricted: Only the primary developer has access to the Developer Console."
+            }), 403
+        flash("Access Denied: The Developer Console is strictly restricted to the primary developer. Regular administrators do not have access.", "danger")
+        return redirect(url_for("dashboard"))
+
+    # 2. Allow login and logout endpoints through
     if request.endpoint in ("developer.dev_login", "developer.dev_logout"):
         return
 
+    # 3. Require valid 6-digit PIN authentication
     if not _is_dev_authenticated():
         if request.path.startswith("/developer/api/"):
             return jsonify({"status": "error", "message": "Developer authentication required."}), 403
@@ -109,6 +183,10 @@ def require_dev_auth():
 @developer_bp.route("/login", methods=["GET", "POST"])
 def dev_login():
     """Dedicated 6-digit PIN login for the Developer Console."""
+    if _is_logged_in_as_non_dev_staff():
+        flash("Access Denied: The Developer Console is strictly restricted to the primary developer. Regular administrators do not have access.", "danger")
+        return redirect(url_for("dashboard"))
+
     if _is_dev_authenticated():
         return redirect(url_for("developer.dashboard"))
 
@@ -163,7 +241,7 @@ def dev_logout():
 @developer_bp.route("")
 @developer_bp.route("/")
 def dashboard():
-    """Render the Developer Super Admin Monitoring Dashboard."""
+    """Render the Developer Monitoring Dashboard."""
     return render_template("dashboard.html")
 
 
