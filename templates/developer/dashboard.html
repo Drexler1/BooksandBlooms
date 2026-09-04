@@ -1294,14 +1294,15 @@
                             <div class="panel-title">👥 Active Personnel & Access Roles</div>
                             <p style="color: var(--text-dim); font-size: 0.82rem; margin-top: 2px;">Real-time headcount of authorized café staff and active system accounts</p>
                         </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <span class="badge badge-ok" id="activeOnDutyBadge">● Checking shifts...</span>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <span class="badge badge-info" id="activeWebLoginsBadge" title="Unique accounts authenticated via web browser today">🌐 0 Web Logins Today</span>
+                            <span class="badge badge-ok" id="activeOnDutyBadge" title="Staff clocked in today via biometric POS face verification">🕒 0 Shifts Active</span>
                         </div>
                     </div>
 
                     <div class="role-grid">
                         <!-- Admins -->
-                        <div class="role-card">
+                        <div class="role-card" onclick="filterRoleDirectory('admin')" style="cursor: pointer;" title="Click to filter directory to Admins">
                             <div class="role-card-header">
                                 <div class="role-icon-box gold">👑</div>
                                 <div class="role-status-tag gold">ADMIN</div>
@@ -1312,7 +1313,7 @@
                         </div>
 
                         <!-- Managers -->
-                        <div class="role-card">
+                        <div class="role-card" onclick="filterRoleDirectory('manager')" style="cursor: pointer;" title="Click to filter directory to Managers">
                             <div class="role-card-header">
                                 <div class="role-icon-box cyan">👔</div>
                                 <div class="role-status-tag cyan">MANAGEMENT</div>
@@ -1323,7 +1324,7 @@
                         </div>
 
                         <!-- Cashiers -->
-                        <div class="role-card">
+                        <div class="role-card" onclick="filterRoleDirectory('cashier')" style="cursor: pointer;" title="Click to filter directory to Cashiers">
                             <div class="role-card-header">
                                 <div class="role-icon-box emerald">🧾</div>
                                 <div class="role-status-tag emerald">POS TERMINAL</div>
@@ -1334,7 +1335,7 @@
                         </div>
 
                         <!-- Total Personnel -->
-                        <div class="role-card highlight">
+                        <div class="role-card highlight" onclick="filterRoleDirectory('all')" style="cursor: pointer;" title="Click to show all accounts in directory">
                             <div class="role-card-header">
                                 <div class="role-icon-box amber">👥</div>
                                 <div class="role-status-tag amber">TOTAL STAFF</div>
@@ -1357,6 +1358,76 @@
                             <div id="ratioManagerBar" class="ratio-segment cyan" style="width: 0%;"></div>
                             <div id="ratioCashierBar" class="ratio-segment emerald" style="width: 0%;"></div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 👥 Registered Accounts Directory per Role -->
+                <div class="panel" style="margin-bottom: 2rem;">
+                    <div class="panel-header" style="flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <div class="panel-title">👥 Registered Accounts Breakdown per Role</div>
+                            <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 2px;">
+                                Inspect active credentials, decrypted identities, and authorization privileges
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                            <button class="btn btn-outline role-dir-btn active" id="dirBtnAll" onclick="filterRoleDirectory('all')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">All (<span id="dirCountAll">0</span>)</button>
+                            <button class="btn btn-outline role-dir-btn" id="dirBtnAdmin" onclick="filterRoleDirectory('admin')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; color: var(--gold);">👑 Admins (<span id="dirCountAdmin">0</span>)</button>
+                            <button class="btn btn-outline role-dir-btn" id="dirBtnManager" onclick="filterRoleDirectory('manager')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; color: var(--cyan);">👔 Managers (<span id="dirCountManager">0</span>)</button>
+                            <button class="btn btn-outline role-dir-btn" id="dirBtnCashier" onclick="filterRoleDirectory('cashier')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; color: var(--emerald);">🧾 Cashiers (<span id="dirCountCashier">0</span>)</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Role</th>
+                                    <th>Email / Details</th>
+                                    <th>Status</th>
+                                    <th>Last Login / Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody id="roleAccountsTableRows">
+                                <tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 1.25rem;">Loading account breakdown...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ⚡ Real-Time Login Activity Stream -->
+                <div class="panel" style="margin-bottom: 2rem;">
+                    <div class="panel-header" style="flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <div class="panel-title">⚡ Real-Time Login Activity Stream</div>
+                            <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 2px;">
+                                Live audit log of successful web authentications with device, browser, and IP telemetry
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <span class="badge badge-ok" id="loginStreamLiveBadge">● Live Stream (8s)</span>
+                            <button class="btn btn-outline" onclick="fetchLoginActivity(); showToast('Login activity refreshed');" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive" style="max-height: 360px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp (PHT)</th>
+                                    <th>User &amp; Name</th>
+                                    <th>Role</th>
+                                    <th>Device / Browser</th>
+                                    <th>IP Address</th>
+                                    <th>Auth Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="loginActivityTableRows">
+                                <tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 1.25rem;">Checking login activity...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -1670,6 +1741,7 @@
                     const csh = roles.cashiers || 0;
                     const tot = roles.total_active || 0;
                     const onDuty = roles.on_duty_today || 0;
+                    const loginsToday = roles.logins_today || 0;
 
                     document.getElementById('activeAdminsVal').innerText = adm;
                     document.getElementById('activeManagersVal').innerText = mgr;
@@ -1677,15 +1749,20 @@
                     document.getElementById('totalActiveStaffVal').innerText = tot;
                     document.getElementById('sidebarStaffVal').innerText = tot;
 
-                    // On-duty indicator
+                    // Dual badges: Web Logins & Physical Shifts
+                    const webLoginsBadge = document.getElementById('activeWebLoginsBadge');
+                    if (webLoginsBadge) {
+                        webLoginsBadge.innerText = `🌐 ${loginsToday} Web Login${loginsToday === 1 ? '' : 's'} Today`;
+                    }
+
                     const dutyBadge = document.getElementById('activeOnDutyBadge');
                     if (dutyBadge) {
                         if (onDuty > 0) {
                             dutyBadge.className = 'badge badge-ok';
-                            dutyBadge.innerText = `● ${onDuty} On Duty Right Now`;
+                            dutyBadge.innerText = `🕒 ${onDuty} Staff Clocked-In`;
                         } else {
                             dutyBadge.className = 'badge badge-info';
-                            dutyBadge.innerText = `● 0 Active Shifts Today`;
+                            dutyBadge.innerText = `🕒 0 Physical Shifts Active`;
                         }
                     }
 
@@ -1707,6 +1784,12 @@
                         document.getElementById('ratioManagerBar').style.width = '0%';
                         document.getElementById('ratioCashierBar').style.width = '0%';
                     }
+
+                    // Accounts Directory breakdown rendering
+                    if (data.accounts_breakdown) {
+                        cachedAccountsBreakdown = data.accounts_breakdown;
+                        renderRoleDirectory();
+                    }
                 }
 
                 // Runtime Table
@@ -1717,6 +1800,116 @@
                 document.getElementById('specEngine').innerText = data.resources.has_psutil ? 'Full Telemetry (psutil active)' : 'Standard Telemetry (fallback engine)';
             } catch (err) {
                 console.error('Metrics fetch error:', err);
+            }
+        }
+
+        // Role Directory Logic
+        let cachedAccountsBreakdown = { admins: [], managers: [], cashiers: [] };
+        let currentDirFilter = 'all';
+
+        function renderRoleDirectory() {
+            const tbody = document.getElementById('roleAccountsTableRows');
+            if (!tbody) return;
+
+            const adm = cachedAccountsBreakdown.admins || [];
+            const mgr = cachedAccountsBreakdown.managers || [];
+            const csh = cachedAccountsBreakdown.cashiers || [];
+
+            const cAll = document.getElementById('dirCountAll');
+            const cAdm = document.getElementById('dirCountAdmin');
+            const cMgr = document.getElementById('dirCountManager');
+            const cCsh = document.getElementById('dirCountCashier');
+            if (cAll) cAll.innerText = adm.length + mgr.length + csh.length;
+            if (cAdm) cAdm.innerText = adm.length;
+            if (cMgr) cMgr.innerText = mgr.length;
+            if (cCsh) cCsh.innerText = csh.length;
+
+            let items = [];
+            if (currentDirFilter === 'admin') items = adm;
+            else if (currentDirFilter === 'manager') items = mgr;
+            else if (currentDirFilter === 'cashier') items = csh;
+            else items = [...adm, ...mgr, ...csh];
+
+            if (items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">No accounts found for selected filter (${currentDirFilter}).</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = items.map(a => {
+                let tagClass = 'gold';
+                let roleIcon = '👑';
+                let roleDisplay = 'Admin';
+                if (a.role === 'manager') { tagClass = 'cyan'; roleIcon = '👔'; roleDisplay = 'Manager'; }
+                else if (a.role === 'cashier') { tagClass = 'emerald'; roleIcon = '🧾'; roleDisplay = 'Cashier'; }
+
+                return `
+                    <tr>
+                        <td><strong>${roleIcon} ${escapeHtml(a.username)}</strong></td>
+                        <td>${escapeHtml(a.full_name || '—')}</td>
+                        <td><span class="role-status-tag ${tagClass}">${roleDisplay}</span></td>
+                        <td><span style="color: var(--text-dim); font-size: 0.82rem;">${escapeHtml(a.email || (a.id ? 'Account #' + a.id : '—'))}</span></td>
+                        <td><span class="badge badge-ok">● ${escapeHtml(a.status || 'Active')}</span></td>
+                        <td style="font-size: 0.8rem; color: var(--text-dim); font-family: var(--font-mono);">
+                            ${a.hourly_rate ? '₱' + a.hourly_rate.toFixed(2) + '/hr' : (a.last_login ? 'Last: ' + escapeHtml(a.last_login) : 'Store Administrator')}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterRoleDirectory(filter) {
+            currentDirFilter = filter;
+            document.querySelectorAll('.role-dir-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.getElementById('dirBtn' + filter.charAt(0).toUpperCase() + filter.slice(1));
+            if (activeBtn) activeBtn.classList.add('active');
+            renderRoleDirectory();
+        }
+
+        // Real-Time Login Activity Fetcher
+        async function fetchLoginActivity() {
+            try {
+                const res = await fetch('/developer/api/login-activity?limit=30');
+                if (!res.ok) return;
+                const data = await res.json();
+                const rows = data.logins || [];
+                const tbody = document.getElementById('loginActivityTableRows');
+                if (!tbody) return;
+
+                if (rows.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">No web logins recorded yet today.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = rows.map(l => {
+                    let roleBadgeClass = 'gold';
+                    let roleIcon = '👑';
+                    const roleLow = (l.role || '').toLowerCase();
+                    if (roleLow === 'manager') { roleBadgeClass = 'cyan'; roleIcon = '👔'; }
+                    else if (roleLow === 'cashier') { roleBadgeClass = 'emerald'; roleIcon = '🧾'; }
+
+                    let devIcon = '💻';
+                    const devLow = (l.device || '').toLowerCase();
+                    if (devLow.includes('android') || devLow.includes('phone') || devLow.includes('mobile')) devIcon = '📱';
+                    else if (devLow.includes('ipad') || devLow.includes('tablet')) devIcon = '📟';
+
+                    return `
+                        <tr>
+                            <td style="font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-dim);">${escapeHtml(l.timestamp)}</td>
+                            <td>
+                                <div style="font-weight: 600;">${escapeHtml(l.username)}</div>
+                                <div style="font-size: 0.78rem; color: var(--text-dim);">${escapeHtml(l.full_name || '—')}</div>
+                            </td>
+                            <td><span class="role-status-tag ${roleBadgeClass}">${roleIcon} ${(l.role || '').toUpperCase()}</span></td>
+                            <td><span>${devIcon}</span> <span style="font-size: 0.82rem;">${escapeHtml(l.device)}</span></td>
+                            <td><code style="font-size: 0.78rem;">${escapeHtml(l.ip_address || '—')}</code></td>
+                            <td><span class="badge badge-ok">✓ Authenticated</span></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error('Login activity fetch error:', err);
             }
         }
 
@@ -1887,7 +2080,9 @@
 
         // Initialize polling
         fetchMetrics();
+        fetchLoginActivity();
         setInterval(fetchMetrics, 5000);
+        setInterval(fetchLoginActivity, 8000);
         setInterval(() => {
             const logsTab = document.getElementById('tab-logs');
             if (logsTab && logsTab.classList.contains('active')) {

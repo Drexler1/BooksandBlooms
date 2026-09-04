@@ -89,6 +89,59 @@ def _is_dev_authenticated():
     return session.get("dev_authenticated") is True
 
 
+def _dev_decrypt(token: str) -> str:
+    """Decrypt AES-256-CBC token if encrypted, else return as-is."""
+    if not token:
+        return ""
+    token_str = str(token).strip()
+    raw_key = os.environ.get("AES_SECRET_KEY", "")
+    if not raw_key or len(token_str) < 44:
+        return token_str
+    try:
+        import base64, hashlib
+        from Crypto.Cipher import AES
+        from Crypto.Util.Padding import unpad
+        k = hashlib.sha256(raw_key.encode()).digest()
+        raw = base64.b64decode(token_str)
+        iv, ct = raw[:16], raw[16:]
+        return unpad(AES.new(k, AES.MODE_CBC, iv).decrypt(ct), AES.block_size).decode("utf-8", errors="ignore")
+    except Exception:
+        return token_str
+
+
+def _parse_device_quick(ua_string: str) -> str:
+    """Fallback parser for device user agent string."""
+    if not ua_string:
+        return "Unknown Device"
+    ua = str(ua_string).lower()
+    if "android" in ua:
+        dev = "Android"
+    elif "iphone" in ua:
+        dev = "iPhone"
+    elif "ipad" in ua:
+        dev = "iPad"
+    elif "windows" in ua:
+        dev = "Windows"
+    elif "macintosh" in ua or "mac os" in ua:
+        dev = "Mac"
+    elif "linux" in ua:
+        dev = "Linux"
+    else:
+        dev = "Mobile" if "mobile" in ua else "Desktop"
+
+    if "edg" in ua:
+        br = "Edge"
+    elif "chrome" in ua or "crios" in ua:
+        br = "Chrome"
+    elif "firefox" in ua or "fxios" in ua:
+        br = "Firefox"
+    elif "safari" in ua and "chrome" not in ua:
+        br = "Safari"
+    else:
+        br = "Browser"
+    return f"{dev} ({br})"
+
+
 def _get_primary_dev_username():
     """Return the configured primary developer username (case-insensitive)."""
     return str(os.environ.get("PRIMARY_DEV_USERNAME", "drexler")).strip().lower()
@@ -155,6 +208,13 @@ def require_dev_auth():
     Gate every /developer route behind the Developer PIN session.
     Regular store administrators, managers, and staff cannot access without the developer PIN.
     """
+    # 0. If non-dev store staff (regular admin, manager, cashier) attempts to access, redirect to dashboard
+    if _is_logged_in_as_non_dev_staff():
+        role = session.get("role")
+        if role == "cashier":
+            return redirect(url_for("cashier_dashboard"))
+        return redirect(url_for("dashboard"))
+
     # 1. Allow login and logout endpoints through
     if request.endpoint in ("developer.dev_login", "developer.dev_logout"):
         return
@@ -319,6 +379,59 @@ def get_system_metrics():
             except Exception:
                 pass
 
+            # 4. Unique web logins today from login_activity_log
+            logins_today = 0
+            try:
+                cur.execute("SELECT COUNT(DISTINCT username) FROM login_activity_log WHERE DATE(logged_in_at) = CURDATE()")
+                l_row = cur.fetchone()
+                if l_row and l_row[0]:
+                    logins_today = l_row[0]
+            except Exception:
+                pass
+
+            # 5. Accounts directory breakdown
+            admins_list = []
+            managers_list = []
+            cashiers_list = []
+            try:
+                cur.execute("SELECT admin_id, username, full_name, email FROM admins ORDER BY admin_id ASC")
+                for r in cur.fetchall() or []:
+                    admins_list.append({
+                        "id": r[0],
+                        "username": _dev_decrypt(r[1]),
+                        "full_name": _dev_decrypt(r[2]),
+                        "email": _dev_decrypt(r[3]),
+                        "role": "admin",
+                        "status": "active"
+                    })
+            except Exception as e:
+                current_app.logger.warning(f"[developer] Admins breakdown query failed: {e}")
+
+            try:
+                cur.execute("""
+                    SELECT employee_id, username, full_name, role, employment_status, hourly_rate, email, last_login 
+                    FROM employees 
+                    WHERE employment_status = 'active'
+                    ORDER BY employee_id ASC
+                """)
+                for r in cur.fetchall() or []:
+                    acc = {
+                        "id": r[0],
+                        "username": _dev_decrypt(r[1]),
+                        "full_name": _dev_decrypt(r[2]),
+                        "role": r[3],
+                        "status": r[4],
+                        "hourly_rate": float(r[5]) if r[5] is not None else 0.0,
+                        "email": _dev_decrypt(r[6]),
+                        "last_login": r[7].strftime("%Y-%m-%d %H:%M:%S") if r[7] else "Never"
+                    }
+                    if r[3] == "manager":
+                        managers_list.append(acc)
+                    elif r[3] == "cashier":
+                        cashiers_list.append(acc)
+            except Exception as e:
+                current_app.logger.warning(f"[developer] Employees breakdown query failed: {e}")
+
             cur.close()
 
             adm_total = admin_tbl_cnt + emp_roles.get("admin", 0)
@@ -331,6 +444,7 @@ def get_system_metrics():
                 "cashiers": csh_total,
                 "total_active": adm_total + mgr_total + csh_total,
                 "on_duty_today": on_duty_cnt,
+                "logins_today": logins_today,
             }
         except Exception as exc:
             db_status = f"Error: {str(exc)[:40]}"
@@ -363,8 +477,57 @@ def get_system_metrics():
             "status": db_status,
             "latency_ms": db_latency_ms,
         },
-        "active_roles": active_roles
+        "active_roles": active_roles,
+        "accounts_breakdown": {
+            "admins": admins_list,
+            "managers": managers_list,
+            "cashiers": cashiers_list,
+        }
     })
+
+
+@developer_bp.route("/api/login-activity", methods=["GET"])
+def get_login_activity():
+    """Return real-time login activity logs from login_activity_log."""
+    mysql = get_db()
+    if not mysql:
+        return jsonify({"status": "error", "message": "Database disconnected", "logins": []}), 500
+
+    limit = min(int(request.args.get("limit", 50)), 100)
+    try:
+        conn = mysql.connection
+        cur = conn.cursor(DictCursor)
+        cur.execute("""
+            SELECT id, username, full_name, role, ip_address, user_agent, device_summary, status, logged_in_at
+            FROM login_activity_log
+            ORDER BY logged_in_at DESC
+            LIMIT %s
+        """, (limit,))
+        rows = cur.fetchall() or []
+        cur.close()
+
+        formatted = []
+        for r in rows:
+            dt = r.get("logged_in_at")
+            formatted.append({
+                "id": r.get("id"),
+                "username": r.get("username"),
+                "full_name": r.get("full_name"),
+                "role": r.get("role"),
+                "ip_address": r.get("ip_address"),
+                "device": r.get("device_summary") or _parse_device_quick(r.get("user_agent")),
+                "status": r.get("status") or "success",
+                "timestamp": dt.strftime("%Y-%m-%d %H:%M:%S") if dt else "",
+            })
+
+        return jsonify({
+            "status": "success",
+            "count": len(formatted),
+            "logins": formatted
+        })
+    except Exception as exc:
+        current_app.logger.warning(f"[developer.login-activity] Query failed: {exc}")
+        return jsonify({"status": "success", "count": 0, "logins": []})
 
 
 @developer_bp.route("/api/logs", methods=["GET"])

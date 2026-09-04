@@ -374,11 +374,96 @@ def _ensure_lockout_table():
                 INDEX `idx_attempted_at` (`attempted_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         """)
+        # ── Real-time login activity log ────────────────────────────────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `login_activity_log` (
+                `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `username`        VARCHAR(255) NOT NULL,
+                `full_name`       VARCHAR(255) DEFAULT '',
+                `role`            VARCHAR(50)  NOT NULL,
+                `ip_address`      VARCHAR(45)  DEFAULT NULL,
+                `user_agent`      VARCHAR(255) DEFAULT NULL,
+                `device_summary`  VARCHAR(100) DEFAULT NULL,
+                `status`          VARCHAR(20)  NOT NULL DEFAULT 'success',
+                `logged_in_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX `idx_logged_in_at` (`logged_in_at`),
+                INDEX `idx_role` (`role`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
         conn.commit()
         cur.close()
-        app.logger.info("[migration] login_attempts + face_mismatch_log tables ensured")
+        app.logger.info("[migration] login_attempts + face_mismatch_log + login_activity_log tables ensured")
     except Exception as exc:
         app.logger.error(f"[migration] _ensure_lockout_table failed: {exc}")
+
+
+def _parse_device(ua_string: str) -> str:
+    """Parse User-Agent string to a clean device and browser summary."""
+    if not ua_string:
+        return "Unknown Device"
+    ua = ua_string.lower()
+
+    if "android" in ua:
+        device = "Android"
+    elif "iphone" in ua:
+        device = "iPhone"
+    elif "ipad" in ua:
+        device = "iPad"
+    elif "windows" in ua:
+        device = "Windows"
+    elif "macintosh" in ua or "mac os" in ua:
+        device = "Mac"
+    elif "linux" in ua:
+        device = "Linux"
+    else:
+        device = "Mobile" if "mobile" in ua else "Desktop"
+
+    if "edg" in ua:
+        browser = "Edge"
+    elif "chrome" in ua or "crios" in ua:
+        browser = "Chrome"
+    elif "firefox" in ua or "fxios" in ua:
+        browser = "Firefox"
+    elif "safari" in ua and "chrome" not in ua:
+        browser = "Safari"
+    elif "opera" in ua or "opr" in ua:
+        browser = "Opera"
+    else:
+        browser = "Browser"
+
+    return f"{device} ({browser})"
+
+
+def _record_login_activity(username: str, full_name: str, role: str, ip: str, user_agent: str, status: str = "success"):
+    """Persist a login event to login_activity_log and emit an INFO log for the developer console."""
+    device = _parse_device(user_agent)
+    for attempt in range(2):
+        try:
+            conn = mysql.connection
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO login_activity_log (username, full_name, role, ip_address, user_agent, device_summary, status, logged_in_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+            """, (
+                (username or "")[:255],
+                (full_name or "")[:255],
+                (role or "")[:50],
+                (ip or "")[:45],
+                (user_agent or "")[:255],
+                device[:100],
+                status[:20]
+            ))
+            conn.commit()
+            cur.close()
+            break
+        except Exception as exc:
+            if attempt == 0 and "doesn't exist" in str(exc).lower():
+                _ensure_lockout_table()
+                continue
+            app.logger.warning(f"[login_activity] Failed saving login activity log: {exc}")
+            break
+
+    app.logger.info(f"[AUTH] Login success: {role.upper()} '{username}' ({full_name}) from {ip} [{device}]")
 
 
 def _widen_face_model_path():
@@ -1903,6 +1988,14 @@ def login():
         cur.close()
 
         if auth_ok:
+            # ── Record login activity for Developer Console audit stream ─────
+            _record_login_activity(
+                session.get("username", ""),
+                session.get("full_name", ""),
+                session.get("role", role),
+                request.remote_addr or "unknown",
+                request.user_agent.string if request.user_agent else ""
+            )
             # ── Successful login: clear the fail counter ──────────────────────
             session.permanent = True  # honour PERMANENT_SESSION_LIFETIME (30 min)
             clear_failed_attempts(u_hash, lockout_role_key)
