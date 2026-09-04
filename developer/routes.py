@@ -206,7 +206,16 @@ def get_system_metrics():
         # Fallback estimation using GC and platform info
         mem_used_mb = round(sys.getsizeof(gc.get_objects()) / (1024 ** 2), 1)
 
-    # Database latency and health test
+    # Active accounts / roles monitoring
+    active_roles = {
+        "admins": 0,
+        "managers": 0,
+        "cashiers": 0,
+        "total_active": 0,
+        "on_duty_today": 0,
+    }
+
+    # Database latency, health test, and active roles
     mysql = get_db()
     db_status = "Disconnected"
     db_latency_ms = None
@@ -217,11 +226,54 @@ def get_system_metrics():
             cur = conn.cursor()
             cur.execute("SELECT 1")
             cur.fetchone()
-            cur.close()
             db_latency_ms = round((time.perf_counter() - t0) * 1000, 2)
             db_status = "Connected"
+
+            # 1. Admin count from admins table
+            try:
+                cur.execute("SELECT COUNT(*) FROM admins")
+                a_row = cur.fetchone()
+                admin_tbl_cnt = a_row[0] if a_row else 0
+            except Exception:
+                admin_tbl_cnt = 0
+
+            # 2. Employees grouped by role where active
+            try:
+                cur.execute(
+                    "SELECT role, COUNT(*) FROM employees WHERE employment_status = 'active' GROUP BY role"
+                )
+                emp_roles = dict(cur.fetchall() or [])
+            except Exception:
+                emp_roles = {}
+
+            # 3. Currently on-duty staff (clocked in today without clocking out)
+            on_duty_cnt = 0
+            try:
+                cur.execute(
+                    "SELECT COUNT(DISTINCT employee_id) FROM attendance WHERE attendance_date = CURDATE() AND clock_in IS NOT NULL AND clock_out IS NULL"
+                )
+                od_row = cur.fetchone()
+                if od_row:
+                    on_duty_cnt = od_row[0]
+            except Exception:
+                pass
+
+            cur.close()
+
+            adm_total = admin_tbl_cnt + emp_roles.get("admin", 0)
+            mgr_total = emp_roles.get("manager", 0)
+            csh_total = emp_roles.get("cashier", 0)
+
+            active_roles = {
+                "admins": adm_total,
+                "managers": mgr_total,
+                "cashiers": csh_total,
+                "total_active": adm_total + mgr_total + csh_total,
+                "on_duty_today": on_duty_cnt,
+            }
         except Exception as exc:
             db_status = f"Error: {str(exc)[:40]}"
+            current_app.logger.warning(f"[developer.metrics] Failed reading database stats: {exc}")
 
     return jsonify({
         "status": "success",
@@ -249,7 +301,8 @@ def get_system_metrics():
         "database": {
             "status": db_status,
             "latency_ms": db_latency_ms,
-        }
+        },
+        "active_roles": active_roles
     })
 
 
