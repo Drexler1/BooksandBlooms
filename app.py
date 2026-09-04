@@ -1488,7 +1488,9 @@ def commit_face_registration():
     persist_embedding(str(employee_id), avg_emb)
 
     # ── Clean up registration session ───────────────────────────────────────
-    del reg_sessions[token]
+    # Use pop() instead of del to safely handle double-submits or race
+    # conditions where the token was already removed by the expiry path.
+    reg_sessions.pop(token, None)
 
     return jsonify({"success": True, "message": "✅ Face ID registered successfully"})
 
