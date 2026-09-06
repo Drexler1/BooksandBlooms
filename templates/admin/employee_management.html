@@ -1145,64 +1145,6 @@
             z-index: 1;
         }
 
-        .eotm-inner::before {
-            content: '';
-            position: absolute;
-            left: 120px;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 200px;
-            height: 200px;
-            background: radial-gradient(circle, rgba(201,169,97,0.12) 0%, transparent 70%);
-            pointer-events: none;
-        }
-
-        .eotm-crown-wrap {
-            position: relative;
-            flex-shrink: 0;
-        }
-
-        .eotm-crown {
-            position: absolute;
-            top: -18px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 1.6rem;
-            filter: drop-shadow(0 2px 4px rgba(201,169,97,0.6));
-            animation: crownFloat 3s ease-in-out infinite;
-        }
-
-        @keyframes crownFloat {
-            0%, 100% { transform: translateX(-50%) translateY(0); }
-            50%       { transform: translateX(-50%) translateY(-4px); }
-        }
-
-        .eotm-avatar {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            border: 3px solid var(--gold);
-            object-fit: cover;
-            box-shadow: 0 0 0 5px rgba(201,169,97,0.15), 0 4px 20px rgba(0,0,0,0.4);
-            display: block;
-        }
-
-        .eotm-avatar-placeholder {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            border: 3px solid var(--gold);
-            background: var(--dark-gray);
-            box-shadow: 0 0 0 5px rgba(201,169,97,0.15), 0 4px 20px rgba(0,0,0,0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--gold);
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 2.2rem;
-            font-weight: 600;
-        }
-
         .eotm-info {
             flex: 1;
             min-width: 0;
@@ -1340,7 +1282,6 @@
                 /* extra top padding clears the absolutely-positioned month picker */
                 padding: 3.5rem 1.25rem 1.25rem;
             }
-            .eotm-inner::before { display: none; }
             .eotm-stats {
                 width: 100%;
             }
@@ -1362,10 +1303,6 @@
             .eotm-month-picker select {
                 font-size: 0.72rem;
                 padding: 0.25rem 0.45rem;
-            }
-            /* crown needs room above the avatar on mobile */
-            .eotm-crown-wrap {
-                margin-top: 1rem;
             }
         }
 
@@ -2342,12 +2279,6 @@
                 }
 
                 const w = data.winner;
-                const initials = (w.full_name || '?').split(' ').map(p => p[0]).slice(0,2).join('').toUpperCase();
-
-                const avatarHtml = w.face_image_path
-                    ? `<img class="eotm-avatar" src="/static/${escHtml(w.face_image_path)}" alt="${escHtml(w.full_name)}" onerror="this.outerHTML='<div class=\\'eotm-avatar-placeholder\\'>${initials}</div>'">`
-                    : `<div class="eotm-avatar-placeholder">${initials}</div>`;
-
                 const runnerHtml = data.runner_up
                     ? `<div class="eotm-runner-up">🥈 Runner-up: <span>${escHtml(data.runner_up)}</span></div>`
                     : '';
@@ -2356,10 +2287,6 @@
 
                 body.innerHTML = `
                     <div class="eotm-inner">
-                        <div class="eotm-crown-wrap">
-                            <span class="eotm-crown">👑</span>
-                            ${avatarHtml}
-                        </div>
                         <div class="eotm-info">
                             <div class="eotm-label">⭐ Employee of the Month — ${escHtml(data.month_label)}</div>
                             <div class="eotm-name">${escHtml(w.full_name)}</div>
