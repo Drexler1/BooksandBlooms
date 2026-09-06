@@ -2037,6 +2037,18 @@ def handle_csrf_error(e):
             jsonify({"success": False, "message": "CSRF token missing or invalid"}),
             400,
         )
+    # If the user was attempting to log out, satisfy the logout instead of blocking them
+    if request.path in ("/logout", "/developer/logout"):
+        try:
+            if session.get("admin_id") or session.get("role") == "admin":
+                _mark_account_offline("admin", session.get("admin_id"))
+            elif session.get("employee_id"):
+                _mark_account_offline("employee", session.get("employee_id"))
+        except Exception:
+            pass
+        session.clear()
+        return redirect(url_for("login"))
+
     # Recovery flow: keep user in password reset flow rather than dumping to login
     if request.path in (
         "/forgot_password",
@@ -5871,6 +5883,7 @@ def api_my_attendance():
 
 
 @app.route("/logout", methods=["GET", "POST"])
+@csrf.exempt
 def logout():
     try:
         if session.get("admin_id") or session.get("role") == "admin":
