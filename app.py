@@ -2408,6 +2408,7 @@ def _send_sms_otp(phone_number: str, otp_code: str, full_name: str, role: str):
 
 
 @app.route("/forgot_password", methods=["GET", "POST"])
+@csrf.exempt
 def forgot_password():
     """
     GET  — render the name entry form.
@@ -2493,6 +2494,7 @@ def _mask_phone(phone: str) -> str:
 
 
 @app.route("/choose_account", methods=["GET", "POST"])
+@csrf.exempt
 def choose_account():
     """
     GET  — show matching profiles stored in session from forgot_password.
@@ -2571,6 +2573,7 @@ def choose_account():
 
 
 @app.route("/choose_method", methods=["POST"])
+@csrf.exempt
 def choose_method():
     """
     POST — receives the chosen delivery method (email or sms),
@@ -2677,6 +2680,7 @@ def choose_method():
 
 
 @app.route("/verify_otp", methods=["GET", "POST"])
+@csrf.exempt
 def verify_otp():
     """
     GET  — render OTP entry screen (token passed as query param).
@@ -2746,6 +2750,7 @@ def verify_otp():
 
 
 @app.route("/reset_password", methods=["GET", "POST"])
+@csrf.exempt
 def reset_password():
     """
     GET  — validate token from URL, render the set-new-password form.
