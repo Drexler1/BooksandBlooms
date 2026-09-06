@@ -1142,8 +1142,18 @@ def set_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
-    # Prevent browsers from caching login forms with stale CSRF tokens
-    if request.path in ("/login", "/", "/developer/login"):
+    # Prevent browsers from caching auth and recovery forms with stale CSRF tokens
+    if request.path in (
+        "/",
+        "/login",
+        "/developer/login",
+        "/forgot_password",
+        "/choose_account",
+        "/choose_method",
+        "/verify_otp",
+        "/reset_password",
+        "/developer/change_password",
+    ):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"]        = "no-cache"
         response.headers["Expires"]       = "0"
@@ -2027,6 +2037,16 @@ def handle_csrf_error(e):
             jsonify({"success": False, "message": "CSRF token missing or invalid"}),
             400,
         )
+    # Recovery flow: keep user in password reset flow rather than dumping to login
+    if request.path in (
+        "/forgot_password",
+        "/choose_account",
+        "/choose_method",
+        "/verify_otp",
+        "/reset_password",
+    ):
+        flash("Your recovery session expired or was refreshed. Please try again.", "danger")
+        return redirect(url_for("forgot_password"))
     flash("Session expired or security token mismatch. Please sign in again.", "danger")
     return redirect(url_for("login"))
 
