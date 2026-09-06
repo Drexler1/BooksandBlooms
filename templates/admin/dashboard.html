@@ -1275,6 +1275,13 @@
             // Run once on load then every 90 seconds
             refreshLowStock();
             setInterval(refreshLowStock, 90_000);
+
+            // ── Active Session Keepalive Heartbeat ─────────────────────────────
+            setInterval(() => {
+                if (document.visibilityState !== 'hidden') {
+                    fetch('/api/user/heartbeat', { method: 'POST' }).catch(() => {});
+                }
+            }, 120_000);
         
 
 

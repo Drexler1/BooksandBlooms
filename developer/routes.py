@@ -389,20 +389,81 @@ def get_system_metrics():
             except Exception:
                 pass
 
-            # 5. Accounts directory breakdown
+            # 5. Accounts directory breakdown with live active/offline status
             admins_list = []
             managers_list = []
             cashiers_list = []
+
+            # Check account_sessions for currently active accounts (active within last 10 minutes)
+            active_accounts = set()
+            admin_last_logins = {}
+            try:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS `account_sessions` (
+                        `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                        `account_type`    VARCHAR(20)  NOT NULL,
+                        `account_id`      INT          NOT NULL,
+                        `username`        VARCHAR(255) NOT NULL DEFAULT '',
+                        `role`            VARCHAR(50)  NOT NULL DEFAULT '',
+                        `is_active`       TINYINT(1)   NOT NULL DEFAULT 0,
+                        `last_activity`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        `last_login`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        `ip_address`      VARCHAR(45)  DEFAULT NULL,
+                        `user_agent`      VARCHAR(255) DEFAULT NULL,
+                        UNIQUE KEY `uk_account` (`account_type`, `account_id`),
+                        INDEX `idx_username` (`username`),
+                        INDEX `idx_active_activity` (`is_active`, `last_activity`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+                """)
+                cur.execute("""
+                    SELECT account_type, account_id, last_login, last_activity, is_active
+                    FROM account_sessions
+                    WHERE is_active = 1 AND last_activity >= NOW() - INTERVAL 10 MINUTE
+                """)
+                for s_row in cur.fetchall() or []:
+                    active_accounts.add((s_row[0], s_row[1]))
+
+                cur.execute("""
+                    SELECT account_id, last_login
+                    FROM account_sessions
+                    WHERE account_type = 'admin' AND last_login IS NOT NULL
+                """)
+                for l_row in cur.fetchall() or []:
+                    if l_row[1]:
+                        admin_last_logins[l_row[0]] = l_row[1].strftime("%Y-%m-%d %H:%M:%S")
+            except Exception as e:
+                current_app.logger.warning(f"[developer] account_sessions query failed: {e}")
+
+            # Also fetch latest admin logins from login_activity_log as fallback
+            admin_logins_by_name = {}
+            try:
+                cur.execute("""
+                    SELECT username, MAX(logged_in_at)
+                    FROM login_activity_log
+                    WHERE role = 'admin'
+                    GROUP BY username
+                """)
+                for l_row in cur.fetchall() or []:
+                    if l_row[0] and l_row[1]:
+                        admin_logins_by_name[l_row[0].strip().lower()] = l_row[1].strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+
             try:
                 cur.execute("SELECT admin_id, username, full_name, email FROM admins ORDER BY admin_id ASC")
                 for r in cur.fetchall() or []:
+                    adm_id = r[0]
+                    u_dec = _dev_decrypt(r[1])
+                    adm_status = "active" if ("admin", adm_id) in active_accounts else "offline"
+                    last_log = admin_last_logins.get(adm_id) or admin_logins_by_name.get(u_dec.lower())
                     admins_list.append({
-                        "id": r[0],
-                        "username": _dev_decrypt(r[1]),
+                        "id": adm_id,
+                        "username": u_dec,
                         "full_name": _dev_decrypt(r[2]),
                         "email": _dev_decrypt(r[3]),
                         "role": "admin",
-                        "status": "active"
+                        "status": adm_status,
+                        "last_login": last_log
                     })
             except Exception as e:
                 current_app.logger.warning(f"[developer] Admins breakdown query failed: {e}")
@@ -415,12 +476,15 @@ def get_system_metrics():
                     ORDER BY employee_id ASC
                 """)
                 for r in cur.fetchall() or []:
+                    emp_id = r[0]
+                    emp_status = "active" if ("employee", emp_id) in active_accounts else "offline"
                     acc = {
-                        "id": r[0],
+                        "id": emp_id,
                         "username": _dev_decrypt(r[1]),
                         "full_name": _dev_decrypt(r[2]),
                         "role": r[3],
-                        "status": r[4],
+                        "status": emp_status,
+                        "employment_status": r[4],
                         "hourly_rate": float(r[5]) if r[5] is not None else 0.0,
                         "email": _dev_decrypt(r[6]),
                         "last_login": r[7].strftime("%Y-%m-%d %H:%M:%S") if r[7] else "Never"
@@ -438,11 +502,20 @@ def get_system_metrics():
             mgr_total = emp_roles.get("manager", 0)
             csh_total = emp_roles.get("cashier", 0)
 
+            online_adm = sum(1 for a in admins_list if a["status"] == "active")
+            online_mgr = sum(1 for m in managers_list if m["status"] == "active")
+            online_csh = sum(1 for c in cashiers_list if c["status"] == "active")
+            online_total = online_adm + online_mgr + online_csh
+
             active_roles = {
                 "admins": adm_total,
                 "managers": mgr_total,
                 "cashiers": csh_total,
                 "total_active": adm_total + mgr_total + csh_total,
+                "online_admins": online_adm,
+                "online_managers": online_mgr,
+                "online_cashiers": online_csh,
+                "total_online": online_total,
                 "on_duty_today": on_duty_cnt,
                 "logins_today": logins_today,
             }

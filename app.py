@@ -390,9 +390,27 @@ def _ensure_lockout_table():
                 INDEX `idx_role` (`role`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         """)
+        # ── Real-time account active session tracking ────────────────────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `account_sessions` (
+                `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `account_type`    VARCHAR(20)  NOT NULL,
+                `account_id`      INT          NOT NULL,
+                `username`        VARCHAR(255) NOT NULL DEFAULT '',
+                `role`            VARCHAR(50)  NOT NULL DEFAULT '',
+                `is_active`       TINYINT(1)   NOT NULL DEFAULT 0,
+                `last_activity`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `last_login`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `ip_address`      VARCHAR(45)  DEFAULT NULL,
+                `user_agent`      VARCHAR(255) DEFAULT NULL,
+                UNIQUE KEY `uk_account` (`account_type`, `account_id`),
+                INDEX `idx_username` (`username`),
+                INDEX `idx_active_activity` (`is_active`, `last_activity`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
         conn.commit()
         cur.close()
-        app.logger.info("[migration] login_attempts + face_mismatch_log + login_activity_log tables ensured")
+        app.logger.info("[migration] login_attempts + face_mismatch_log + login_activity_log + account_sessions tables ensured")
     except Exception as exc:
         app.logger.error(f"[migration] _ensure_lockout_table failed: {exc}")
 
@@ -464,6 +482,175 @@ def _record_login_activity(username: str, full_name: str, role: str, ip: str, us
             break
 
     app.logger.info(f"[AUTH] Login success: {role.upper()} '{username}' ({full_name}) from {ip} [{device}]")
+
+
+def _ensure_account_sessions_table(cur=None):
+    """Ensure the account_sessions table exists for tracking active/offline account telemetry."""
+    should_close = False
+    try:
+        if cur is None:
+            conn = mysql.connection
+            cur = conn.cursor()
+            should_close = True
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `account_sessions` (
+                `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `account_type`    VARCHAR(20)  NOT NULL,
+                `account_id`      INT          NOT NULL,
+                `username`        VARCHAR(255) NOT NULL DEFAULT '',
+                `role`            VARCHAR(50)  NOT NULL DEFAULT '',
+                `is_active`       TINYINT(1)   NOT NULL DEFAULT 0,
+                `last_activity`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `last_login`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `ip_address`      VARCHAR(45)  DEFAULT NULL,
+                `user_agent`      VARCHAR(255) DEFAULT NULL,
+                UNIQUE KEY `uk_account` (`account_type`, `account_id`),
+                INDEX `idx_username` (`username`),
+                INDEX `idx_active_activity` (`is_active`, `last_activity`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
+        if should_close:
+            mysql.connection.commit()
+            cur.close()
+    except Exception as exc:
+        app.logger.warning(f"[session_tracking] _ensure_account_sessions_table error: {exc}")
+        if should_close and cur:
+            try:
+                cur.close()
+            except Exception:
+                pass
+
+
+def _mark_account_active(account_type: str, account_id: int, username: str, role: str, ip: str = "", user_agent: str = ""):
+    """Mark an account as online and active upon successful login."""
+    if not account_id:
+        return
+    for attempt in range(2):
+        try:
+            conn = mysql.connection
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO account_sessions (
+                    account_type, account_id, username, role, is_active, last_activity, last_login, ip_address, user_agent
+                ) VALUES (%s, %s, %s, %s, 1, NOW(), NOW(), %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    username = VALUES(username),
+                    role = VALUES(role),
+                    is_active = 1,
+                    last_activity = NOW(),
+                    last_login = NOW(),
+                    ip_address = VALUES(ip_address),
+                    user_agent = VALUES(user_agent)
+            """, (
+                account_type[:20],
+                int(account_id),
+                (username or "")[:255],
+                (role or "")[:50],
+                (ip or "")[:45],
+                (user_agent or "")[:255]
+            ))
+            conn.commit()
+            cur.close()
+            try:
+                session["_last_act_touch"] = time.time()
+            except Exception:
+                pass
+            break
+        except Exception as exc:
+            if attempt == 0 and "doesn't exist" in str(exc).lower():
+                _ensure_account_sessions_table()
+                continue
+            app.logger.warning(f"[session_tracking] Failed to mark account active: {exc}")
+            break
+
+
+def _touch_user_activity():
+    """Update last_activity timestamp for an active user session, throttled to once per 30s."""
+    now = time.time()
+    try:
+        last_touch = session.get("_last_act_touch", 0)
+        if now - last_touch < 30:
+            return
+        session["_last_act_touch"] = now
+    except Exception:
+        pass
+
+    try:
+        account_type = "admin" if (session.get("is_admin") or session.get("role") == "admin") else "employee"
+        account_id = session.get("admin_id") or session.get("employee_id")
+    except Exception:
+        return
+    if not account_id:
+        return
+
+    req_ip = ""
+    req_ua = ""
+    try:
+        req_ip = request.remote_addr or ""
+        req_ua = request.user_agent.string if request.user_agent else ""
+    except Exception:
+        pass
+
+    for attempt in range(2):
+        try:
+            conn = mysql.connection
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE account_sessions
+                SET is_active = 1, last_activity = NOW()
+                WHERE account_type = %s AND account_id = %s
+            """, (account_type, int(account_id)))
+            if cur.rowcount == 0:
+                # If row doesn't exist yet (e.g. existing session prior to migration), insert it
+                username = ""
+                role = "admin" if account_type == "admin" else "cashier"
+                try:
+                    username = session.get("username", "")
+                    role = session.get("role", role)
+                except Exception:
+                    pass
+                cur.execute("""
+                    INSERT INTO account_sessions (
+                        account_type, account_id, username, role, is_active, last_activity, last_login, ip_address, user_agent
+                    ) VALUES (%s, %s, %s, %s, 1, NOW(), NOW(), %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        is_active = 1,
+                        last_activity = NOW()
+                """, (
+                    account_type,
+                    int(account_id),
+                    username[:255],
+                    role[:50],
+                    req_ip[:45],
+                    req_ua[:255]
+                ))
+            conn.commit()
+            cur.close()
+            break
+        except Exception as exc:
+            if attempt == 0 and "doesn't exist" in str(exc).lower():
+                _ensure_account_sessions_table()
+                continue
+            app.logger.debug(f"[session_tracking] Failed to update activity: {exc}")
+            break
+
+
+def _mark_account_offline(account_type: str, account_id: int):
+    """Mark an account as offline immediately on logout or deletion."""
+    if not account_id:
+        return
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE account_sessions
+            SET is_active = 0
+            WHERE account_type = %s AND account_id = %s
+        """, (account_type[:20], int(account_id)))
+        conn.commit()
+        cur.close()
+    except Exception as exc:
+        app.logger.warning(f"[session_tracking] Failed to mark account offline: {exc}")
 
 
 def _widen_face_model_path():
@@ -1998,6 +2185,18 @@ def login():
                 request.remote_addr or "unknown",
                 request.user_agent.string if request.user_agent else ""
             )
+            # ── Mark account active in account_sessions ───────────────────────
+            _acc_type = "admin" if (session.get("is_admin") or session.get("role") == "admin") else "employee"
+            _acc_id = session.get("admin_id") or session.get("employee_id")
+            if _acc_id:
+                _mark_account_active(
+                    account_type=_acc_type,
+                    account_id=_acc_id,
+                    username=session.get("username", ""),
+                    role=session.get("role", role),
+                    ip=request.remote_addr or "",
+                    user_agent=request.user_agent.string if request.user_agent else ""
+                )
             # ── Successful login: clear the fail counter ──────────────────────
             session.permanent = True  # honour PERMANENT_SESSION_LIFETIME (30 min)
             clear_failed_attempts(u_hash, lockout_role_key)
@@ -5651,10 +5850,27 @@ def api_my_attendance():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
-@app.route("/logout", methods=["POST"])
+@app.route("/logout", methods=["GET", "POST"])
 def logout():
+    try:
+        if session.get("admin_id") or session.get("role") == "admin":
+            _mark_account_offline("admin", session.get("admin_id"))
+        elif session.get("employee_id"):
+            _mark_account_offline("employee", session.get("employee_id"))
+    except Exception as exc:
+        app.logger.warning(f"[logout] Could not mark offline: {exc}")
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/api/user/heartbeat", methods=["GET", "POST"])
+@csrf.exempt
+def user_heartbeat():
+    """Keep-alive ping for active authenticated sessions."""
+    if session.get("admin_id") or session.get("employee_id"):
+        _touch_user_activity()
+        return jsonify({"status": "active"}), 200
+    return jsonify({"status": "anonymous"}), 200
 
 
 @app.route("/admin/unlock_account", methods=["POST"])
@@ -8455,8 +8671,10 @@ def api_inventory_restock():
 
 @app.before_request
 def ensure_purge():
-    """Rate-limited trash purge on every request (at most every 5 min)."""
+    """Rate-limited trash purge and active user session activity tracking."""
     _purge_expired_trash()
+    if session.get("admin_id") or session.get("employee_id"):
+        _touch_user_activity()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -10864,6 +11082,7 @@ def api_danger_delete_account():
         mysql.connection.commit()
         cur.close()
         app.logger.warning(f"[danger] Admin account deleted: admin_id={admin_id}")
+        _mark_account_offline("admin", admin_id)
         session.clear()
         return jsonify({"success": True, "message": "Account deleted. You have been logged out."})
 

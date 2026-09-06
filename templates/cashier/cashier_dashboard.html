@@ -2171,6 +2171,12 @@
                 if (t) t.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             }
         updateClock(); setInterval(updateClock, 1000);
+        // Active Session Keepalive Heartbeat
+        setInterval(() => {
+            if (document.visibilityState !== 'hidden') {
+                fetch('/api/user/heartbeat', { method: 'POST' }).catch(() => {});
+            }
+        }, 120_000);
 
         /* TOAST */
         function showToast(msg, type = 'success') {

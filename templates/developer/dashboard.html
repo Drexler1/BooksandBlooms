@@ -824,6 +824,7 @@
         .badge-warn { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
         .badge-err { background: rgba(248, 113, 113, 0.15); color: var(--rose); }
         .badge-ok { background: rgba(52, 211, 153, 0.15); color: var(--emerald); }
+        .badge-offline { background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); }
 
         /* Terminal Log Stream */
         .terminal-box {
@@ -1295,6 +1296,7 @@
                             <p style="color: var(--text-dim); font-size: 0.82rem; margin-top: 2px;">Real-time headcount of authorized café staff and active system accounts</p>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <span class="badge badge-offline" id="activeOnlineUsersBadge" title="Accounts currently logged in and actively using the system">⚪ 0 Active Now</span>
                             <span class="badge badge-info" id="activeWebLoginsBadge" title="Unique accounts authenticated via web browser today">🌐 0 Web Logins Today</span>
                             <span class="badge badge-ok" id="activeOnDutyBadge" title="Staff clocked in today via biometric POS face verification">🕒 0 Shifts Active</span>
                         </div>
@@ -1375,6 +1377,8 @@
                             <button class="btn btn-outline role-dir-btn" id="dirBtnAdmin" onclick="filterRoleDirectory('admin')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; color: var(--gold);">👑 Admins (<span id="dirCountAdmin">0</span>)</button>
                             <button class="btn btn-outline role-dir-btn" id="dirBtnManager" onclick="filterRoleDirectory('manager')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; color: var(--cyan);">👔 Managers (<span id="dirCountManager">0</span>)</button>
                             <button class="btn btn-outline role-dir-btn" id="dirBtnCashier" onclick="filterRoleDirectory('cashier')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; color: var(--emerald);">🧾 Cashiers (<span id="dirCountCashier">0</span>)</button>
+                            <button class="btn btn-outline role-dir-btn" id="dirBtnActive" onclick="filterRoleDirectory('active')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; color: var(--emerald);">🟢 Active (<span id="dirCountActive">0</span>)</button>
+                            <button class="btn btn-outline role-dir-btn" id="dirBtnOffline" onclick="filterRoleDirectory('offline')" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; color: #94a3b8;">⚪ Offline (<span id="dirCountOffline">0</span>)</button>
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -1750,7 +1754,19 @@
                     document.getElementById('totalActiveStaffVal').innerText = tot;
                     document.getElementById('sidebarStaffVal').innerText = tot;
 
-                    // Dual badges: Web Logins & Physical Shifts
+                    // Online, Web Logins & Physical Shifts
+                    const onlineBadge = document.getElementById('activeOnlineUsersBadge');
+                    if (onlineBadge) {
+                        const totOnline = roles.total_online || 0;
+                        if (totOnline > 0) {
+                            onlineBadge.className = 'badge badge-ok';
+                            onlineBadge.innerText = `🟢 ${totOnline} Active Now`;
+                        } else {
+                            onlineBadge.className = 'badge badge-offline';
+                            onlineBadge.innerText = `⚪ 0 Active Now`;
+                        }
+                    }
+
                     const webLoginsBadge = document.getElementById('activeWebLoginsBadge');
                     if (webLoginsBadge) {
                         webLoginsBadge.innerText = `🌐 ${loginsToday} Web Login${loginsToday === 1 ? '' : 's'} Today`;
@@ -1815,21 +1831,31 @@
             const adm = cachedAccountsBreakdown.admins || [];
             const mgr = cachedAccountsBreakdown.managers || [];
             const csh = cachedAccountsBreakdown.cashiers || [];
+            const allItems = [...adm, ...mgr, ...csh];
+
+            const onlineCount = allItems.filter(a => (a.status || '').toLowerCase() === 'active').length;
+            const offlineCount = allItems.length - onlineCount;
 
             const cAll = document.getElementById('dirCountAll');
             const cAdm = document.getElementById('dirCountAdmin');
             const cMgr = document.getElementById('dirCountManager');
             const cCsh = document.getElementById('dirCountCashier');
-            if (cAll) cAll.innerText = adm.length + mgr.length + csh.length;
+            const cActive = document.getElementById('dirCountActive');
+            const cOffline = document.getElementById('dirCountOffline');
+            if (cAll) cAll.innerText = allItems.length;
             if (cAdm) cAdm.innerText = adm.length;
             if (cMgr) cMgr.innerText = mgr.length;
             if (cCsh) cCsh.innerText = csh.length;
+            if (cActive) cActive.innerText = onlineCount;
+            if (cOffline) cOffline.innerText = offlineCount;
 
             let items = [];
             if (currentDirFilter === 'admin') items = adm;
             else if (currentDirFilter === 'manager') items = mgr;
             else if (currentDirFilter === 'cashier') items = csh;
-            else items = [...adm, ...mgr, ...csh];
+            else if (currentDirFilter === 'active') items = allItems.filter(a => (a.status || '').toLowerCase() === 'active');
+            else if (currentDirFilter === 'offline') items = allItems.filter(a => (a.status || '').toLowerCase() !== 'active');
+            else items = allItems;
 
             if (items.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">No accounts found for selected filter (${currentDirFilter}).</td></tr>`;
@@ -1843,15 +1869,20 @@
                 if (a.role === 'manager') { tagClass = 'cyan'; roleIcon = '👔'; roleDisplay = 'Manager'; }
                 else if (a.role === 'cashier') { tagClass = 'emerald'; roleIcon = '🧾'; roleDisplay = 'Cashier'; }
 
+                const isOnline = (a.status || '').toLowerCase() === 'active';
+                const statusBadge = isOnline 
+                    ? '<span class="badge badge-ok">● active</span>' 
+                    : '<span class="badge badge-offline">○ offline</span>';
+
                 return `
                     <tr>
                         <td><strong>${roleIcon} ${escapeHtml(a.username)}</strong></td>
                         <td>${escapeHtml(a.full_name || '—')}</td>
                         <td><span class="role-status-tag ${tagClass}">${roleDisplay}</span></td>
                         <td><span style="color: var(--text-dim); font-size: 0.82rem;">${escapeHtml(a.email || (a.id ? 'Account #' + a.id : '—'))}</span></td>
-                        <td><span class="badge badge-ok">● ${escapeHtml(a.status || 'Active')}</span></td>
+                        <td>${statusBadge}</td>
                         <td style="font-size: 0.8rem; color: var(--text-dim); font-family: var(--font-mono);">
-                            ${a.hourly_rate ? '₱' + a.hourly_rate.toFixed(2) + '/hr' : (a.last_login ? 'Last: ' + escapeHtml(a.last_login) : 'Store Administrator')}
+                            ${a.hourly_rate ? '₱' + a.hourly_rate.toFixed(2) + '/hr' : (a.last_login && a.last_login !== 'Never' ? 'Last: ' + escapeHtml(a.last_login) : 'Store Administrator')}
                         </td>
                     </tr>
                 `;
