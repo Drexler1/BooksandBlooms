@@ -383,35 +383,17 @@
             color: #9c27b0;
         }
 
-        .employee-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .employee-avatar {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            background: var(--gold);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--black);
-            font-weight: 700;
-            font-size: 1rem;
-            flex-shrink: 0;
-        }
-
         .employee-details h4 {
             font-weight: 700;
             color: var(--black);
             margin-bottom: 2px;
+            white-space: nowrap;
         }
 
         .employee-details p {
             font-size: 0.85rem;
             color: #666;
+            white-space: nowrap;
         }
 
         /* Face ID display */
@@ -1448,12 +1430,9 @@
                         {% for emp in employees %}
                         <tr>
                             <td>
-                                <div class="employee-info">
-                                    <div class="employee-avatar">{{ (emp.full_name or '?')[0]|upper }}</div>
-                                    <div class="employee-details">
-                                        <h4>{{ emp.full_name or '(name missing — please edit)' }}</h4>
-                                        <p>Joined: {{ emp.created_at }}</p>
-                                    </div>
+                                <div class="employee-details">
+                                    <h4>{{ emp.full_name or '(name missing — please edit)' }}</h4>
+                                    <p>Joined: {{ emp.created_at }}</p>
                                 </div>
                             </td>
 
