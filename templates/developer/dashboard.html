@@ -1526,7 +1526,7 @@
                                     <th>Role</th>
                                     <th>Email / Details</th>
                                     <th>Status</th>
-                                    <th>Last Login / Rate</th>
+                                    <th>Last Login</th>
                                 </tr>
                             </thead>
                             <tbody id="roleAccountsTableRows">
@@ -2039,7 +2039,7 @@
                         <td><span style="color: var(--text-dim); font-size: 0.82rem;">${escapeHtml(a.email || (a.id ? 'Account #' + a.id : '—'))}</span></td>
                         <td>${statusBadge}</td>
                         <td style="font-size: 0.8rem; color: var(--text-dim); font-family: var(--font-mono);">
-                            ${a.hourly_rate ? '₱' + a.hourly_rate.toFixed(2) + '/hr' : (a.last_login && a.last_login !== 'Never' ? 'Last: ' + escapeHtml(a.last_login) : 'Store Administrator')}
+                            ${(a.last_login && a.last_login !== 'Never') ? 'Last: ' + escapeHtml(a.last_login) : (a.role === 'admin' ? 'Store Administrator' : 'Never')}
                         </td>
                     </tr>
                 `;

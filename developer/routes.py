@@ -470,7 +470,7 @@ def get_system_metrics():
 
             try:
                 cur.execute("""
-                    SELECT employee_id, username, full_name, role, employment_status, hourly_rate, email, last_login 
+                    SELECT employee_id, username, full_name, role, employment_status, email, last_login 
                     FROM employees 
                     WHERE employment_status = 'active'
                     ORDER BY employee_id ASC
@@ -485,9 +485,8 @@ def get_system_metrics():
                         "role": r[3],
                         "status": emp_status,
                         "employment_status": r[4],
-                        "hourly_rate": float(r[5]) if r[5] is not None else 0.0,
-                        "email": _dev_decrypt(r[6]),
-                        "last_login": r[7].strftime("%Y-%m-%d %H:%M:%S") if r[7] else "Never"
+                        "email": _dev_decrypt(r[5]),
+                        "last_login": r[6].strftime("%Y-%m-%d %H:%M:%S") if r[6] else "Never"
                     }
                     if r[3] == "manager":
                         managers_list.append(acc)
