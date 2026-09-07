@@ -1233,7 +1233,15 @@ def is_admin():
     All page/API routes use this helper so both admin and manager paths
     are covered without duplicating logic.
     """
-    if session.get("admin_id") or session.get("admin_role") in ("admin", "manager") or session.get("admin_is_admin"):
+    if (
+        session.get("admin_auth_id")
+        or session.get("admin_auth_emp_id")
+        or session.get("admin_auth_role") in ("admin", "manager")
+        or session.get("admin_auth_is_admin")
+        or session.get("admin_id")
+        or session.get("admin_role") in ("admin", "manager")
+        or session.get("admin_is_admin")
+    ):
         return True
     if session.get("role") == "admin" and ("admin_id" in session or "employee_id" in session or session.get("is_admin")):
         return True
@@ -1251,7 +1259,14 @@ def is_admin_user():
     Used to restrict sensitive configuration routes — like hourly rate
     edits and late-deduction settings — that managers must not access.
     """
-    if session.get("admin_id") or session.get("admin_role") == "admin" or session.get("admin_is_admin"):
+    if (
+        session.get("admin_auth_id")
+        or session.get("admin_auth_role") == "admin"
+        or session.get("admin_auth_is_admin")
+        or session.get("admin_id")
+        or session.get("admin_role") == "admin"
+        or session.get("admin_is_admin")
+    ):
         return True
     return session.get("role") == "admin" and ("admin_id" in session or "employee_id" in session or session.get("is_admin"))
 
@@ -2043,16 +2058,12 @@ def handle_csrf_error(e):
             400,
         )
     # If the user was attempting to log out, satisfy the logout instead of blocking them
+    if request.path in ("/cashier_logout", "/cashier/logout"):
+        return _do_cashier_logout()
+    if request.path in ("/admin_logout", "/admin/logout"):
+        return _do_admin_logout()
     if request.path in ("/logout", "/developer/logout"):
-        try:
-            if session.get("admin_id") or session.get("role") == "admin":
-                _mark_account_offline("admin", session.get("admin_id"))
-            elif session.get("employee_id"):
-                _mark_account_offline("employee", session.get("employee_id"))
-        except Exception:
-            pass
-        session.clear()
-        return redirect(url_for("login"))
+        return logout()
 
     # Recovery flow: keep user in password reset flow rather than dumping to login
     if request.path in (
@@ -2099,51 +2110,97 @@ def reset_liveness_route():
 
 def _set_admin_session_data(admin_id=None, employee_id=None, username="", full_name="", role="admin", is_admin=True):
     """Store admin/manager credentials in isolated admin session keys without clearing dev or cashier sessions."""
-    for k in ("admin_id", "admin_employee_id", "admin_username", "admin_role", "admin_is_admin", "admin_full_name"):
+    for k in (
+        "admin_auth_id",
+        "admin_auth_emp_id",
+        "admin_auth_username",
+        "admin_auth_role",
+        "admin_auth_is_admin",
+        "admin_auth_full_name",
+        "admin_id",
+        "admin_employee_id",
+        "admin_username",
+        "admin_role",
+        "admin_is_admin",
+        "admin_full_name",
+    ):
         session.pop(k, None)
 
     if admin_id:
+        session["admin_auth_id"] = admin_id
         session["admin_id"] = admin_id
     if employee_id:
+        session["admin_auth_emp_id"] = employee_id
         session["admin_employee_id"] = employee_id
-    session["admin_username"] = (username or "").strip()
+
+    session["admin_auth_username"] = (username or "").strip()
+    session["admin_auth_role"] = role
+    session["admin_auth_is_admin"] = is_admin
+    session["admin_auth_full_name"] = (full_name or "Admin").strip()
+
+    session["admin_username"] = session["admin_auth_username"]
     session["admin_role"] = role
     session["admin_is_admin"] = is_admin
-    session["admin_full_name"] = (full_name or "Admin").strip()
+    session["admin_full_name"] = session["admin_auth_full_name"]
 
-    # Set active top-level keys for immediate use
+    # Active top-level keys for immediate use
     if admin_id:
         session["admin_id"] = admin_id
+        session.pop("employee_id", None)
     if employee_id:
         session["employee_id"] = employee_id
+        session.pop("admin_id", None)
     session["role"] = role
-    session["username"] = session["admin_username"]
-    session["full_name"] = session["admin_full_name"]
+    session["username"] = session["admin_auth_username"]
+    session["full_name"] = session["admin_auth_full_name"]
     session["is_admin"] = is_admin
 
 
 def _set_cashier_session_data(employee_id=None, admin_id=None, username="", full_name="", role="cashier", is_admin=False):
     """Store cashier credentials in isolated cashier session keys without clearing dev or admin sessions."""
-    for k in ("cashier_employee_id", "cashier_admin_id", "cashier_username", "cashier_role", "cashier_is_admin", "cashier_full_name"):
+    for k in (
+        "cashier_auth_emp_id",
+        "cashier_auth_adm_id",
+        "cashier_auth_username",
+        "cashier_auth_role",
+        "cashier_auth_is_admin",
+        "cashier_auth_full_name",
+        "cashier_employee_id",
+        "cashier_admin_id",
+        "cashier_username",
+        "cashier_role",
+        "cashier_is_admin",
+        "cashier_full_name",
+    ):
         session.pop(k, None)
 
     if employee_id:
+        session["cashier_auth_emp_id"] = employee_id
         session["cashier_employee_id"] = employee_id
     if admin_id:
+        session["cashier_auth_adm_id"] = admin_id
         session["cashier_admin_id"] = admin_id
-    session["cashier_username"] = (username or "").strip()
+
+    session["cashier_auth_username"] = (username or "").strip()
+    session["cashier_auth_role"] = role
+    session["cashier_auth_is_admin"] = is_admin
+    session["cashier_auth_full_name"] = (full_name or "Cashier").strip()
+
+    session["cashier_username"] = session["cashier_auth_username"]
     session["cashier_role"] = role
     session["cashier_is_admin"] = is_admin
-    session["cashier_full_name"] = (full_name or "Cashier").strip()
+    session["cashier_full_name"] = session["cashier_auth_full_name"]
 
-    # Set active top-level keys for cashier
+    # Active top-level keys for cashier
     if employee_id:
         session["employee_id"] = employee_id
+        session.pop("admin_id", None)
     if admin_id:
         session["admin_id"] = admin_id
+        session.pop("employee_id", None)
     session["role"] = role
-    session["username"] = session["cashier_username"]
-    session["full_name"] = session["cashier_full_name"]
+    session["username"] = session["cashier_auth_username"]
+    session["full_name"] = session["cashier_auth_full_name"]
     session["is_admin"] = is_admin
 
 
@@ -2173,43 +2230,55 @@ def _resolve_portal_session():
     )
 
     if is_cashier_route:
-        # Cashier portal context
-        if session.get("cashier_employee_id") or session.get("cashier_admin_id"):
-            session["role"] = session.get("cashier_role", "cashier")
-            session["username"] = session.get("cashier_username", "")
-            session["full_name"] = session.get("cashier_full_name", "Cashier")
-            session["is_admin"] = session.get("cashier_is_admin", False)
-            if session.get("cashier_employee_id"):
-                session["employee_id"] = session["cashier_employee_id"]
-                if not session.get("cashier_admin_id"):
+        # Cashier portal context:
+        c_emp = session.get("cashier_auth_emp_id") or session.get("cashier_employee_id")
+        c_adm = session.get("cashier_auth_adm_id") or session.get("cashier_admin_id")
+        if c_emp or c_adm:
+            session["role"] = session.get("cashier_auth_role") or session.get("cashier_role") or "cashier"
+            session["username"] = session.get("cashier_auth_username") or session.get("cashier_username") or ""
+            session["full_name"] = session.get("cashier_auth_full_name") or session.get("cashier_full_name") or "Cashier"
+            session["is_admin"] = session.get("cashier_auth_is_admin", session.get("cashier_is_admin", False))
+            if c_emp:
+                session["employee_id"] = c_emp
+                if not c_adm:
                     session.pop("admin_id", None)
-            elif session.get("cashier_admin_id"):
-                session["admin_id"] = session["cashier_admin_id"]
+            elif c_adm:
+                session["admin_id"] = c_adm
                 session.pop("employee_id", None)
-        elif session.get("admin_id") or session.get("admin_employee_id") or session.get("admin_role"):
+        elif (
+            session.get("admin_auth_id")
+            or session.get("admin_auth_emp_id")
+            or session.get("admin_id")
+            or session.get("admin_role")
+        ):
             # Fallback: admin account accessing cashier POS
-            session["role"] = session.get("admin_role", "admin")
-            session["username"] = session.get("admin_username", "")
-            session["full_name"] = session.get("admin_full_name", "Admin")
-            session["is_admin"] = session.get("admin_is_admin", True)
-            if session.get("admin_id"):
-                session["admin_id"] = session["admin_id"]
-            if session.get("admin_employee_id"):
-                session["employee_id"] = session["admin_employee_id"]
+            session["role"] = session.get("admin_auth_role") or session.get("admin_role") or "admin"
+            session["username"] = session.get("admin_auth_username") or session.get("admin_username") or ""
+            session["full_name"] = session.get("admin_auth_full_name") or session.get("admin_full_name") or "Admin"
+            session["is_admin"] = session.get("admin_auth_is_admin", session.get("admin_is_admin", True))
+            a_id = session.get("admin_auth_id") or session.get("admin_id")
+            a_emp = session.get("admin_auth_emp_id") or session.get("admin_employee_id")
+            if a_id:
+                session["admin_id"] = a_id
+            if a_emp:
+                session["employee_id"] = a_emp
 
-    elif path not in ("/login", "/logout", "/"):
-        # Admin / Manager portal context
-        if session.get("admin_id") or session.get("admin_employee_id") or session.get("admin_role"):
-            session["role"] = session.get("admin_role", "admin")
-            session["username"] = session.get("admin_username", "")
-            session["full_name"] = session.get("admin_full_name", "Admin")
-            session["is_admin"] = session.get("admin_is_admin", True)
-            if session.get("admin_id"):
-                session["admin_id"] = session["admin_id"]
-                if not session.get("admin_employee_id"):
+    elif path not in ("/login", "/logout", "/cashier_logout", "/cashier/logout", "/admin_logout", "/admin/logout", "/"):
+        # Admin / Manager portal context:
+        a_id = session.get("admin_auth_id") or session.get("admin_id")
+        a_emp = session.get("admin_auth_emp_id") or session.get("admin_employee_id")
+        a_role = session.get("admin_auth_role") or session.get("admin_role")
+        if a_id or a_emp or a_role:
+            session["role"] = a_role or "admin"
+            session["username"] = session.get("admin_auth_username") or session.get("admin_username") or ""
+            session["full_name"] = session.get("admin_auth_full_name") or session.get("admin_full_name") or "Admin"
+            session["is_admin"] = session.get("admin_auth_is_admin", session.get("admin_is_admin", True))
+            if a_id:
+                session["admin_id"] = a_id
+                if not a_emp:
                     session.pop("employee_id", None)
-            elif session.get("admin_employee_id"):
-                session["employee_id"] = session["admin_employee_id"]
+            elif a_emp:
+                session["employee_id"] = a_emp
                 session.pop("admin_id", None)
 
 
@@ -6142,6 +6211,139 @@ def api_my_attendance():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
+def _do_cashier_logout():
+    """Clear only the cashier portal session, preserving any active admin or developer sessions."""
+    try:
+        emp_id = session.get("cashier_auth_emp_id") or session.get("cashier_employee_id")
+        adm_id = session.get("cashier_auth_adm_id") or session.get("cashier_admin_id")
+        if emp_id:
+            _mark_account_offline("employee", emp_id)
+        elif adm_id and not (session.get("admin_auth_id") or session.get("admin_id")):
+            _mark_account_offline("admin", adm_id)
+    except Exception as exc:
+        app.logger.warning(f"[cashier_logout] Could not mark offline: {exc}")
+
+    # Remove ALL cashier-scoped session keys
+    for k in (
+        "cashier_auth_emp_id",
+        "cashier_auth_adm_id",
+        "cashier_auth_username",
+        "cashier_auth_role",
+        "cashier_auth_is_admin",
+        "cashier_auth_full_name",
+        "cashier_employee_id",
+        "cashier_admin_id",
+        "cashier_username",
+        "cashier_role",
+        "cashier_is_admin",
+        "cashier_full_name",
+    ):
+        session.pop(k, None)
+
+    # If an admin session is active in the same browser, restore top-level keys to admin
+    has_admin = bool(
+        session.get("admin_auth_id")
+        or session.get("admin_auth_emp_id")
+        or session.get("admin_auth_role")
+        or session.get("admin_id")
+        or session.get("admin_role")
+    )
+    if has_admin:
+        session["role"] = session.get("admin_auth_role") or session.get("admin_role") or "admin"
+        session["username"] = session.get("admin_auth_username") or session.get("admin_username") or ""
+        session["full_name"] = session.get("admin_auth_full_name") or session.get("admin_full_name") or "Admin"
+        session["is_admin"] = session.get("admin_auth_is_admin", session.get("admin_is_admin", True))
+        adm_id = session.get("admin_auth_id") or session.get("admin_id")
+        emp_id = session.get("admin_auth_emp_id") or session.get("admin_employee_id")
+        if adm_id:
+            session["admin_id"] = adm_id
+            session.pop("employee_id", None)
+        elif emp_id:
+            session["employee_id"] = emp_id
+            session.pop("admin_id", None)
+    else:
+        # No admin session active; clear top-level session keys
+        for k in ("employee_id", "admin_id", "role", "username", "full_name", "is_admin"):
+            session.pop(k, None)
+
+    return redirect(url_for("login"))
+
+
+def _do_admin_logout():
+    """Clear only the admin portal session, preserving any active cashier or developer sessions."""
+    try:
+        adm_id = session.get("admin_auth_id") or session.get("admin_id")
+        emp_id = session.get("admin_auth_emp_id") or session.get("admin_employee_id")
+        if adm_id:
+            _mark_account_offline("admin", adm_id)
+        elif emp_id:
+            _mark_account_offline("employee", emp_id)
+        elif session.get("role") == "admin" and session.get("admin_id"):
+            _mark_account_offline("admin", session.get("admin_id"))
+    except Exception as exc:
+        app.logger.warning(f"[admin_logout] Could not mark offline: {exc}")
+
+    # Clear isolated admin keys
+    for k in (
+        "admin_auth_id",
+        "admin_auth_emp_id",
+        "admin_auth_username",
+        "admin_auth_role",
+        "admin_auth_is_admin",
+        "admin_auth_full_name",
+        "admin_id",
+        "admin_employee_id",
+        "admin_username",
+        "admin_role",
+        "admin_is_admin",
+        "admin_full_name",
+    ):
+        session.pop(k, None)
+
+    # If a cashier session is active in the same browser, restore top-level keys to cashier
+    has_cashier = bool(
+        session.get("cashier_auth_emp_id")
+        or session.get("cashier_auth_adm_id")
+        or session.get("cashier_employee_id")
+        or session.get("cashier_admin_id")
+    )
+    if has_cashier:
+        session["role"] = session.get("cashier_auth_role") or session.get("cashier_role") or "cashier"
+        session["username"] = session.get("cashier_auth_username") or session.get("cashier_username") or ""
+        session["full_name"] = session.get("cashier_auth_full_name") or session.get("cashier_full_name") or "Cashier"
+        session["is_admin"] = session.get("cashier_auth_is_admin", session.get("cashier_is_admin", False))
+        c_emp_id = session.get("cashier_auth_emp_id") or session.get("cashier_employee_id")
+        c_adm_id = session.get("cashier_auth_adm_id") or session.get("cashier_admin_id")
+        if c_emp_id:
+            session["employee_id"] = c_emp_id
+            session.pop("admin_id", None)
+        elif c_adm_id:
+            session["admin_id"] = c_adm_id
+            session.pop("employee_id", None)
+    else:
+        # No cashier session active; clear top-level session keys
+        for k in ("employee_id", "admin_id", "role", "username", "full_name", "is_admin"):
+            session.pop(k, None)
+
+    return redirect(url_for("login"))
+
+
+@app.route("/admin_logout", methods=["GET", "POST"])
+@app.route("/admin/logout", methods=["GET", "POST"])
+@csrf.exempt
+def admin_logout():
+    """Dedicated endpoint for Admin portal logout."""
+    return _do_admin_logout()
+
+
+@app.route("/cashier_logout", methods=["GET", "POST"])
+@app.route("/cashier/logout", methods=["GET", "POST"])
+@csrf.exempt
+def cashier_logout():
+    """Dedicated endpoint for Cashier portal logout."""
+    return _do_cashier_logout()
+
+
 @app.route("/logout", methods=["GET", "POST"])
 @csrf.exempt
 def logout():
@@ -6149,100 +6351,22 @@ def logout():
     referrer = (request.referrer or "").lower()
 
     # Determine if this logout originates from the cashier portal
-    is_cashier_logout = (
+    is_cashier = (
         portal == "cashier"
         or "/cashier" in referrer
         or "/pos" in referrer
+        or request.path.startswith("/cashier")
         or (
-            (session.get("cashier_employee_id") or session.get("cashier_admin_id"))
-            and not (portal == "admin" or "/admin" in referrer or session.get("admin_id") or session.get("admin_employee_id"))
+            (session.get("cashier_auth_emp_id") or session.get("cashier_employee_id"))
+            and session.get("role") == "cashier"
+            and portal != "admin"
+            and "/admin" not in referrer
         )
     )
 
-    try:
-        if is_cashier_logout:
-            # Mark the cashier offline
-            if session.get("cashier_employee_id"):
-                _mark_account_offline("employee", session.get("cashier_employee_id"))
-            elif session.get("cashier_admin_id") and not session.get("admin_id"):
-                _mark_account_offline("admin", session.get("cashier_admin_id"))
-            elif session.get("employee_id") and not session.get("admin_id"):
-                _mark_account_offline("employee", session.get("employee_id"))
-        else:
-            # Mark the admin/manager offline
-            if session.get("admin_id"):
-                _mark_account_offline("admin", session.get("admin_id"))
-            elif session.get("admin_employee_id"):
-                _mark_account_offline("employee", session.get("admin_employee_id"))
-            elif session.get("role") == "admin" and session.get("admin_id"):
-                _mark_account_offline("admin", session.get("admin_id"))
-            elif session.get("employee_id") and not session.get("cashier_employee_id"):
-                _mark_account_offline("employee", session.get("employee_id"))
-    except Exception as exc:
-        app.logger.warning(f"[logout] Could not mark offline: {exc}")
-
-    if is_cashier_logout:
-        # Clear isolated cashier keys
-        for k in (
-            "cashier_employee_id",
-            "cashier_admin_id",
-            "cashier_username",
-            "cashier_role",
-            "cashier_is_admin",
-            "cashier_full_name",
-        ):
-            session.pop(k, None)
-
-        # If an admin session is active in the same browser, restore top-level keys to admin
-        if session.get("admin_id") or session.get("admin_employee_id") or session.get("admin_role"):
-            session["role"] = session.get("admin_role", "admin")
-            session["username"] = session.get("admin_username", "")
-            session["full_name"] = session.get("admin_full_name", "Admin")
-            session["is_admin"] = session.get("admin_is_admin", True)
-            if session.get("admin_id"):
-                session["admin_id"] = session["admin_id"]
-                if not session.get("admin_employee_id"):
-                    session.pop("employee_id", None)
-            elif session.get("admin_employee_id"):
-                session["employee_id"] = session["admin_employee_id"]
-                session.pop("admin_id", None)
-        else:
-            # No admin session active; clear top-level session keys
-            for k in ("employee_id", "admin_id", "role", "username", "full_name", "is_admin"):
-                session.pop(k, None)
-
-        return redirect(url_for("login"))
-    else:
-        # Admin / Manager logout: clear isolated admin keys
-        for k in (
-            "admin_id",
-            "admin_employee_id",
-            "admin_username",
-            "admin_role",
-            "admin_is_admin",
-            "admin_full_name",
-        ):
-            session.pop(k, None)
-
-        # If a cashier session is active in the same browser, restore top-level keys to cashier
-        if session.get("cashier_employee_id") or session.get("cashier_admin_id"):
-            session["role"] = session.get("cashier_role", "cashier")
-            session["username"] = session.get("cashier_username", "")
-            session["full_name"] = session.get("cashier_full_name", "Cashier")
-            session["is_admin"] = session.get("cashier_is_admin", False)
-            if session.get("cashier_employee_id"):
-                session["employee_id"] = session["cashier_employee_id"]
-                if not session.get("cashier_admin_id"):
-                    session.pop("admin_id", None)
-            elif session.get("cashier_admin_id"):
-                session["admin_id"] = session["cashier_admin_id"]
-                session.pop("employee_id", None)
-        else:
-            # No cashier session active; clear top-level session keys
-            for k in ("employee_id", "admin_id", "role", "username", "full_name", "is_admin"):
-                session.pop(k, None)
-
-        return redirect(url_for("login"))
+    if is_cashier:
+        return _do_cashier_logout()
+    return _do_admin_logout()
 
 
 @app.route("/api/user/heartbeat", methods=["GET", "POST"])
@@ -6250,7 +6374,11 @@ def logout():
 def user_heartbeat():
     """Keep-alive ping for active authenticated sessions."""
     if (
-        session.get("admin_id")
+        session.get("admin_auth_id")
+        or session.get("admin_auth_emp_id")
+        or session.get("cashier_auth_emp_id")
+        or session.get("cashier_auth_adm_id")
+        or session.get("admin_id")
         or session.get("employee_id")
         or session.get("admin_employee_id")
         or session.get("cashier_employee_id")
