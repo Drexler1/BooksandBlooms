@@ -1988,6 +1988,9 @@
                 <li><a href="{{ url_for('cashier_transactions') }}">📊 My Transactions</a></li>
                 <li><a href="{{ url_for('cashier_attendance') }}" class="active">📅 Attendance</a></li>
                 <li><a href="{{ url_for('cashier_inventory') }}">📦 Supply Monitor</a></li>
+                {% if session.get('is_admin') or session.get('role') == 'admin' %}
+                <li><a href="{{ url_for('dashboard') }}" style="color: #6366f1; font-weight: 600;">⚡ Admin Dashboard</a></li>
+                {% endif %}
             </ul>
         </nav>
 

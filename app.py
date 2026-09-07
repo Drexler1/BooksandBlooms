@@ -1232,7 +1232,7 @@ def is_admin():
     All page/API routes use this helper so both admin and manager paths
     are covered without duplicating logic.
     """
-    if session.get("role") == "admin" and "admin_id" in session:
+    if session.get("role") == "admin" and ("admin_id" in session or "employee_id" in session or session.get("is_admin")):
         return True
     if session.get("role") == "manager":
         # Covers both is_admin=True (admin logged in via Manager tab)
@@ -1248,7 +1248,7 @@ def is_admin_user():
     Used to restrict sensitive configuration routes — like hourly rate
     edits and late-deduction settings — that managers must not access.
     """
-    return session.get("role") == "admin" and "admin_id" in session
+    return session.get("role") == "admin" and ("admin_id" in session or "employee_id" in session or session.get("is_admin"))
 
 
 # Standard role alias: 'super_admin' role standardized to 'admin'
@@ -2205,6 +2205,46 @@ def login():
                 mysql.connection.commit()
                 auth_ok = True
                 redirect_to = url_for("cashier_dashboard")
+            else:
+                # Fallback 1: allow admins from admins table to log into Cashier POS terminal
+                cur.execute(
+                    "SELECT admin_id, username, full_name, password, email"
+                    " FROM admins WHERE username_hash=%s",
+                    (u_hash,),
+                )
+                admin = _dec_adm(cur.fetchone())
+                if admin and _check_login_password(password, admin):
+                    session.clear()
+                    session["admin_id"] = admin["admin_id"]
+                    session["username"] = (admin.get("username") or "").strip()
+                    session["role"] = "admin"
+                    session["is_admin"] = True
+                    session["full_name"] = (admin.get("full_name") or "Admin").strip()
+                    auth_ok = True
+                    redirect_to = url_for("cashier_dashboard")
+                else:
+                    # Fallback 2: allow admins from employees table to log into Cashier POS terminal
+                    cur.execute(
+                        """SELECT employee_id, username, full_name, password, email
+                           FROM employees WHERE username_hash=%s
+                           AND role='admin' AND employment_status='active'""",
+                        (u_hash,),
+                    )
+                    emp_admin = _dec_emp(cur.fetchone())
+                    if emp_admin and _check_login_password(password, emp_admin):
+                        session.clear()
+                        session["employee_id"] = emp_admin["employee_id"]
+                        session["username"] = (emp_admin.get("username") or "").strip()
+                        session["role"] = "admin"
+                        session["is_admin"] = True
+                        session["full_name"] = (emp_admin.get("full_name") or "Admin").strip()
+                        cur.execute(
+                            "UPDATE employees SET last_login=NOW() WHERE employee_id=%s",
+                            (emp_admin["employee_id"],),
+                        )
+                        mysql.connection.commit()
+                        auth_ok = True
+                        redirect_to = url_for("cashier_dashboard")
 
         cur.close()
 
@@ -5480,15 +5520,40 @@ def api_danger_clear_all_data():
 
 @app.route("/cashier_dashboard")
 def cashier_dashboard():
-    if "employee_id" not in session or session.get("role") != "cashier":
+    is_cashier_auth = ("employee_id" in session and session.get("role") == "cashier")
+    if not (is_cashier_auth or is_admin()):
         return redirect(url_for("login"))
 
     cur = mysql.connection.cursor(DictCursor)
-    cur.execute(
-        "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
-        (session["employee_id"],),
-    )
-    employee = _dec_emp(cur.fetchone())
+    employee = None
+    if "employee_id" in session:
+        cur.execute(
+            "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
+            (session["employee_id"],),
+        )
+        employee = _dec_emp(cur.fetchone())
+    elif "admin_id" in session:
+        cur.execute(
+            "SELECT full_name, username, 'admin' AS role, email FROM admins WHERE admin_id=%s",
+            (session["admin_id"],),
+        )
+        admin_row = _dec_adm(cur.fetchone())
+        if admin_row:
+            employee = {
+                "employee_id": session.get("admin_id"),
+                "full_name": (admin_row.get("full_name") or session.get("full_name") or "Admin").strip(),
+                "username": (admin_row.get("username") or session.get("username") or "Admin").strip(),
+                "role": "admin",
+                "email": admin_row.get("email") or "",
+            }
+        else:
+            employee = {
+                "employee_id": session.get("admin_id"),
+                "full_name": session.get("full_name", "Admin"),
+                "username": session.get("username", "Admin"),
+                "role": "admin",
+                "email": "",
+            }
     cur.close()
 
     return render_template("cashier/cashier_dashboard.html", employee=employee)
@@ -5496,15 +5561,40 @@ def cashier_dashboard():
 
 @app.route("/cashier_transactions")
 def cashier_transactions():
-    if "employee_id" not in session or session.get("role") != "cashier":
+    is_cashier_auth = ("employee_id" in session and session.get("role") == "cashier")
+    if not (is_cashier_auth or is_admin()):
         return redirect(url_for("login"))
 
     cur = mysql.connection.cursor(DictCursor)
-    cur.execute(
-        "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
-        (session["employee_id"],),
-    )
-    employee = _dec_emp(cur.fetchone())
+    employee = None
+    if "employee_id" in session:
+        cur.execute(
+            "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
+            (session["employee_id"],),
+        )
+        employee = _dec_emp(cur.fetchone())
+    elif "admin_id" in session:
+        cur.execute(
+            "SELECT full_name, username, 'admin' AS role, email FROM admins WHERE admin_id=%s",
+            (session["admin_id"],),
+        )
+        admin_row = _dec_adm(cur.fetchone())
+        if admin_row:
+            employee = {
+                "employee_id": session.get("admin_id"),
+                "full_name": (admin_row.get("full_name") or session.get("full_name") or "Admin").strip(),
+                "username": (admin_row.get("username") or session.get("username") or "Admin").strip(),
+                "role": "admin",
+                "email": admin_row.get("email") or "",
+            }
+        else:
+            employee = {
+                "employee_id": session.get("admin_id"),
+                "full_name": session.get("full_name", "Admin"),
+                "username": session.get("username", "Admin"),
+                "role": "admin",
+                "email": "",
+            }
     cur.close()
 
     return render_template("cashier/transaction.html", employee=employee)
@@ -5512,15 +5602,31 @@ def cashier_transactions():
 
 @app.route("/cashier_attendance")
 def cashier_attendance():
-    """Cashier-only attendance page — clock-in/out and own history only."""
-    if "employee_id" not in session or session.get("role") != "cashier":
+    """Cashier attendance page — clock-in/out and own history only."""
+    is_cashier_auth = ("employee_id" in session and session.get("role") == "cashier")
+    if not (is_cashier_auth or is_admin()):
         return redirect(url_for("login"))
     cur = mysql.connection.cursor(DictCursor)
-    cur.execute(
-        "SELECT employee_id, full_name, role, hourly_rate FROM employees WHERE employee_id=%s",
-        (session["employee_id"],),
-    )
-    employee = _dec_emp(cur.fetchone())
+    employee = None
+    if "employee_id" in session:
+        cur.execute(
+            "SELECT employee_id, full_name, role, hourly_rate FROM employees WHERE employee_id=%s",
+            (session["employee_id"],),
+        )
+        employee = _dec_emp(cur.fetchone())
+    elif "admin_id" in session:
+        cur.execute(
+            "SELECT admin_id, full_name, username FROM admins WHERE admin_id=%s",
+            (session["admin_id"],),
+        )
+        admin_row = _dec_adm(cur.fetchone())
+        full_name = (admin_row.get("full_name") or session.get("full_name") or "Admin") if admin_row else session.get("full_name", "Admin")
+        employee = {
+            "employee_id": session.get("admin_id"),
+            "full_name": full_name,
+            "role": "admin",
+            "hourly_rate": 0.0,
+        }
     cur.close()
     return render_template("cashier/cashier_attendance.html", employee=employee)
 
@@ -5788,13 +5894,30 @@ def api_my_attendance():
     Returns attendance records scoped strictly to the logged-in cashier.
     Accepts ?date=YYYY-MM-DD for single day, or ?range_start=&range_end= for a period.
     """
-    if "employee_id" not in session or session.get("role") != "cashier":
+    is_cashier_auth = ("employee_id" in session and session.get("role") == "cashier")
+    if not (is_cashier_auth or is_admin()):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
-    employee_id = session["employee_id"]
+    employee_id = session.get("employee_id")
     date_str = request.args.get("date", "")
     range_start = request.args.get("range_start", "")
     range_end = request.args.get("range_end", "")
+
+    if not employee_id:
+        if range_start and range_end:
+            return jsonify({
+                "success": True,
+                "records": [],
+                "total_hours": 0.0,
+                "range_start": range_start,
+                "range_end": range_end,
+            })
+        return jsonify({
+            "success": True,
+            "date": date_str or str(datetime.now(PHT).date()),
+            "records": [],
+            "total_hours": 0.0,
+        })
     cur = mysql.connection.cursor(DictCursor)
 
     BASE_SQL = """
@@ -7940,11 +8063,12 @@ def api_pos_transactions():
                    COALESCE(t.net_sales, ROUND(t.total_amount / 1.12, 2))   AS net_sales,
                    COALESCE(t.vat_amount, ROUND(t.total_amount / 1.12 * 0.12, 2)) AS vat_amount,
                    COUNT(ti.item_id) AS item_count,
-                   e.role            AS cashier_role,
-                   e.email  AS cashier_contact_enc
+                   COALESCE(e.role, CASE WHEN a.admin_id IS NOT NULL THEN 'admin' ELSE 'cashier' END) AS cashier_role,
+                   COALESCE(e.email, a.email) AS cashier_contact_enc
             FROM transactions t
             LEFT JOIN transaction_items ti ON ti.transaction_id = t.transaction_id
             LEFT JOIN employees e ON e.employee_id = t.cashier_id
+            LEFT JOIN admins a ON a.admin_id = t.cashier_id
             WHERE {' AND '.join(where)}
             GROUP BY t.transaction_id
             ORDER BY t.created_at DESC
@@ -12421,8 +12545,12 @@ def api_overtime_review(request_id):
 
 
 def _is_cashier():
-    """Return True only when a cashier is logged in via the employee session."""
-    return "employee_id" in session and session.get("role") == "cashier"
+    """Return True when a cashier or admin is logged in."""
+    if "employee_id" in session and session.get("role") == "cashier":
+        return True
+    if is_admin():
+        return True
+    return False
 
 
 @app.route("/cashier/inventory")
@@ -12433,22 +12561,37 @@ def cashier_inventory():
     employee = None
     try:
         cur = mysql.connection.cursor(DictCursor)
-        cur.execute(
-            "SELECT employee_id, full_name, username, role "
-            "FROM employees WHERE employee_id = %s LIMIT 1",
-            (session["employee_id"],),
-        )
-        row = cur.fetchone()
-        cur.close()
-        if row:
-            full_name = aes_decrypt(row["full_name"]) if row.get("full_name") else ""
-            username = aes_decrypt(row["username"]) if row.get("username") else ""
+        if "employee_id" in session:
+            cur.execute(
+                "SELECT employee_id, full_name, username, role "
+                "FROM employees WHERE employee_id = %s LIMIT 1",
+                (session["employee_id"],),
+            )
+            row = cur.fetchone()
+            if row:
+                full_name = aes_decrypt(row["full_name"]) if row.get("full_name") else ""
+                username = aes_decrypt(row["username"]) if row.get("username") else ""
+                employee = {
+                    "employee_id": row["employee_id"],
+                    "full_name": full_name or username,
+                    "username": username,
+                    "role": row["role"],
+                }
+        elif "admin_id" in session:
+            cur.execute(
+                "SELECT admin_id, full_name, username FROM admins WHERE admin_id = %s LIMIT 1",
+                (session["admin_id"],),
+            )
+            admin_row = _dec_adm(cur.fetchone())
+            full_name = (admin_row.get("full_name") or session.get("full_name") or "Admin") if admin_row else session.get("full_name", "Admin")
+            username = (admin_row.get("username") or session.get("username") or "Admin") if admin_row else session.get("username", "Admin")
             employee = {
-                "employee_id": row["employee_id"],
-                "full_name": full_name or username,
+                "employee_id": session.get("admin_id"),
+                "full_name": full_name,
                 "username": username,
-                "role": row["role"],
+                "role": "admin",
             }
+        cur.close()
     except Exception as exc:
         app.logger.error(f"[cashier_inventory] employee lookup: {exc}")
     return render_template("cashier/cashier_inventory.html", employee=employee)
@@ -12461,28 +12604,52 @@ def api_cashier_me():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     try:
         cur = mysql.connection.cursor(DictCursor)
-        cur.execute(
-            "SELECT employee_id, full_name, username, role "
-            "FROM employees WHERE employee_id = %s LIMIT 1",
-            (session["employee_id"],),
-        )
-        row = cur.fetchone()
-        cur.close()
-        if not row:
-            return jsonify({"success": False, "message": "Employee not found"}), 404
-        full_name = aes_decrypt(row["full_name"]) if row.get("full_name") else ""
-        username = aes_decrypt(row["username"]) if row.get("username") else ""
-        return jsonify(
-            {
-                "success": True,
-                "user": {
-                    "employee_id": row["employee_id"],
-                    "full_name": full_name or username,
-                    "username": username,
-                    "role": row["role"],
-                },
-            }
-        )
+        if "employee_id" in session:
+            cur.execute(
+                "SELECT employee_id, full_name, username, role "
+                "FROM employees WHERE employee_id = %s LIMIT 1",
+                (session["employee_id"],),
+            )
+            row = cur.fetchone()
+            cur.close()
+            if not row:
+                return jsonify({"success": False, "message": "Employee not found"}), 404
+            full_name = aes_decrypt(row["full_name"]) if row.get("full_name") else ""
+            username = aes_decrypt(row["username"]) if row.get("username") else ""
+            return jsonify(
+                {
+                    "success": True,
+                    "user": {
+                        "employee_id": row["employee_id"],
+                        "full_name": full_name or username,
+                        "username": username,
+                        "role": row["role"],
+                    },
+                }
+            )
+        elif "admin_id" in session:
+            cur.execute(
+                "SELECT admin_id, full_name, username FROM admins WHERE admin_id = %s LIMIT 1",
+                (session["admin_id"],),
+            )
+            admin_row = _dec_adm(cur.fetchone())
+            cur.close()
+            full_name = (admin_row.get("full_name") or session.get("full_name") or "Admin") if admin_row else session.get("full_name", "Admin")
+            username = (admin_row.get("username") or session.get("username") or "Admin") if admin_row else session.get("username", "Admin")
+            return jsonify(
+                {
+                    "success": True,
+                    "user": {
+                        "employee_id": session.get("admin_id"),
+                        "full_name": full_name,
+                        "username": username,
+                        "role": "admin",
+                    },
+                }
+            )
+        else:
+            cur.close()
+            return jsonify({"success": False, "message": "Unauthorized"}), 401
     except Exception as exc:
         app.logger.error(f"[cashier_inv] api_cashier_me: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
@@ -12842,8 +13009,8 @@ def api_cashier_inv_request():
         if item_type not in ("ingredient", "packaging"):
             item_type = "ingredient"
 
-        emp_id = session.get("employee_id")
-        emp_name = session.get("full_name") or f"Cashier#{emp_id}"
+        emp_id = session.get("employee_id") or session.get("admin_id")
+        emp_name = session.get("full_name") or f"Staff#{emp_id}"
 
         conn = mysql.connection
         cur = conn.cursor()
@@ -12872,7 +13039,7 @@ def api_cashier_inv_my_requests():
     if not _is_cashier():
         return jsonify({"success": False, "message": "Unauthorized"}), 403
     try:
-        emp_name = session.get("full_name") or f"Cashier#{session.get('employee_id')}"
+        emp_name = session.get("full_name") or f"Staff#{session.get('employee_id') or session.get('admin_id')}"
         conn = mysql.connection
         cur = conn.cursor(DictCursor)
         cur.execute(
