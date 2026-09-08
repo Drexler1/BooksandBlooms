@@ -1142,29 +1142,8 @@ def set_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
-
-    path = request.path
-
-    # Static assets (CSS, JS, images, fonts) should be freely cached by the browser.
-    if path.startswith("/static/"):
-        return response
-
-    # ── Prevent ALL authenticated pages and API endpoints from being cached ───
-    # Without this, browsers and Railway's reverse proxy can serve a cached HTML
-    # response (with User A's full_name baked in by Jinja) to a completely
-    # different User B, making it appear that the account has "switched" to the
-    # wrong user.  The same problem affects JSON API responses: a cached
-    # /api/pos/transactions reply from one session can be replayed to another.
-    #
-    # Rule: any response whose content is user-specific must never be stored in
-    # any shared cache.  Static assets are the only safe exception.
-    content_type = response.content_type or ""
-    is_html      = "text/html" in content_type
-    is_json      = "application/json" in content_type
-    is_sse       = "text/event-stream" in content_type
-
-    # Login / recovery forms also need no-store (CSRF token freshness)
-    is_auth_form = path in (
+    # Prevent browsers from caching auth and recovery forms with stale CSRF tokens
+    if request.path in (
         "/",
         "/login",
         "/developer/login",
@@ -1174,13 +1153,10 @@ def set_security_headers(response):
         "/verify_otp",
         "/reset_password",
         "/developer/change_password",
-    )
-
-    if is_html or is_json or is_sse or is_auth_form:
+    ):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"]        = "no-cache"
         response.headers["Expires"]       = "0"
-
     return response
 
 
