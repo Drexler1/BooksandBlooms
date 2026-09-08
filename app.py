@@ -1142,19 +1142,9 @@ def set_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
-    # Prevent browsers from caching auth and recovery forms with stale CSRF tokens
-    if request.path in (
-        "/",
-        "/login",
-        "/developer/login",
-        "/forgot_password",
-        "/choose_account",
-        "/choose_method",
-        "/verify_otp",
-        "/reset_password",
-        "/developer/change_password",
-    ):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    # Prevent proxies and browsers from caching dynamic/authenticated pages and stale CSRF tokens
+    if not request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "private, no-cache, no-store, must-revalidate, max-age=0"
         response.headers["Pragma"]        = "no-cache"
         response.headers["Expires"]       = "0"
     return response
@@ -1218,25 +1208,194 @@ def reset_liveness(emp_id):
     liveness_sessions.pop(emp_id, None)
 
 
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                         PORTAL SESSION MANAGEMENT                            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+def _set_admin_session_data(admin_id=None, employee_id=None, username="", full_name="", role="admin", is_admin=True):
+    """Store admin/manager credentials in isolated admin session keys without clearing dev or cashier sessions."""
+    for k in ("admin_auth_id", "admin_auth_emp_id", "admin_auth_username", "admin_auth_role", "admin_auth_is_admin", "admin_auth_full_name"):
+        session.pop(k, None)
+
+    if admin_id:
+        session["admin_auth_id"] = admin_id
+    if employee_id:
+        session["admin_auth_emp_id"] = employee_id
+    session["admin_auth_username"] = (username or "").strip()
+    session["admin_auth_role"] = role
+    session["admin_auth_is_admin"] = is_admin
+    session["admin_auth_full_name"] = (full_name or ("Admin" if role == "admin" else "Manager")).strip()
+
+    # Active top-level keys for immediate use
+    if admin_id:
+        session["admin_id"] = admin_id
+        session.pop("employee_id", None)
+    elif employee_id:
+        session["employee_id"] = employee_id
+        session.pop("admin_id", None)
+    session["role"] = role
+    session["username"] = session["admin_auth_username"]
+    session["full_name"] = session["admin_auth_full_name"]
+    session["is_admin"] = is_admin
+
+
+def _set_cashier_session_data(employee_id=None, username="", full_name="", role="cashier", is_admin=False):
+    """Store cashier credentials in isolated cashier session keys without clearing dev or admin sessions."""
+    for k in ("cashier_auth_emp_id", "cashier_auth_username", "cashier_auth_role", "cashier_auth_is_admin", "cashier_auth_full_name"):
+        session.pop(k, None)
+
+    if employee_id:
+        session["cashier_auth_emp_id"] = employee_id
+    session["cashier_auth_username"] = (username or "").strip()
+    session["cashier_auth_role"] = role
+    session["cashier_auth_is_admin"] = is_admin
+    session["cashier_auth_full_name"] = (full_name or "Cashier").strip()
+
+    # Active top-level keys for immediate use
+    session["employee_id"] = employee_id
+    session.pop("admin_id", None)
+    session["role"] = role
+    session["username"] = session["cashier_auth_username"]
+    session["full_name"] = session["cashier_auth_full_name"]
+    session["is_admin"] = is_admin
+
+
+def _do_admin_logout():
+    """Clear admin/manager portal session without terminating cashier or developer sessions."""
+    admin_id = session.get("admin_auth_id") or session.get("admin_id")
+    emp_id = session.get("admin_auth_emp_id")
+    try:
+        if admin_id:
+            _mark_account_offline("admin", admin_id)
+        elif emp_id:
+            _mark_account_offline("employee", emp_id)
+    except Exception as exc:
+        app.logger.warning(f"[admin_logout] Could not mark offline: {exc}")
+
+    for k in (
+        "admin_auth_id",
+        "admin_auth_emp_id",
+        "admin_auth_username",
+        "admin_auth_role",
+        "admin_auth_is_admin",
+        "admin_auth_full_name",
+    ):
+        session.pop(k, None)
+
+    # If cashier session exists, restore active top-level keys to cashier
+    if session.get("cashier_auth_emp_id") or session.get("cashier_auth_role") == "cashier":
+        session["role"] = session.get("cashier_auth_role", "cashier")
+        session["username"] = session.get("cashier_auth_username", "")
+        session["full_name"] = session.get("cashier_auth_full_name", "Cashier")
+        session["is_admin"] = session.get("cashier_auth_is_admin", False)
+        session["employee_id"] = session.get("cashier_auth_emp_id")
+        session.pop("admin_id", None)
+    else:
+        for k in ("employee_id", "admin_id", "role", "username", "full_name", "is_admin"):
+            session.pop(k, None)
+
+    return redirect(url_for("login"))
+
+
+def _do_cashier_logout():
+    """Clear cashier portal session without terminating admin or developer sessions."""
+    emp_id = session.get("cashier_auth_emp_id") or session.get("employee_id")
+    try:
+        if emp_id:
+            _mark_account_offline("employee", emp_id)
+    except Exception as exc:
+        app.logger.warning(f"[cashier_logout] Could not mark offline: {exc}")
+
+    for k in (
+        "cashier_auth_emp_id",
+        "cashier_auth_username",
+        "cashier_auth_role",
+        "cashier_auth_is_admin",
+        "cashier_auth_full_name",
+    ):
+        session.pop(k, None)
+
+    # If admin session exists, restore active top-level keys to admin
+    if session.get("admin_auth_id") or session.get("admin_auth_emp_id") or session.get("admin_auth_role") in ("admin", "manager"):
+        session["role"] = session.get("admin_auth_role", "admin")
+        session["username"] = session.get("admin_auth_username", "")
+        session["full_name"] = session.get("admin_auth_full_name", "Admin")
+        session["is_admin"] = session.get("admin_auth_is_admin", True)
+        if session.get("admin_auth_id"):
+            session["admin_id"] = session.get("admin_auth_id")
+            session.pop("employee_id", None)
+        elif session.get("admin_auth_emp_id"):
+            session["employee_id"] = session.get("admin_auth_emp_id")
+            session.pop("admin_id", None)
+    else:
+        for k in ("employee_id", "admin_id", "role", "username", "full_name", "is_admin"):
+            session.pop(k, None)
+
+    return redirect(url_for("login"))
+
+
+@app.before_request
+def _resolve_portal_session():
+    """
+    Dynamically maps partitioned portal credentials (admin_auth_* vs cashier_auth_*)
+    to the active top-level session keys (role, username, employee_id, admin_id)
+    based on the requested URL path.
+    """
+    path = request.path
+
+    # Static assets and developer blueprint routes are never touched
+    if path.startswith("/static/") or path.startswith("/developer"):
+        return
+
+    # Skip recovery flow
+    if path in ("/forgot_password", "/choose_account", "/choose_method", "/verify_otp", "/reset_password"):
+        return
+
+    # Cashier routes
+    referrer = (request.referrer or "").lower()
+    is_cashier_route = (
+        path.startswith("/cashier")
+        or path.startswith("/api/pos/")
+        or path.startswith("/api/cashier/")
+        or ("/cashier" in referrer and path in ("/verify_face", "/log_attendance", "/api/user/heartbeat"))
+    )
+
+    if is_cashier_route:
+        # If we have partitioned cashier auth, ensure active context reflects cashier
+        if session.get("cashier_auth_emp_id") or session.get("cashier_auth_role") == "cashier":
+            session["role"] = session.get("cashier_auth_role", "cashier")
+            session["username"] = session.get("cashier_auth_username", "")
+            session["full_name"] = session.get("cashier_auth_full_name", "Cashier")
+            session["is_admin"] = session.get("cashier_auth_is_admin", False)
+            session["employee_id"] = session.get("cashier_auth_emp_id")
+            session.pop("admin_id", None)
+    else:
+        # Admin / Manager routes (e.g. /dashboard, /admin_sales, /inventory, /payroll, etc.)
+        # If we have partitioned admin auth, ensure active context reflects admin
+        if session.get("admin_auth_id") or session.get("admin_auth_emp_id") or session.get("admin_auth_role") in ("admin", "manager"):
+            session["role"] = session.get("admin_auth_role", "admin")
+            session["username"] = session.get("admin_auth_username", "")
+            session["full_name"] = session.get("admin_auth_full_name", "Admin")
+            session["is_admin"] = session.get("admin_auth_is_admin", True)
+            if session.get("admin_auth_id"):
+                session["admin_id"] = session.get("admin_auth_id")
+                session.pop("employee_id", None)
+            elif session.get("admin_auth_emp_id"):
+                session["employee_id"] = session.get("admin_auth_emp_id")
+                session.pop("admin_id", None)
+
+
 def is_admin():
     """
     Return True if the current session belongs to an admin or a manager.
-
-    Accepted session states:
-      1. Legacy admin login  — role='admin'  AND admin_id in session
-      2. Admin via Manager tab — role='manager' AND is_admin=True
-      3. Regular manager login — role='manager' AND is_admin=False
-         (employees table row with role='manager'; has access to all
-          management pages but is NOT a store admin)
-
-    All page/API routes use this helper so both admin and manager paths
-    are covered without duplicating logic.
+    Checks both partitioned admin_auth_* keys and top-level session keys.
     """
-    if session.get("role") == "admin" and "admin_id" in session:
+    if session.get("admin_auth_id") or session.get("admin_auth_role") in ("admin", "manager") or session.get("admin_auth_is_admin"):
+        return True
+    if session.get("role") == "admin" and ("admin_id" in session or "employee_id" in session or session.get("is_admin")):
         return True
     if session.get("role") == "manager":
-        # Covers both is_admin=True (admin logged in via Manager tab)
-        # and is_admin=False (regular manager employee account).
         return True
     return False
 
@@ -1244,15 +1403,21 @@ def is_admin():
 def is_admin_user():
     """
     Return True only for true admin accounts in the admins table (not managers).
-
-    Used to restrict sensitive configuration routes — like hourly rate
-    edits and late-deduction settings — that managers must not access.
     """
+    if session.get("admin_auth_id") or (session.get("admin_auth_role") == "admin" and not session.get("admin_auth_emp_id")):
+        return True
     return session.get("role") == "admin" and "admin_id" in session
 
 
 # Standard role alias: 'super_admin' role standardized to 'admin'
 is_super_admin = is_admin_user
+
+
+def _is_cashier():
+    """Return True only when a cashier is logged in via the cashier session."""
+    if session.get("cashier_auth_emp_id") or session.get("cashier_auth_role") == "cashier":
+        return True
+    return "employee_id" in session and session.get("role") == "cashier"
 
 
 def decode_base64_image(image_data: str):
@@ -1717,18 +1882,24 @@ def verify_face():
     if not employee_id or not image_data:
         return jsonify({"success": False, "message": "Missing data"})
 
-    # ── Session-binding: the requester may ONLY verify their own face ─────────
-    # This closes the bypass where an admin/manager selects another employee
-    # in the dropdown, completes liveness with their own face, and clocks in
-    # as someone else because the face comparison runs against the selected
-    # employee's stored FaceID rather than the logged-in user's FaceID.
-    _srole = session.get("role", "")
-    _semp_id = session.get("employee_id")
-    if _srole in ("cashier", "manager"):
-        # Non-admin users: employee_id MUST exactly match their own session record
-        if str(_semp_id) != employee_id:
+    # ── Role-based verification authorization ─────────────────────────────────
+    # If request is from an admin or manager (operating the staff kiosk),
+    # any active employee in the dropdown may be verified against their DB face.
+    # If request is from a cashier, they may ONLY verify their own identity.
+    is_mgmt = (
+        is_admin()
+        or session.get("role") in ("admin", "manager")
+        or session.get("admin_auth_id")
+        or session.get("admin_auth_emp_id")
+    )
+    if is_mgmt:
+        # Admin / Manager kiosk mode: authorized to verify the selected employee
+        pass
+    elif session.get("role") == "cashier" or session.get("cashier_auth_emp_id"):
+        cashier_emp = str(session.get("cashier_auth_emp_id") or session.get("employee_id") or "")
+        if cashier_emp != str(employee_id):
             app.logger.warning(
-                f"[verify_face] BLOCKED — session employee {_semp_id} "
+                f"[verify_face] BLOCKED — cashier employee {cashier_emp} "
                 f"tried to verify as employee {employee_id} ip={request.remote_addr}"
             )
             return jsonify(
@@ -1738,36 +1909,6 @@ def verify_face():
                     "mismatch": True,
                 }
             )
-    elif _srole == "admin":
-        # Admins: find their linked employee record via matching username_hash
-        _admin_id = session.get("admin_id")
-        if _admin_id:
-            _ca = mysql.connection.cursor(DictCursor)
-            _ca.execute(
-                "SELECT username_hash FROM admins WHERE admin_id=%s", (_admin_id,)
-            )
-            _adm = _ca.fetchone()
-            if _adm and _adm.get("username_hash"):
-                _ca.execute(
-                    "SELECT employee_id FROM employees WHERE username_hash=%s LIMIT 1",
-                    (_adm["username_hash"],),
-                )
-                _linked = _ca.fetchone()
-                _ca.close()
-                if _linked and str(_linked["employee_id"]) != employee_id:
-                    app.logger.warning(
-                        f"[verify_face] BLOCKED — admin {_admin_id} (emp {_linked['employee_id']}) "
-                        f"tried to verify as employee {employee_id} ip={request.remote_addr}"
-                    )
-                    return jsonify(
-                        {
-                            "success": False,
-                            "message": "\U0001f6ab You can only verify your own identity.",
-                            "mismatch": True,
-                        }
-                    )
-            else:
-                _ca.close()
     else:
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
@@ -2038,16 +2179,20 @@ def handle_csrf_error(e):
             400,
         )
     # If the user was attempting to log out, satisfy the logout instead of blocking them
-    if request.path in ("/logout", "/developer/logout"):
-        try:
-            if session.get("admin_id") or session.get("role") == "admin":
-                _mark_account_offline("admin", session.get("admin_id"))
-            elif session.get("employee_id"):
-                _mark_account_offline("employee", session.get("employee_id"))
-        except Exception:
-            pass
-        session.clear()
-        return redirect(url_for("login"))
+    if request.path in ("/logout", "/developer/logout", "/admin_logout", "/cashier_logout", "/admin/logout", "/cashier/logout"):
+        if request.path.startswith("/cashier"):
+            return _do_cashier_logout()
+        elif request.path.startswith("/admin"):
+            return _do_admin_logout()
+        elif request.path == "/developer/logout":
+            session.pop("dev_authenticated", None)
+            return redirect(url_for("developer.dev_login"))
+        # Fallback /logout: resolve portal
+        portal = (request.args.get("portal") or request.form.get("portal") or "").strip().lower()
+        referrer = (request.referrer or "").lower()
+        if portal == "cashier" or "/cashier" in referrer or "/pos" in referrer:
+            return _do_cashier_logout()
+        return _do_admin_logout()
 
     # Recovery flow: keep user in password reset flow rather than dumping to login
     if request.path in (
@@ -2132,12 +2277,13 @@ def login():
             )
             user = _dec_adm(cur.fetchone())
             if user and _check_login_password(password, user):
-                session.clear()
-                session["admin_id"] = user["admin_id"]
-                session["username"] = (user.get("username") or "").strip()
-                session["role"] = "admin"
-                session["is_admin"] = True
-                session["full_name"] = (user.get("full_name") or "Admin").strip()
+                _set_admin_session_data(
+                    admin_id=user["admin_id"],
+                    username=user.get("username") or "",
+                    full_name=user.get("full_name") or "Admin",
+                    role="admin",
+                    is_admin=True,
+                )
                 auth_ok = True
                 redirect_to = url_for("dashboard")
 
@@ -2151,12 +2297,13 @@ def login():
             )
             employee = _dec_emp(cur.fetchone())
             if employee and _check_login_password(password, employee):
-                session.clear()
-                session["employee_id"] = employee["employee_id"]
-                session["username"] = (employee.get("username") or "").strip()
-                session["role"] = "manager"
-                session["is_admin"] = False
-                session["full_name"] = (employee.get("full_name") or "Manager").strip()
+                _set_admin_session_data(
+                    employee_id=employee["employee_id"],
+                    username=employee.get("username") or "",
+                    full_name=employee.get("full_name") or "Manager",
+                    role="manager",
+                    is_admin=False,
+                )
                 cur.execute(
                     "UPDATE employees SET last_login=NOW() WHERE employee_id=%s",
                     (employee["employee_id"],),
@@ -2173,12 +2320,13 @@ def login():
                 )
                 admin = _dec_adm(cur.fetchone())
                 if admin and _check_login_password(password, admin):
-                    session.clear()
-                    session["admin_id"] = admin["admin_id"]
-                    session["username"] = (admin.get("username") or "").strip()
-                    session["role"] = "admin"
-                    session["is_admin"] = True
-                    session["full_name"] = (admin.get("full_name") or "Admin").strip()
+                    _set_admin_session_data(
+                        admin_id=admin["admin_id"],
+                        username=admin.get("username") or "",
+                        full_name=admin.get("full_name") or "Admin",
+                        role="admin",
+                        is_admin=True,
+                    )
                     auth_ok = True
                     redirect_to = url_for("dashboard")
 
@@ -2192,12 +2340,13 @@ def login():
             )
             user = _dec_emp(cur.fetchone())
             if user and _check_login_password(password, user):
-                session.clear()
-                session["employee_id"] = user["employee_id"]
-                session["username"] = (user.get("username") or "").strip()
-                session["role"] = "cashier"
-                session["is_admin"] = False
-                session["full_name"] = (user.get("full_name") or "Cashier").strip()
+                _set_cashier_session_data(
+                    employee_id=user["employee_id"],
+                    username=user.get("username") or "",
+                    full_name=user.get("full_name") or "Cashier",
+                    role="cashier",
+                    is_admin=False,
+                )
                 cur.execute(
                     "UPDATE employees SET last_login=NOW() WHERE employee_id=%s",
                     (user["employee_id"],),
@@ -3740,7 +3889,7 @@ def log_attendance():
     employee_id in this request, clock-in/out is refused. This prevents anyone
     from bypassing face verification by POSTing directly to this endpoint.
     """
-    if "employee_id" not in session and not is_admin():
+    if "employee_id" not in session and not is_admin() and not session.get("cashier_auth_emp_id"):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
@@ -3777,42 +3926,51 @@ def log_attendance():
     employee_id = token_data["employee_id"]
     employee_id_str = str(employee_id)
 
-    # Sanity-guard: logged-in session employee must match the face that was verified.
-    # This catches any case where the session identity diverges from the verified face.
-    session_emp = session.get("employee_id")
-    if session_emp and str(session_emp) != employee_id_str:
-        app.logger.warning(
-            f"[log_attendance] SESSION/TOKEN MISMATCH — session employee "
-            f"{session_emp} attempted to use token belonging to employee "
-            f"{employee_id_str} ip={request.remote_addr}"
-        )
-        # Log as a security event against the session employee (the one attempting the bypass)
-        try:
-            mlog_cur = mysql.connection.cursor()
-            mlog_cur.execute(
-                """INSERT INTO face_mismatch_log
-                   (employee_id, distance_score, ip_address, user_agent)
-                   VALUES (%s, %s, %s, %s)""",
-                (
-                    session_emp,
-                    None,
-                    request.remote_addr,
-                    (request.user_agent.string or "")[:255],
-                ),
+    # Sanity-guard: for cashier self-service sessions, enforce that the logged-in
+    # cashier cannot clock in using someone else's verified token.
+    # For admin/manager sessions operating the staff kiosk, any employee with a valid
+    # verified token can be clocked in/out.
+    is_mgmt = (
+        is_admin()
+        or session.get("role") in ("admin", "manager")
+        or session.get("admin_auth_id")
+        or session.get("admin_auth_emp_id")
+    )
+    if not is_mgmt:
+        cashier_emp = session.get("cashier_auth_emp_id") or session.get("employee_id")
+        if cashier_emp and str(cashier_emp) != employee_id_str:
+            app.logger.warning(
+                f"[log_attendance] SESSION/TOKEN MISMATCH — cashier employee "
+                f"{cashier_emp} attempted to use token belonging to employee "
+                f"{employee_id_str} ip={request.remote_addr}"
             )
-            mysql.connection.commit()
-            mlog_cur.close()
-        except Exception:
-            pass
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": "Face verification token does not match this employee.",
-                }
-            ),
-            403,
-        )
+            # Log as a security event against the session employee (the one attempting the bypass)
+            try:
+                mlog_cur = mysql.connection.cursor()
+                mlog_cur.execute(
+                    """INSERT INTO face_mismatch_log
+                       (employee_id, distance_score, ip_address, user_agent)
+                       VALUES (%s, %s, %s, %s)""",
+                    (
+                        cashier_emp,
+                        None,
+                        request.remote_addr,
+                        (request.user_agent.string or "")[:255],
+                    ),
+                )
+                mysql.connection.commit()
+                mlog_cur.close()
+            except Exception:
+                pass
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Face verification token does not match this employee.",
+                    }
+                ),
+                403,
+            )
 
     if datetime.now(PHT) > token_data["expires"]:
         verified_tokens.pop(verify_token, None)
@@ -5480,13 +5638,16 @@ def api_danger_clear_all_data():
 
 @app.route("/cashier_dashboard")
 def cashier_dashboard():
-    if "employee_id" not in session or session.get("role") != "cashier":
+    if not _is_cashier():
+        return redirect(url_for("login"))
+    emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+    if not emp_id:
         return redirect(url_for("login"))
 
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
         "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
-        (session["employee_id"],),
+        (emp_id,),
     )
     employee = _dec_emp(cur.fetchone())
     cur.close()
@@ -5496,13 +5657,16 @@ def cashier_dashboard():
 
 @app.route("/cashier_transactions")
 def cashier_transactions():
-    if "employee_id" not in session or session.get("role") != "cashier":
+    if not _is_cashier():
+        return redirect(url_for("login"))
+    emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+    if not emp_id:
         return redirect(url_for("login"))
 
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
         "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
-        (session["employee_id"],),
+        (emp_id,),
     )
     employee = _dec_emp(cur.fetchone())
     cur.close()
@@ -5513,12 +5677,16 @@ def cashier_transactions():
 @app.route("/cashier_attendance")
 def cashier_attendance():
     """Cashier-only attendance page — clock-in/out and own history only."""
-    if "employee_id" not in session or session.get("role") != "cashier":
+    if not _is_cashier():
         return redirect(url_for("login"))
+    emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+    if not emp_id:
+        return redirect(url_for("login"))
+
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
         "SELECT employee_id, full_name, role, hourly_rate FROM employees WHERE employee_id=%s",
-        (session["employee_id"],),
+        (emp_id,),
     )
     employee = _dec_emp(cur.fetchone())
     cur.close()
@@ -5887,25 +6055,53 @@ def api_my_attendance():
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
+@app.route("/admin_logout", methods=["GET", "POST"])
+@app.route("/admin/logout", methods=["GET", "POST"])
+@csrf.exempt
+def admin_logout():
+    return _do_admin_logout()
+
+
+@app.route("/cashier_logout", methods=["GET", "POST"])
+@app.route("/cashier/logout", methods=["GET", "POST"])
+@csrf.exempt
+def cashier_logout():
+    return _do_cashier_logout()
+
+
 @app.route("/logout", methods=["GET", "POST"])
 @csrf.exempt
 def logout():
-    try:
-        if session.get("admin_id") or session.get("role") == "admin":
-            _mark_account_offline("admin", session.get("admin_id"))
-        elif session.get("employee_id"):
-            _mark_account_offline("employee", session.get("employee_id"))
-    except Exception as exc:
-        app.logger.warning(f"[logout] Could not mark offline: {exc}")
-    session.clear()
-    return redirect(url_for("login"))
+    portal = (request.args.get("portal") or request.form.get("portal") or "").strip().lower()
+    referrer = (request.referrer or "").lower()
+
+    if portal == "cashier" or "/cashier" in referrer or "/pos" in referrer:
+        return _do_cashier_logout()
+    elif portal == "admin" or "/admin" in referrer or "/dashboard" in referrer:
+        return _do_admin_logout()
+
+    # If no explicit indicator, inspect stored credentials
+    if session.get("cashier_auth_emp_id") and not session.get("admin_auth_id") and not session.get("admin_auth_emp_id"):
+        return _do_cashier_logout()
+    if (session.get("admin_auth_id") or session.get("admin_auth_emp_id")) and not session.get("cashier_auth_emp_id"):
+        return _do_admin_logout()
+
+    if session.get("role") == "cashier":
+        return _do_cashier_logout()
+    return _do_admin_logout()
 
 
 @app.route("/api/user/heartbeat", methods=["GET", "POST"])
 @csrf.exempt
 def user_heartbeat():
     """Keep-alive ping for active authenticated sessions."""
-    if session.get("admin_id") or session.get("employee_id"):
+    if (
+        session.get("admin_id")
+        or session.get("employee_id")
+        or session.get("admin_auth_id")
+        or session.get("admin_auth_emp_id")
+        or session.get("cashier_auth_emp_id")
+    ):
         _touch_user_activity()
         return jsonify({"status": "active"}), 200
     return jsonify({"status": "anonymous"}), 200
@@ -12420,11 +12616,6 @@ def api_overtime_review(request_id):
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 
-def _is_cashier():
-    """Return True only when a cashier is logged in via the employee session."""
-    return "employee_id" in session and session.get("role") == "cashier"
-
-
 @app.route("/cashier/inventory")
 def cashier_inventory():
     """Render the cashier Supply Monitor page."""
@@ -12432,11 +12623,12 @@ def cashier_inventory():
         return redirect(url_for("login"))
     employee = None
     try:
+        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
         cur = mysql.connection.cursor(DictCursor)
         cur.execute(
             "SELECT employee_id, full_name, username, role "
             "FROM employees WHERE employee_id = %s LIMIT 1",
-            (session["employee_id"],),
+            (emp_id,),
         )
         row = cur.fetchone()
         cur.close()

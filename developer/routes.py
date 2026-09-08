@@ -206,15 +206,8 @@ def _is_logged_in_as_non_dev_staff():
 def require_dev_auth():
     """
     Gate every /developer route behind the Developer PIN session.
-    Regular store administrators, managers, and staff cannot access without the developer PIN.
+    A valid 6-digit PIN is required to access the developer console.
     """
-    # 0. If non-dev store staff (regular admin, manager, cashier) attempts to access, redirect to dashboard
-    if _is_logged_in_as_non_dev_staff():
-        role = session.get("role")
-        if role == "cashier":
-            return redirect(url_for("cashier_dashboard"))
-        return redirect(url_for("dashboard"))
-
     # 1. Allow login and logout endpoints through
     if request.endpoint in ("developer.dev_login", "developer.dev_logout"):
         return

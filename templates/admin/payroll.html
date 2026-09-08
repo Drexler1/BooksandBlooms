@@ -1890,7 +1890,7 @@
             <p>{{ session.get('role','Admin')|capitalize }}</p>
           </div>
         </div>
-        <form method="POST" action="{{ url_for('logout') }}" style="display:inline;margin:0;"><input type="hidden"
+        <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden"
             name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜] Logout</button>
         </form>
       </div>

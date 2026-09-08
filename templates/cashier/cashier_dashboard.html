@@ -1974,7 +1974,7 @@
                         <p>{{ employee.role|capitalize if employee else 'Cashier' }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜ Logout</button></form>
+                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜ Logout</button></form>
             </div>
         </header>
 
