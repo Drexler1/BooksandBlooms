@@ -3276,7 +3276,7 @@
                         <p>{{ session.get('role')|capitalize }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="portal" value="admin"><button type="submit" class="logout-btn">➜ Logout</button></form>
+                <form method="POST" action="{{ url_for('logout') }}?portal=admin" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="portal" value="admin"><button type="submit" class="logout-btn">➜] Logout</button></form>
             </div>
         </header>
 
