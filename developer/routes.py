@@ -208,20 +208,22 @@ def require_dev_auth():
     Gate every /developer route behind the Developer PIN session.
     Regular store administrators, managers, and staff cannot access without the developer PIN.
     """
+    # 0. If non-dev store staff (regular admin, manager, cashier) attempts to access, redirect to dashboard
+    if _is_logged_in_as_non_dev_staff():
+        role = session.get("role")
+        if role == "cashier":
+            return redirect(url_for("cashier_dashboard"))
+        return redirect(url_for("dashboard"))
+
     # 1. Allow login and logout endpoints through
     if request.endpoint in ("developer.dev_login", "developer.dev_logout"):
         return
 
-    # 2. If authenticated with developer PIN, allow access immediately
-    if _is_dev_authenticated():
-        return
-
-    # 3. For API endpoints without dev auth, return 403
-    if request.path.startswith("/developer/api/"):
-        return jsonify({"status": "error", "message": "Developer authentication required."}), 403
-
-    # 4. Otherwise, redirect to developer PIN login
-    return redirect(url_for("developer.dev_login"))
+    # 2. Require valid 6-digit PIN authentication
+    if not _is_dev_authenticated():
+        if request.path.startswith("/developer/api/"):
+            return jsonify({"status": "error", "message": "Developer authentication required."}), 403
+        return redirect(url_for("developer.dev_login"))
 
 
 # -- PIN Login ----------------------------------------------------------------
