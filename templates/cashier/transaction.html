@@ -157,28 +157,28 @@
             color: var(--gold);
         }
 
-        .btn-logout {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            background: rgba(220, 53, 69, 0.15);
-            border: 1px solid rgba(220, 53, 69, 0.3);
-            color: #ff6b6b;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .logout-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 0.45rem 0.95rem;
+            border-radius: 6px;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            font-size: 0.82rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            white-space: nowrap;
         }
 
-        .btn-logout:hover {
-            background: rgba(220, 53, 69, 0.3);
-            border-color: #dc3545;
-            color: #fff;
-            transform: translateY(-1px);
+        .logout-btn:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
         }
 
-        /* ── Nav ── */
+        /* Nav */
         nav {
             flex: 0 0 var(--nav-h);
             background: var(--dark-gray);
@@ -197,13 +197,9 @@
             overflow-x: auto;
         }
 
-        nav ul::-webkit-scrollbar {
-            height: 3px;
-        }
-
-        nav ul::-webkit-scrollbar-thumb {
-            background: var(--gold);
-        }
+        nav ul::-webkit-scrollbar { height: 3px; }
+        nav ul::-webkit-scrollbar-track { background: var(--black); }
+        nav ul::-webkit-scrollbar-thumb { background: var(--gold); }
 
         nav li {
             flex-shrink: 0;
@@ -213,7 +209,7 @@
         nav a {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.45rem;
             padding: 0 1.6rem;
             text-decoration: none;
             color: #aaa;
@@ -222,6 +218,7 @@
             transition: all 0.2s;
             border-bottom: 3px solid transparent;
             white-space: nowrap;
+            cursor: pointer;
         }
 
         nav a:hover {
@@ -1085,18 +1082,18 @@
                         <p>{{ employee.role|capitalize if employee else 'Cashier' }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn-logout" title="Logout" aria-label="Logout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button></form>
+                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
             </div>
         </header>
 
-        <!-- NAV -->
+        <!-- NAV (cashier-only links) -->
         <nav id="mainNav">
-            <button class="nav-close-btn" id="navCloseBtn" aria-label="Close navigation"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="nav-close-btn" id="navCloseBtn" aria-label="Close navigation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             <ul>
-                <li><a href="{{ url_for('cashier_dashboard') }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>POS</a></li>
-                <li><a href="{{ url_for('cashier_transactions') }}" class="active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>My Transactions</a></li>
-                <li><a href="{{ url_for('cashier_attendance') }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Attendance</a></li>
-                <li><a href="{{ url_for('cashier_inventory') }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>Supply Monitor</a></li>
+                <li><a href="{{ url_for('cashier_dashboard') }}">POS</a></li>
+                <li><a href="{{ url_for('cashier_transactions') }}" class="active">My Transactions</a></li>
+                <li><a href="{{ url_for('cashier_attendance') }}">Attendance</a></li>
+                <li><a href="{{ url_for('cashier_inventory') }}">Supply Monitor</a></li>
             </ul>
         </nav>
 
