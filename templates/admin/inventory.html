@@ -3634,6 +3634,7 @@
                                 <option value="ok">In Stock</option>
                                 <option value="low">Low Stock Warning</option>
                                 <option value="out">Out of Stock</option>
+                                <option value="untracked">Untracked</option>
                             </select>
                             <button class="btn btn-outline btn-sm" id="prodStockRefreshBtn" style="padding:0.6rem 0.95rem;">Refresh</button>
                             <span class="result-count" id="prodStockCount" style="align-self:center;font-size:0.82rem;color:#888;font-weight:600;">Loading…</span>
@@ -3771,6 +3772,10 @@
 
 
 
+                </div><!-- /tab-ingredients -->
+
+                <!-- ════════ TAB 4: STOCK REQUESTS ════════ -->
+                <div class="inv-tab-panel" id="tab-stock-requests">
                 <!-- ═══════════════════════════════════════════════════════════
                      STOCK REQUESTS PANEL (Cashier → Admin approval)
                 ═══════════════════════════════════════════════════════════ -->
@@ -3804,6 +3809,8 @@
                         </div>
                     </div>
                 </div>
+
+                </div><!-- /tab-stock-requests -->
 
                 <!-- ═══════════════════════════════════════════════════════════
                      DAILY INVENTORY REPORT PANEL
@@ -4156,6 +4163,55 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('srReviewModal')">Cancel</button>
                 <button class="btn" id="srConfirmBtn" onclick="submitReview()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- ═══ QUICK ADJUST PRODUCT STOCK MODAL ═══ -->
+    <div class="modal-overlay" id="adjustProductStockModal">
+        <div class="modal" style="max-width:min(450px, calc(100vw - 2rem));">
+            <div class="modal-header">
+                <h2>Adjust <span>Product Stock</span></h2>
+                <button class="modal-close" id="closeAdjustProductStockModal">✕</button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem 1.5rem;">
+                <input type="hidden" id="adjProdId">
+                <div style="margin-bottom:1.1rem;padding:0.9rem 1rem;background:#f9f8f5;border-radius:8px;border:1px solid #eedec4;">
+                    <div style="font-weight:700;font-size:1.05rem;color:var(--black);" id="adjProdName">—</div>
+                    <div style="display:flex;justify-content:space-between;margin-top:0.4rem;font-size:0.85rem;color:#666;">
+                        <span>Department: <strong id="adjProdDept" style="color:#444;">—</strong></span>
+                        <span>Current Stock: <strong id="adjProdCurrent" style="color:var(--gold);font-size:1rem;">0</strong></span>
+                    </div>
+                    <div style="margin-top:0.6rem;" id="adjProdStatusPill"></div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1rem;">
+                    <label class="form-label" style="font-weight:700;font-size:0.85rem;color:var(--black);display:block;margin-bottom:0.4rem;">Stock Change Quantity (+ or -)</label>
+                    <input type="number" class="form-control" id="adjProdDelta" placeholder="e.g. 10 or -5" style="font-size:1.1rem;font-weight:700;">
+                    <span class="form-hint" style="font-size:0.78rem;color:#888;margin-top:0.25rem;display:block;">Positive to add incoming stock, negative to deduct consumed or damaged units.</span>
+                    <div class="quick-adj-btn-group" style="display:flex;gap:0.4rem;margin-top:0.5rem;">
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+5)">+5</button>
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+10)">+10</button>
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+25)">+25</button>
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(-1)">-1</button>
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(-5)">-5</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.1rem;">
+                    <label class="form-label" style="font-weight:700;font-size:0.85rem;color:var(--black);display:block;margin-bottom:0.4rem;">Adjustment Reason / Note</label>
+                    <input type="text" class="form-control" id="adjProdNote" placeholder="e.g. Supplier restocking, physical inventory recount, damaged">
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.85rem 1rem;background:#f5f5f5;border-radius:6px;font-size:0.88rem;">
+                    <span>Projected Resulting Stock:</span>
+                    <strong id="adjProdProjected" style="font-size:1.15rem;color:var(--black);">0</strong>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:1rem 1.5rem;display:flex;justify-content:flex-end;gap:0.75rem;">
+                <button class="btn btn-outline" id="cancelAdjustProductStockModal">Cancel</button>
+                <button class="btn btn-primary" id="saveAdjustProductStockBtn">Save Stock Update</button>
             </div>
         </div>
     </div>
@@ -5856,6 +5912,11 @@
         function _updateUnifiedStats() {
             let ok = 0, low = 0, out = 0;
             allStoreProducts.forEach(p => {
+                const isTracked = (p.track_stock !== false && p.track_stock !== 0);
+                if (!isTracked) {
+                    ok++;
+                    return;
+                }
                 const st = parseInt(p.stock) || 0;
                 const rp = parseInt(p.reorder_point) || 5;
                 if (st <= 0) out++;
@@ -5921,11 +5982,18 @@
                 if (deptId && String(p.main_category_id) !== String(deptId)) return false;
                 if (catId && String(p.category_id) !== String(catId)) return false;
                 if (status) {
+                    const isTracked = (p.track_stock !== false && p.track_stock !== 0);
                     const st = parseInt(p.stock) || 0;
                     const rp = parseInt(p.reorder_point) || 5;
-                    if (status === 'out' && st > 0) return false;
-                    if (status === 'low' && (st <= 0 || st > rp)) return false;
-                    if (status === 'ok'  && st <= rp) return false;
+                    if (status === 'untracked') {
+                        if (isTracked) return false;
+                    } else if (status === 'out') {
+                        if (!isTracked || st > 0) return false;
+                    } else if (status === 'low') {
+                        if (!isTracked || st <= 0 || st > rp) return false;
+                    } else if (status === 'ok') {
+                        if (!isTracked || st <= rp) return false;
+                    }
                 }
                 return true;
             });
@@ -5958,7 +6026,10 @@
                 const stockVal = (price * st).toFixed(2);
 
                 let statusBadge = '';
-                if (st <= 0) {
+                const isTracked = (p.track_stock !== false && p.track_stock !== 0);
+                if (!isTracked) {
+                    statusBadge = `<span class="stock-pill none" style="background:rgba(255,255,255,0.06);color:#999;border:1px solid rgba(255,255,255,0.12);" title="Stock tracking disabled"><span class="status-dot" style="background:#777;"></span>Untracked</span>`;
+                } else if (st <= 0) {
                     statusBadge = `<span class="stock-pill out" title="Out of stock! Threshold: ${rp}"><span class="status-dot"></span>Out of Stock</span>`;
                 } else if (st <= rp) {
                     statusBadge = `<span class="stock-pill low" title="Low stock warning! Threshold: ${rp}"><span class="status-dot"></span>Low Stock Warning</span>`;
@@ -6016,10 +6087,13 @@
             document.getElementById('adjProdDelta').value = '';
             document.getElementById('adjProdNote').value = '';
 
+            const isTracked = (p.track_stock !== false && p.track_stock !== 0);
             const st = parseInt(p.stock) || 0;
             const rp = parseInt(p.reorder_point) || 5;
             const statusPill = document.getElementById('adjProdStatusPill');
-            if (st <= 0) {
+            if (!isTracked) {
+                statusPill.innerHTML = `<span class="stock-pill none" style="background:rgba(255,255,255,0.06);color:#999;border:1px solid rgba(255,255,255,0.12);"><span class="status-dot" style="background:#777;"></span>Untracked (Saving adjustment will update inventory)</span>`;
+            } else if (st <= 0) {
                 statusPill.innerHTML = `<span class="stock-pill out"><span class="status-dot"></span>Out of Stock (0 units)</span>`;
             } else if (st <= rp) {
                 statusPill.innerHTML = `<span class="stock-pill low"><span class="status-dot"></span>Low Stock Warning (${st} units remaining, threshold: ${rp})</span>`;
@@ -6103,61 +6177,5 @@
         // Also call loadStoreProducts immediately
         loadStoreProducts();
 </script>
-
-    <!-- ═══ QUICK ADJUST PRODUCT STOCK MODAL ═══ -->
-    <div class="modal-overlay" id="adjustProductStockModal">
-        <div class="modal" style="max-width:min(450px, calc(100vw - 2rem));">
-            <div class="modal-header">
-                <h2>Adjust <span>Product Stock</span></h2>
-                <button class="modal-close" id="closeAdjustProductStockModal">✕</button>
-            </div>
-            <div class="modal-body" style="padding:1.25rem 1.5rem;">
-                <input type="hidden" id="adjProdId">
-                <div style="margin-bottom:1.1rem;padding:0.9rem 1rem;background:#f9f8f5;border-radius:8px;border:1px solid #eedec4;">
-                    <div style="font-weight:700;font-size:1.05rem;color:var(--black);" id="adjProdName">—</div>
-                    <div style="display:flex;justify-content:space-between;margin-top:0.4rem;font-size:0.85rem;color:#666;">
-                        <span>Department: <strong id="adjProdDept" style="color:#444;">—</strong></span>
-                        <span>Current Stock: <strong id="adjProdCurrent" style="color:var(--gold);font-size:1rem;">0</strong></span>
-                    </div>
-                    <div style="margin-top:0.6rem;" id="adjProdStatusPill"></div>
-                </div>
-
-                <div class="form-group" style="margin-bottom:1rem;">
-                    <label class="form-label" style="font-weight:700;font-size:0.85rem;color:var(--black);display:block;margin-bottom:0.4rem;">Stock Change Quantity (+ or -)</label>
-                    <input type="number" class="form-control" id="adjProdDelta" placeholder="e.g. 10 or -5" style="font-size:1.1rem;font-weight:700;">
-                    <span class="form-hint" style="font-size:0.78rem;color:#888;margin-top:0.25rem;display:block;">Positive to add incoming stock, negative to deduct consumed or damaged units.</span>
-                    <div class="quick-adj-btn-group" style="display:flex;gap:0.4rem;margin-top:0.5rem;">
-                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+5)">+5</button>
-                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+10)">+10</button>
-                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+25)">+25</button>
-                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(-1)">-1</button>
-                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(-5)">-5</button>
-                    </div>
-                </div>
-
-                <div class="form-group" style="margin-bottom:1.1rem;">
-                    <label class="form-label" style="font-weight:700;font-size:0.85rem;color:var(--black);display:block;margin-bottom:0.4rem;">Adjustment Reason / Note</label>
-                    <input type="text" class="form-control" id="adjProdNote" placeholder="e.g. Supplier restocking, physical inventory recount, damaged">
-                </div>
-
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.85rem 1rem;background:#f5f5f5;border-radius:6px;font-size:0.88rem;">
-                    <span>Projected Resulting Stock:</span>
-                    <strong id="adjProdProjected" style="font-size:1.15rem;color:var(--black);">0</strong>
-                </div>
-            </div>
-            <div class="modal-footer" style="padding:1rem 1.5rem;display:flex;justify-content:flex-end;gap:0.75rem;">
-                <button class="btn btn-outline" id="cancelAdjustProductStockModal">Cancel</button>
-                <button class="btn btn-primary" id="saveAdjustProductStockBtn">Save Stock Update</button>
-            </div>
-        </div>
-    </div>
 </body>
-
-</html
-                </div>
-
-                <!-- ════ TAB 4: STOCK REQUESTS ════ -->
-                <div class="inv-tab-panel" id="tab-stock-requests">
-
-                </div>
->
+</html>

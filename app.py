@@ -3073,6 +3073,7 @@ def _get_pos_products() -> dict:
     cur.execute("""
         SELECT p.product_id, p.name, p.description,
                p.image_url, p.icon, p.cup_eligible, p.price, p.stock, p.unit,
+               p.track_stock,
                p.category_id, COALESCE(c.name, 'Other') AS category_name,
                COALESCE(p.main_category_id, c.main_category_id) AS main_category_id,
                COALESCE(mc.name, mc_sub.name, 'General') AS main_category_name
@@ -3094,6 +3095,7 @@ def _get_pos_products() -> dict:
             "price":              float(r["price"]),
             "stock":              int(r["stock"]),
             "unit":               r["unit"],
+            "track_stock":        bool(r.get("track_stock", 1)),
             "category_id":        r["category_id"],
             "category_name":      r["category_name"] or "Other",
             "main_category_id":   r["main_category_id"],
@@ -7745,6 +7747,7 @@ def _ensure_inventory_tables():
                 `cost`             DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                 `stock`            INT           NOT NULL DEFAULT 0,
                 `reorder_point`    INT           NOT NULL DEFAULT 5,
+                `track_stock`      TINYINT(1)    NOT NULL DEFAULT 1,
                 `unit`             VARCHAR(30)   NOT NULL DEFAULT 'pcs',
                 `is_active`        TINYINT(1)    NOT NULL DEFAULT 1,
                 `created_at`       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -7757,6 +7760,14 @@ def _ensure_inventory_tables():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         """)
         conn.commit()
+
+        # Add track_stock to products if missing (idempotent)
+        try:
+            cur.execute("ALTER TABLE `products` ADD COLUMN `track_stock` TINYINT(1) NOT NULL DEFAULT 1 AFTER `reorder_point`")
+            conn.commit()
+            app.logger.info("[inventory] Added track_stock column to products")
+        except Exception:
+            pass
 
         # Add main_category_id to products if missing (idempotent)
         try:
@@ -8618,8 +8629,10 @@ def inventory():
 # ── Inventory API helpers ──────────────────────────────────────────────────────
 
 
-def _stock_status(stock, reorder_point):
-    """Return 'out', 'low', or 'ok' based on stock vs reorder threshold."""
+def _stock_status(stock, reorder_point, track_stock=1):
+    """Return 'untracked', 'out', 'low', or 'ok' based on stock vs reorder threshold."""
+    if not track_stock:
+        return "untracked"
     if stock == 0:
         return "out"
     if stock <= reorder_point:
@@ -8809,16 +8822,19 @@ def api_inventory_items():
             where.append("p.category_id = %s")
             params.append(int(category_id))
 
-        if stock_status == "out":
-            where.append("p.stock = 0")
+        if stock_status == "untracked":
+            where.append("p.track_stock = 0")
+        elif stock_status == "out":
+            where.append("p.track_stock = 1 AND p.stock = 0")
         elif stock_status == "low":
-            where.append("p.stock > 0 AND p.stock <= p.reorder_point")
+            where.append("p.track_stock = 1 AND p.stock > 0 AND p.stock <= p.reorder_point")
         elif stock_status == "ok":
-            where.append("p.stock > p.reorder_point")
+            where.append("(p.track_stock = 0 OR p.stock > p.reorder_point)")
 
         sql = f"""
             SELECT p.product_id, p.name, p.description, p.sku, p.image_url,
                    p.icon, p.cup_eligible, p.price, p.cost, p.stock, p.reorder_point, p.unit,
+                   p.track_stock,
                    p.created_at, p.updated_at,
                    p.category_id, c.name AS category_name,
                    COALESCE(p.main_category_id, c.main_category_id) AS main_category_id,
@@ -8849,8 +8865,9 @@ def api_inventory_items():
                     "stock": int(r["stock"]),
                     "reorder_point": int(r["reorder_point"]),
                     "unit": r["unit"],
+                    "track_stock": bool(r.get("track_stock", 1)),
                     "cup_eligible": bool(r.get("cup_eligible", 0)),
-                    "status": _stock_status(r["stock"], r["reorder_point"]),
+                    "status": _stock_status(r["stock"], r["reorder_point"], r.get("track_stock", 1)),
                     "category_id": r["category_id"],
                     "category_name": r["category_name"] or "Uncategorized",
                     "main_category_id": r["main_category_id"],
@@ -8900,6 +8917,7 @@ def api_inventory_items_create():
     unit = "pcs"  # size is now chosen at POS; unit is always pcs
     cup_eligible = 1 if data.get("cup_eligible") else 0
     image_url = (data.get("image_url") or "").strip() or None
+    track_stock = 0 if data.get("track_stock") in (0, "0", False, "false") else 1
 
     try:
         cur = mysql.connection.cursor(DictCursor)
@@ -8907,8 +8925,8 @@ def api_inventory_items_create():
             """
             INSERT INTO products
                 (main_category_id, category_id, name, description, sku, price, cost,
-                 stock, reorder_point, unit, cup_eligible, image_url)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 stock, reorder_point, track_stock, unit, cup_eligible, image_url)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
             (
                 main_category_id,
@@ -8920,6 +8938,7 @@ def api_inventory_items_create():
                 cost,
                 stock,
                 reorder_point,
+                track_stock,
                 unit,
                 cup_eligible,
                 image_url,
@@ -8971,6 +8990,7 @@ def api_inventory_items_update(product_id):
     unit = "pcs"  # size is now chosen at POS; unit is always pcs
     cup_eligible = 1 if data.get("cup_eligible") else 0
     image_url = (data.get("image_url") or "").strip() or None
+    track_stock = 0 if data.get("track_stock") in (0, "0", False, "false") else 1
 
     if not name:
         return jsonify({"success": False, "message": "Product name is required"}), 400
@@ -8989,6 +9009,7 @@ def api_inventory_items_update(product_id):
                    cost             = %s,
                    stock            = %s,
                    reorder_point    = %s,
+                   track_stock      = %s,
                    unit             = %s,
                    cup_eligible     = %s,
                    image_url        = %s
@@ -9004,6 +9025,7 @@ def api_inventory_items_update(product_id):
                 cost,
                 stock,
                 reorder_point,
+                track_stock,
                 unit,
                 cup_eligible,
                 image_url,

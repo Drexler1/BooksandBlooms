@@ -1694,6 +1694,7 @@
         .stock-pill.ok  { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
         .stock-pill.low { background: #fff8e1; color: #e65100; border: 1px solid #ffe082; }
         .stock-pill.out { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .stock-pill.untracked { background: #f0f0f0; color: #777; border: 1px solid #dcdcdc; }
         .stock-pill .status-dot {
             width: 7px;
             height: 7px;
@@ -1704,6 +1705,8 @@
         .stock-pill.ok .status-dot  { background: #2e7d32; }
         .stock-pill.low .status-dot { background: #e65100; }
         .stock-pill.out .status-dot { background: #c62828; }
+        .stock-pill.untracked .status-dot { background: #999; }
+        body.dark-mode .stock-pill.untracked { background: rgba(255,255,255,0.06); color: #aaa; border-color: rgba(255,255,255,0.15); }
 
         /* Modal Stock Tracking Indicator */
         .modal-stock-indicator {
@@ -1732,6 +1735,11 @@
             border: 1px solid #ffcdd2;
             color: #c62828;
         }
+        .modal-stock-indicator.untracked {
+            background: #f7f7f7;
+            border: 1px solid #e0e0e0;
+            color: #666;
+        }
         .modal-stock-indicator .stock-indicator-badge {
             display: inline-flex;
             align-items: center;
@@ -1752,6 +1760,52 @@
         .modal-stock-indicator.in-stock .status-dot { background: #2e7d32; }
         .modal-stock-indicator.low-stock .status-dot { background: #e65100; }
         .modal-stock-indicator.out-of-stock .status-dot { background: #c62828; }
+        .modal-stock-indicator.untracked .status-dot { background: #888; }
+        body.dark-mode .modal-stock-indicator.untracked {
+            background: rgba(255,255,255,0.04);
+            border-color: rgba(255,255,255,0.12);
+            color: #aaa;
+        }
+
+        /* Toggle switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .25s ease;
+            border-radius: 24px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .25s ease;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: var(--gold, #c9a961);
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
         .modal-stock-indicator .stock-indicator-detail {
             font-size: 0.82rem;
             color: inherit;
@@ -2462,7 +2516,7 @@
                         <span class="form-hint">Used for profit margin tracking</span>
                     </div>
 
-                    <!-- Stock Tracking Section Header -->
+                    <!-- Stock Tracking Section Header & Optional Toggle Switch -->
                     <div class="form-group full" style="margin-top:0.4rem;">
                         <div style="font-weight:700;font-size:0.85rem;color:var(--black);text-transform:uppercase;letter-spacing:0.5px;padding-bottom:0.4rem;border-bottom:1px solid #eee;display:flex;align-items:center;gap:0.5rem;">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
@@ -2470,18 +2524,34 @@
                         </div>
                     </div>
 
-                    <!-- Current Stock -->
-                    <div class="form-group">
-                        <label class="form-label">Current Stock (units) <span>*</span></label>
-                        <input type="number" class="form-control" id="prodStock" min="0" step="1" placeholder="0">
-                        <span class="form-hint">On-hand count ready for sale</span>
+                    <!-- Stock Tracking Enable/Disable Toggle Card -->
+                    <div class="form-group full" style="margin-bottom:0.4rem;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;background:#fbfbfb;border:1px solid #e0e0e0;border-radius:8px;">
+                            <div>
+                                <label for="prodTrackStock" style="font-weight:700;font-size:0.88rem;color:var(--black);display:block;cursor:pointer;margin-bottom:2px;">Track Inventory for this Product</label>
+                                <span style="font-size:0.78rem;color:#777;display:block;">When disabled, this product has unlimited availability and no stock warnings</span>
+                            </div>
+                            <label class="toggle-switch" style="position:relative;display:inline-block;width:44px;height:24px;margin:0;cursor:pointer;flex-shrink:0;">
+                                <input type="checkbox" id="prodTrackStock" checked style="opacity:0;width:0;height:0;">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
 
-                    <!-- Low Stock Alert Threshold -->
-                    <div class="form-group">
-                        <label class="form-label">Low-Stock Alert Threshold <span>*</span></label>
-                        <input type="number" class="form-control" id="prodReorderPoint" min="0" step="1" placeholder="5" value="5">
-                        <span class="form-hint">Triggers warning indicator when stock is ≤ this number</span>
+                    <div id="stockFieldsContainer" style="display:contents;">
+                        <!-- Current Stock -->
+                        <div class="form-group">
+                            <label class="form-label">Current Stock (units) <span>*</span></label>
+                            <input type="number" class="form-control" id="prodStock" min="0" step="1" placeholder="0">
+                            <span class="form-hint">On-hand count ready for sale</span>
+                        </div>
+
+                        <!-- Low Stock Alert Threshold -->
+                        <div class="form-group">
+                            <label class="form-label">Low-Stock Alert Threshold <span>*</span></label>
+                            <input type="number" class="form-control" id="prodReorderPoint" min="0" step="1" placeholder="5" value="5">
+                            <span class="form-hint">Triggers warning indicator when stock is ≤ this number</span>
+                        </div>
                     </div>
 
                     <!-- Live Stock Warning Indicator -->
@@ -3003,6 +3073,10 @@
             <td style="color:#aaa;font-size:0.8rem;">${p.sku || '—'}</td>
             <td>
                 ${(() => {
+                    const isTracked = (p.track_stock === undefined || p.track_stock === null || p.track_stock == 1 || p.track_stock === true);
+                    if (!isTracked) {
+                        return `<span class="stock-pill untracked" title="Stock tracking is disabled for this product"><span class="status-dot"></span>Untracked</span>`;
+                    }
                     const st = parseInt(p.stock) || 0;
                     const rp = parseInt(p.reorder_point) || 5;
                     if (st <= 0) {
@@ -3034,15 +3108,20 @@
                 : `<div class="prod-mobile-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`;
             const deptLabel = p.main_category_name || 'General';
             const catLabel = p.category_name || 'Uncategorized';
-            const st = parseInt(p.stock) || 0;
-            const rp = parseInt(p.reorder_point) || 5;
+            const isTracked = (p.track_stock === undefined || p.track_stock === null || p.track_stock == 1 || p.track_stock === true);
             let stockBadge = '';
-            if (st <= 0) {
-                stockBadge = `<span class="stock-pill out"><span class="status-dot"></span>Out of Stock (0)</span>`;
-            } else if (st <= rp) {
-                stockBadge = `<span class="stock-pill low"><span class="status-dot"></span>Low Stock (${st})</span>`;
+            if (!isTracked) {
+                stockBadge = `<span class="stock-pill untracked"><span class="status-dot"></span>Untracked</span>`;
             } else {
-                stockBadge = `<span class="stock-pill ok"><span class="status-dot"></span>In Stock (${st})</span>`;
+                const st = parseInt(p.stock) || 0;
+                const rp = parseInt(p.reorder_point) || 5;
+                if (st <= 0) {
+                    stockBadge = `<span class="stock-pill out"><span class="status-dot"></span>Out of Stock (0)</span>`;
+                } else if (st <= rp) {
+                    stockBadge = `<span class="stock-pill low"><span class="status-dot"></span>Low Stock (${st})</span>`;
+                } else {
+                    stockBadge = `<span class="stock-pill ok"><span class="status-dot"></span>In Stock (${st})</span>`;
+                }
             }
             return `<div class="prod-card-mobile">
                 ${thumbHtml}
@@ -3186,11 +3265,24 @@
 
         /* Live Stock Indicator inside Product Modal */
         function _updateModalStockIndicator() {
-            const stockInput = document.getElementById('prodStock');
-            const rpInput = document.getElementById('prodReorderPoint');
+            const trackInput = document.getElementById('prodTrackStock');
+            const isTracked = trackInput ? trackInput.checked : true;
             const ind = document.getElementById('modalStockStatusIndicator');
             if (!ind) return;
 
+            if (!isTracked) {
+                ind.className = 'modal-stock-indicator untracked';
+                ind.innerHTML = `
+                    <span class="stock-indicator-badge">
+                        <span class="status-dot"></span> Untracked
+                    </span>
+                    <span class="stock-indicator-detail">Stock tracking is disabled. Item is always available for sale.</span>
+                `;
+                return;
+            }
+
+            const stockInput = document.getElementById('prodStock');
+            const rpInput = document.getElementById('prodReorderPoint');
             const stockVal = stockInput ? parseInt(stockInput.value, 10) : 0;
             const rpVal = rpInput ? parseInt(rpInput.value, 10) : 5;
 
@@ -3224,6 +3316,25 @@
             }
         }
 
+        function _toggleStockTrackingUI() {
+            const trackInput = document.getElementById('prodTrackStock');
+            const isTracked = trackInput ? trackInput.checked : true;
+            const stockInput = document.getElementById('prodStock');
+            const rpInput = document.getElementById('prodReorderPoint');
+            const container = document.getElementById('stockFieldsContainer');
+
+            if (stockInput) stockInput.disabled = !isTracked;
+            if (rpInput) rpInput.disabled = !isTracked;
+            if (container) {
+                container.style.opacity = isTracked ? '1' : '0.45';
+                container.style.pointerEvents = isTracked ? 'auto' : 'none';
+            }
+            _updateModalStockIndicator();
+        }
+
+        const _trackToggleInp = document.getElementById('prodTrackStock');
+        if (_trackToggleInp) _trackToggleInp.addEventListener('change', _toggleStockTrackingUI);
+
         const _stockInp = document.getElementById('prodStock');
         if (_stockInp) _stockInp.addEventListener('input', _updateModalStockIndicator);
         const _rpInp = document.getElementById('prodReorderPoint');
@@ -3234,9 +3345,10 @@
             document.getElementById('modalTitle').innerHTML = 'Add <span>Product</span>';
             document.getElementById('editProductId').value = '';
             ['prodName', 'prodDesc', 'prodSku', 'prodPrice', 'prodCost'].forEach(id => document.getElementById(id).value = '');
+            if (document.getElementById('prodTrackStock')) document.getElementById('prodTrackStock').checked = true;
             if (document.getElementById('prodStock')) document.getElementById('prodStock').value = '0';
             if (document.getElementById('prodReorderPoint')) document.getElementById('prodReorderPoint').value = '5';
-            _updateModalStockIndicator();
+            _toggleStockTrackingUI();
             document.getElementById('prodMainCategory').value = '';
             _updateProductCategoryOptions('');
             document.getElementById('prodCupEligible').checked = false;
@@ -3264,13 +3376,17 @@
             document.getElementById('prodSku').value = p.sku || '';
             document.getElementById('prodPrice').value = p.price || 0;
             document.getElementById('prodCost').value = p.cost || 0;
+            const isTracked = (p.track_stock === undefined || p.track_stock === null || p.track_stock == 1 || p.track_stock === true);
+            if (document.getElementById('prodTrackStock')) {
+                document.getElementById('prodTrackStock').checked = isTracked;
+            }
             if (document.getElementById('prodStock')) {
                 document.getElementById('prodStock').value = (p.stock !== undefined && p.stock !== null) ? p.stock : 0;
             }
             if (document.getElementById('prodReorderPoint')) {
                 document.getElementById('prodReorderPoint').value = (p.reorder_point !== undefined && p.reorder_point !== null) ? p.reorder_point : 5;
             }
-            _updateModalStockIndicator();
+            _toggleStockTrackingUI();
             document.getElementById('prodMainCategory').value = p.main_category_id || '';
             _updateProductCategoryOptions(p.category_id || '');
             document.getElementById('prodCupEligible').checked = !!p.cup_eligible;
@@ -3318,6 +3434,8 @@
                     imageUrl = upData.image_url;
                 }
 
+                const trackInput = document.getElementById('prodTrackStock');
+                const trackStock = trackInput ? (trackInput.checked ? 1 : 0) : 1;
                 const stockInput = document.getElementById('prodStock');
                 const rpInput = document.getElementById('prodReorderPoint');
                 const stockVal = stockInput ? parseInt(stockInput.value, 10) : 0;
@@ -3329,6 +3447,7 @@
                     sku: document.getElementById('prodSku').value.trim(),
                     price,
                     cost: parseFloat(document.getElementById('prodCost').value) || 0,
+                    track_stock: trackStock,
                     stock: isNaN(stockVal) ? 0 : Math.max(0, stockVal),
                     reorder_point: isNaN(rpVal) ? 5 : Math.max(0, rpVal),
                     unit: 'pcs',          // size is chosen at POS per transaction
