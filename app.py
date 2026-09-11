@@ -3039,47 +3039,75 @@ def _get_pos_products() -> dict:
         return cached
 
     cur = mysql.connection.cursor(DictCursor)
+    # Main categories (departments)
     cur.execute("""
-        SELECT c.category_id, c.name,
+        SELECT mc.main_category_id, mc.name
+        FROM   main_categories mc
+        ORDER  BY mc.name
+    """)
+    main_categories = [
+        {"main_category_id": mc["main_category_id"], "name": mc["name"]}
+        for mc in cur.fetchall()
+    ]
+
+    cur.execute("""
+        SELECT c.category_id, c.name, c.main_category_id,
+               COALESCE(mc.name, '') AS main_category_name,
                COUNT(p.product_id) AS product_count
         FROM   categories c
+        LEFT   JOIN main_categories mc ON mc.main_category_id = c.main_category_id
         LEFT   JOIN products p ON p.category_id = c.category_id AND p.is_active = 1
-        GROUP  BY c.category_id
-        HAVING product_count > 0
+        GROUP  BY c.category_id, c.name, c.main_category_id, mc.name
         ORDER  BY c.name
     """)
     categories = [
-        {"category_id": c["category_id"], "name": c["name"],
-         "product_count": int(c["product_count"])}
+        {
+            "category_id": c["category_id"],
+            "name": c["name"],
+            "main_category_id": c["main_category_id"],
+            "main_category_name": c["main_category_name"],
+            "product_count": int(c["product_count"]),
+        }
         for c in cur.fetchall()
     ]
     cur.execute("""
         SELECT p.product_id, p.name, p.description,
                p.image_url, p.icon, p.cup_eligible, p.price, p.stock, p.unit,
-               c.category_id, c.name AS category_name
+               p.category_id, COALESCE(c.name, 'Other') AS category_name,
+               COALESCE(p.main_category_id, c.main_category_id) AS main_category_id,
+               COALESCE(mc.name, mc_sub.name, 'General') AS main_category_name
         FROM   products p
         LEFT   JOIN categories c ON c.category_id = p.category_id
+        LEFT   JOIN main_categories mc ON mc.main_category_id = p.main_category_id
+        LEFT   JOIN main_categories mc_sub ON mc_sub.main_category_id = c.main_category_id
         WHERE  p.is_active = 1
-        ORDER  BY c.name, p.name
+        ORDER  BY main_category_name, c.name, p.name
     """)
     items = [
         {
-            "product_id":    r["product_id"],
-            "name":          r["name"],
-            "description":   r["description"] or "",
-            "image_url":     r["image_url"] or "",
-            "icon":          r["icon"] or "📦",
-            "cup_eligible":  bool(r.get("cup_eligible", 0)),
-            "price":         float(r["price"]),
-            "stock":         int(r["stock"]),
-            "unit":          r["unit"],
-            "category_id":   r["category_id"],
-            "category_name": r["category_name"] or "Other",
+            "product_id":         r["product_id"],
+            "name":               r["name"],
+            "description":        r["description"] or "",
+            "image_url":          r["image_url"] or "",
+            "icon":               "",
+            "cup_eligible":       bool(r.get("cup_eligible", 0)),
+            "price":              float(r["price"]),
+            "stock":              int(r["stock"]),
+            "unit":               r["unit"],
+            "category_id":        r["category_id"],
+            "category_name":      r["category_name"] or "Other",
+            "main_category_id":   r["main_category_id"],
+            "main_category_name": r["main_category_name"] or "General",
         }
         for r in cur.fetchall()
     ]
     cur.close()
-    result = {"_cached_at": now, "items": items, "categories": categories}
+    result = {
+        "_cached_at": now,
+        "items": items,
+        "categories": categories,
+        "main_categories": main_categories,
+    }
     _pos_products_cache["data"] = result
     return result
 
@@ -5812,69 +5840,20 @@ def api_products_upload_image():
 def api_products_pos():
     """
     POS endpoint for cashiers and admins.
-    Returns active products with images + categories for the POS dashboard.
+    Returns active products with images + categories + main_categories for the POS dashboard.
     """
     if "employee_id" not in session and not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     try:
-        cur = mysql.connection.cursor(DictCursor)
-
-        # Only categories that actually have products
-        cur.execute("""
-            SELECT c.category_id, c.name,
-                   COUNT(p.product_id) AS product_count
-            FROM   categories c
-            LEFT   JOIN products p
-                   ON p.category_id = c.category_id AND p.is_active = 1
-            GROUP  BY c.category_id
-            HAVING product_count > 0
-            ORDER  BY c.name
-        """)
-        categories = [
-            {
-                "category_id": c["category_id"],
-                "name": c["name"],
-                "product_count": int(c["product_count"]),
-            }
-            for c in cur.fetchall()
-        ]
-
-        # All active products
-        cur.execute("""
-            SELECT p.product_id, p.name, p.description,
-                   p.image_url, p.icon, p.cup_eligible, p.price, p.stock, p.unit,
-                   c.category_id, c.name AS category_name
-            FROM   products p
-            LEFT   JOIN categories c ON c.category_id = p.category_id
-            WHERE  p.is_active = 1
-            ORDER  BY c.name, p.name
-        """)
-        items = [
-            {
-                "product_id": r["product_id"],
-                "name": r["name"],
-                "description": r["description"] or "",
-                "image_url": r["image_url"] or "",
-                "icon": r["icon"] or "📦",
-                "cup_eligible": bool(r.get("cup_eligible", 0)),
-                "price": float(r["price"]),
-                "stock": int(r["stock"]),
-                "unit": r["unit"],
-                "category_id": r["category_id"],
-                "category_name": r["category_name"] or "Other",
-            }
-            for r in cur.fetchall()
-        ]
-        cur.close()
-        return jsonify(
-            {
-                "success": True,
-                "items": items,
-                "products": items,
-                "categories": categories,
-            }
-        )
+        d = _get_pos_products()
+        return jsonify({
+            "success":         True,
+            "items":           d["items"],
+            "products":        d["items"],
+            "categories":      d["categories"],
+            "main_categories": d.get("main_categories", []),
+        })
     except Exception as exc:
         app.logger.error(f"[products] api_products_pos: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
@@ -5886,26 +5865,34 @@ def api_products_pos():
 @app.route("/api/inventory/categories/<int:category_id>", methods=["PUT"])
 @csrf.exempt
 def api_inventory_categories_update(category_id):
-    """Update an existing category's name."""
+    """Update an existing category's name and/or main_category_id."""
     if not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
+    main_category_id = data.get("main_category_id")
 
     if not name:
         return jsonify({"success": False, "message": "Category name is required"}), 400
 
     try:
         cur = mysql.connection.cursor()
-        cur.execute(
-            "UPDATE categories SET name=%s WHERE category_id=%s", (name, category_id)
-        )
+        if "main_category_id" in data:
+            cur.execute(
+                "UPDATE categories SET name=%s, main_category_id=%s WHERE category_id=%s",
+                (name, main_category_id or None, category_id),
+            )
+        else:
+            cur.execute(
+                "UPDATE categories SET name=%s WHERE category_id=%s", (name, category_id)
+            )
         mysql.connection.commit()
         affected = cur.rowcount
         cur.close()
         if affected == 0:
             return jsonify({"success": False, "message": "Category not found"}), 404
+        _invalidate_pos_cache()
         return jsonify({"success": True, "message": f'Category "{name}" updated'})
     except Exception as exc:
         app.logger.error(f"[inventory] update category #{category_id}: {exc}")
@@ -5926,7 +5913,6 @@ def api_inventory_categories_delete(category_id):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     try:
         cur = mysql.connection.cursor(DictCursor)
-        # Check category exists
         cur.execute(
             "SELECT name FROM categories WHERE category_id = %s", (category_id,)
         )
@@ -5935,18 +5921,145 @@ def api_inventory_categories_delete(category_id):
             cur.close()
             return jsonify({"success": False, "message": "Category not found"}), 404
         cat_name = row["name"]
-        # Unassign products from this category
         cur.execute(
             "UPDATE products SET category_id = NULL WHERE category_id = %s",
             (category_id,),
         )
-        # Delete the category
         cur.execute("DELETE FROM categories WHERE category_id = %s", (category_id,))
         mysql.connection.commit()
         cur.close()
+        _invalidate_pos_cache()
         return jsonify({"success": True, "message": f'Category "{cat_name}" deleted'})
     except Exception as exc:
         app.logger.error(f"[inventory] delete category #{category_id}: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── GET /api/inventory/main_categories ────────────────────────────────────────
+
+
+@app.route("/api/inventory/main_categories", methods=["GET"])
+def api_inventory_main_categories_get():
+    """List all main categories (departments) with subcategory and product counts."""
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("""
+            SELECT mc.main_category_id, mc.name,
+                   COUNT(DISTINCT c.category_id) AS subcategory_count,
+                   COUNT(DISTINCT p.product_id) AS product_count
+            FROM main_categories mc
+            LEFT JOIN categories c ON c.main_category_id = mc.main_category_id
+            LEFT JOIN products p ON (p.main_category_id = mc.main_category_id OR p.category_id = c.category_id) AND p.is_active = 1
+            GROUP BY mc.main_category_id, mc.name
+            ORDER BY mc.name
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        for r in rows:
+            r["subcategory_count"] = int(r["subcategory_count"])
+            r["product_count"] = int(r["product_count"])
+        return jsonify({"success": True, "main_categories": rows})
+    except Exception as exc:
+        app.logger.error(f"[inventory] main_categories GET: {exc}")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+# ── POST /api/inventory/main_categories ───────────────────────────────────────
+
+
+@app.route("/api/inventory/main_categories", methods=["POST"])
+@csrf.exempt
+def api_inventory_main_categories_create():
+    """Create a new main category (department)."""
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"success": False, "message": "Main category name is required"}), 400
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("INSERT INTO main_categories (name) VALUES (%s)", (name,))
+        mysql.connection.commit()
+        new_id = cur.lastrowid
+        cur.close()
+        _invalidate_pos_cache()
+        return jsonify(
+            {"success": True, "main_category_id": new_id, "message": f'Main category "{name}" added'}
+        )
+    except Exception as exc:
+        app.logger.error(f"[inventory] main_categories POST: {exc}")
+        return jsonify({"success": False, "message": "Main category name already exists or DB error"}), 400
+
+
+# ── PUT /api/inventory/main_categories/<id> ───────────────────────────────────
+
+
+@app.route("/api/inventory/main_categories/<int:main_category_id>", methods=["PUT"])
+@csrf.exempt
+def api_inventory_main_categories_update(main_category_id):
+    """Update an existing main category's name."""
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"success": False, "message": "Main category name is required"}), 400
+
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute(
+            "UPDATE main_categories SET name=%s WHERE main_category_id=%s",
+            (name, main_category_id),
+        )
+        mysql.connection.commit()
+        affected = cur.rowcount
+        cur.close()
+        if affected == 0:
+            return jsonify({"success": False, "message": "Main category not found"}), 404
+        _invalidate_pos_cache()
+        return jsonify({"success": True, "message": f'Main category "{name}" updated'})
+    except Exception as exc:
+        app.logger.error(f"[inventory] main_categories PUT #{main_category_id}: {exc}")
+        return jsonify({"success": False, "message": "Name already exists or DB error"}), 400
+
+
+# ── DELETE /api/inventory/main_categories/<id> ────────────────────────────────
+
+
+@app.route("/api/inventory/main_categories/<int:main_category_id>", methods=["DELETE"])
+@csrf.exempt
+def api_inventory_main_categories_delete(main_category_id):
+    """Delete a main category and unlink products and subcategories."""
+    if not is_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT name FROM main_categories WHERE main_category_id=%s",
+            (main_category_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            return jsonify({"success": False, "message": "Main category not found"}), 404
+        name = row["name"]
+        cur.execute("UPDATE products SET main_category_id = NULL WHERE main_category_id = %s", (main_category_id,))
+        cur.execute("UPDATE categories SET main_category_id = NULL WHERE main_category_id = %s", (main_category_id,))
+        cur.execute("DELETE FROM main_categories WHERE main_category_id=%s", (main_category_id,))
+        mysql.connection.commit()
+        cur.close()
+        _invalidate_pos_cache()
+        return jsonify({"success": True, "message": f'Main category "{name}" deleted'})
+    except Exception as exc:
+        app.logger.error(f"[inventory] main_categories DELETE #{main_category_id}: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
@@ -7578,15 +7691,47 @@ def _ensure_inventory_tables():
         conn = mysql.connection
         cur = conn.cursor(DictCursor)
 
-        # ── categories ────────────────────────────────────────────────────────
+        # ── main_categories ───────────────────────────────────────────────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `main_categories` (
+                `main_category_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `name`             VARCHAR(80)  NOT NULL,
+                `created_at`       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY `uq_main_category_name` (`name`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
+        conn.commit()
+
+        # ── categories (subcategories) ────────────────────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS `categories` (
-                `category_id`  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                `name`         VARCHAR(80)  NOT NULL,
-                `created_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `category_id`      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `main_category_id` INT UNSIGNED DEFAULT NULL,
+                `name`             VARCHAR(80)  NOT NULL,
+                `created_at`       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY `uq_category_name` (`name`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         """)
+        conn.commit()
+
+        # Add main_category_id to categories if missing (idempotent)
+        try:
+            cur.execute("ALTER TABLE `categories` ADD COLUMN `main_category_id` INT UNSIGNED DEFAULT NULL")
+            conn.commit()
+            app.logger.info("[inventory] Added main_category_id column to categories")
+        except Exception:
+            pass
+
+        try:
+            cur.execute("""
+                ALTER TABLE `categories`
+                ADD CONSTRAINT `fk_category_main`
+                FOREIGN KEY (`main_category_id`) REFERENCES `main_categories`(`main_category_id`)
+                ON DELETE SET NULL
+            """)
+            conn.commit()
+        except Exception:
+            pass
 
         # ── products ──────────────────────────────────────────────────────────
         cur.execute("""
@@ -7613,6 +7758,25 @@ def _ensure_inventory_tables():
         """)
         conn.commit()
 
+        # Add main_category_id to products if missing (idempotent)
+        try:
+            cur.execute("ALTER TABLE `products` ADD COLUMN `main_category_id` INT UNSIGNED DEFAULT NULL")
+            conn.commit()
+            app.logger.info("[inventory] Added main_category_id column to products")
+        except Exception:
+            pass
+
+        try:
+            cur.execute("""
+                ALTER TABLE `products`
+                ADD CONSTRAINT `fk_product_main`
+                FOREIGN KEY (`main_category_id`) REFERENCES `main_categories`(`main_category_id`)
+                ON DELETE SET NULL
+            """)
+            conn.commit()
+        except Exception:
+            pass
+
         # ── add icon column if missing (idempotent) ─────────────────────────
         try:
             cur.execute(
@@ -7633,8 +7797,20 @@ def _ensure_inventory_tables():
         except Exception:
             pass  # column already exists
 
-        # Seeding removed: categories and products are managed entirely
-        # through the admin UI. No default data is inserted on startup.
+        # Seed default main categories if empty
+        try:
+            cur.execute("SELECT COUNT(*) AS cnt FROM `main_categories`")
+            row = cur.fetchone()
+            cnt = (row["cnt"] if isinstance(row, dict) else row[0]) if row else 0
+            if cnt == 0:
+                cur.executemany(
+                    "INSERT INTO `main_categories` (`name`) VALUES (%s)",
+                    [("Books",), ("Clothes",), ("Blooms",), ("Café",)],
+                )
+                conn.commit()
+                app.logger.info("[inventory] Seeded default main categories: Books, Clothes, Blooms, Café")
+        except Exception as seed_err:
+            app.logger.warning(f"[inventory] Seeding main categories failed: {seed_err}")
 
         cur.close()
         app.logger.info("[inventory] Inventory tables ensured")
@@ -8530,16 +8706,26 @@ def api_inventory_categories():
 
     if request.method == "GET":
         try:
+            main_cat_id = request.args.get("main_category_id")
             cur = mysql.connection.cursor(DictCursor)
-            cur.execute("""
-                SELECT c.category_id, c.name,
+            where_sql = ""
+            params = []
+            if main_cat_id:
+                where_sql = "WHERE c.main_category_id = %s"
+                params.append(int(main_cat_id))
+
+            cur.execute(f"""
+                SELECT c.category_id, c.name, c.main_category_id,
+                       COALESCE(mc.name, '') AS main_category_name,
                        COUNT(p.product_id) AS product_count
                 FROM categories c
+                LEFT JOIN main_categories mc ON mc.main_category_id = c.main_category_id
                 LEFT JOIN products p
                     ON p.category_id = c.category_id AND p.is_active = 1
-                GROUP BY c.category_id
-                ORDER BY c.name
-            """)
+                {where_sql}
+                GROUP BY c.category_id, c.name, c.main_category_id, mc.name
+                ORDER BY mc.name, c.name
+            """, params)
             cats = cur.fetchall()
             cur.close()
             for c in cats:
@@ -8552,14 +8738,16 @@ def api_inventory_categories():
     # POST — add new category
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
+    main_category_id = data.get("main_category_id") or None
     if not name:
         return jsonify({"success": False, "message": "Category name is required"}), 400
     try:
         cur = mysql.connection.cursor(DictCursor)
-        cur.execute("INSERT INTO categories (name) VALUES (%s)", (name,))
+        cur.execute("INSERT INTO categories (name, main_category_id) VALUES (%s, %s)", (name, main_category_id))
         mysql.connection.commit()
         new_id = cur.lastrowid
         cur.close()
+        _invalidate_pos_cache()
         return jsonify(
             {"success": True, "category_id": new_id, "message": "Category added"}
         )
@@ -8589,6 +8777,7 @@ def api_inventory_items():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     search = (request.args.get("search") or "").strip()
+    main_category_id = request.args.get("main_category_id")
     category_id = request.args.get("category_id")
     stock_status = request.args.get("stock_status", "")
     sort = request.args.get("sort", "name")
@@ -8612,6 +8801,10 @@ def api_inventory_items():
             like = f"%{search}%"
             params += [like, like, like]
 
+        if main_category_id:
+            where.append("(p.main_category_id = %s OR c.main_category_id = %s)")
+            params.extend([int(main_category_id), int(main_category_id)])
+
         if category_id:
             where.append("p.category_id = %s")
             params.append(int(category_id))
@@ -8627,9 +8820,13 @@ def api_inventory_items():
             SELECT p.product_id, p.name, p.description, p.sku, p.image_url,
                    p.icon, p.cup_eligible, p.price, p.cost, p.stock, p.reorder_point, p.unit,
                    p.created_at, p.updated_at,
-                   c.category_id, c.name AS category_name
+                   p.category_id, c.name AS category_name,
+                   COALESCE(p.main_category_id, c.main_category_id) AS main_category_id,
+                   COALESCE(mc.name, mc_sub.name, 'General') AS main_category_name
             FROM products p
             LEFT JOIN categories c ON c.category_id = p.category_id
+            LEFT JOIN main_categories mc ON mc.main_category_id = p.main_category_id
+            LEFT JOIN main_categories mc_sub ON mc_sub.main_category_id = c.main_category_id
             WHERE {' AND '.join(where)}
             ORDER BY {order_clause}
         """
@@ -8646,7 +8843,7 @@ def api_inventory_items():
                     "description": r["description"] or "",
                     "sku": r["sku"] or "",
                     "image_url": r["image_url"] or "",
-                    "icon": r["icon"] or "📦",
+                    "icon": "",
                     "price": float(r["price"]),
                     "cost": float(r["cost"]),
                     "stock": int(r["stock"]),
@@ -8656,6 +8853,8 @@ def api_inventory_items():
                     "status": _stock_status(r["stock"], r["reorder_point"]),
                     "category_id": r["category_id"],
                     "category_name": r["category_name"] or "Uncategorized",
+                    "main_category_id": r["main_category_id"],
+                    "main_category_name": r["main_category_name"] or "General",
                     "stock_value": round(float(r["price"]) * int(r["stock"]), 2),
                     "created_at": str(r["created_at"]),
                     "updated_at": str(r["updated_at"]),
@@ -8694,6 +8893,7 @@ def api_inventory_items_create():
     except (TypeError, ValueError):
         return jsonify({"success": False, "message": "Invalid numeric values"}), 400
 
+    main_category_id = data.get("main_category_id") or None
     category_id = data.get("category_id") or None
     sku = (data.get("sku") or "").strip() or None
     description = (data.get("description") or "").strip() or None
@@ -8706,11 +8906,12 @@ def api_inventory_items_create():
         cur.execute(
             """
             INSERT INTO products
-                (category_id, name, description, sku, price, cost,
+                (main_category_id, category_id, name, description, sku, price, cost,
                  stock, reorder_point, unit, cup_eligible, image_url)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
             (
+                main_category_id,
                 category_id,
                 name,
                 description,
@@ -8763,6 +8964,7 @@ def api_inventory_items_update(product_id):
         return jsonify({"success": False, "message": "Invalid numeric values"}), 400
 
     name = (data.get("name") or "").strip()
+    main_category_id = data.get("main_category_id") or None
     category_id = data.get("category_id") or None
     sku = (data.get("sku") or "").strip() or None
     description = (data.get("description") or "").strip() or None
@@ -8778,20 +8980,22 @@ def api_inventory_items_update(product_id):
         cur.execute(
             """
             UPDATE products
-               SET category_id   = %s,
-                   name          = %s,
-                   description   = %s,
-                   sku           = %s,
-                   price         = %s,
-                   cost          = %s,
-                   stock         = %s,
-                   reorder_point = %s,
-                   unit          = %s,
-                   cup_eligible  = %s,
-                   image_url     = %s
+               SET main_category_id = %s,
+                   category_id      = %s,
+                   name             = %s,
+                   description      = %s,
+                   sku              = %s,
+                   price            = %s,
+                   cost             = %s,
+                   stock            = %s,
+                   reorder_point    = %s,
+                   unit             = %s,
+                   cup_eligible     = %s,
+                   image_url        = %s
              WHERE product_id = %s AND is_active = 1
         """,
             (
+                main_category_id,
                 category_id,
                 name,
                 description,
@@ -10040,10 +10244,11 @@ def api_pos_products():
         d = _get_pos_products()
         # Return both `items` and `products` so old and new frontend code both work
         return jsonify({
-            "success":    True,
-            "items":      d["items"],
-            "products":   d["items"],
-            "categories": d["categories"],
+            "success":         True,
+            "items":           d["items"],
+            "products":        d["items"],
+            "categories":      d["categories"],
+            "main_categories": d.get("main_categories", []),
         })
     except Exception as exc:
         app.logger.error(f"[products] api_pos_products: {exc}")

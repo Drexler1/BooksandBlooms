@@ -541,12 +541,16 @@
         }
 
         .search-wrap::before {
-            content: '🔍';
+            content: '';
             position: absolute;
-            left: 0.8rem;
+            left: 0.85rem;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 0.9rem;
+            width: 15px;
+            height: 15px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888888' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat center;
+            background-size: contain;
+            pointer-events: none;
         }
 
         .filter-select {
@@ -759,6 +763,52 @@
         .cat-card-actions {
             display: flex;
             gap: 0.4rem;
+        }
+
+        .dept-chip {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            background: #eef2f7;
+            color: #2c3e50;
+            border: 1px solid #d0d7de;
+            letter-spacing: 0.3px;
+        }
+
+        .dept-parent-badge {
+            display: inline-block;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 0.12rem 0.45rem;
+            border-radius: 4px;
+            background: rgba(201, 169, 97, 0.15);
+            color: var(--dark-gold);
+            margin-top: 0.25rem;
+        }
+
+        .category-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.35rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .category-section-title {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: var(--black);
+        }
+
+        .category-section-desc {
+            font-size: 0.8rem;
+            color: #777;
+            margin-bottom: 1rem;
         }
 
         /* Modals */
@@ -1949,7 +1999,7 @@
                         <p>{{ session.get('role')|capitalize }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜] Logout</button></form>
+                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">Logout</button></form>
             </div>
         </header>
 
@@ -1977,14 +2027,14 @@
                         <p class="page-subtitle">Add and organise products displayed on the cashier dashboard.</p>
                     </div>
                     <div class="header-btns">
-                        <button class="btn btn-outline" id="manageCatsBtn">🏷️ Manage Categories</button>
-                        <button class="btn btn-primary" id="addProductBtn">➕ Add Product</button>
+                        <button class="btn btn-outline" id="manageCatsBtn">Manage Categories</button>
+                        <button class="btn btn-primary" id="addProductBtn">+ Add Product</button>
                     </div>
                 </div>
 
                 <!-- Workflow Info Banner -->
                 <div class="info-banner">
-                    <span style="font-size:1.2rem;flex-shrink:0;">ℹ️</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--info);flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                     <div>
                         <strong>Workflow:</strong> Products added here appear on the <strong>Cashier Dashboard</strong>
                         (name, price & image only — stock is hidden from cashiers).
@@ -1997,7 +2047,7 @@
                 <!-- Stats -->
                 <div class="stats-row">
                     <div class="stat-card">
-                        <div class="stat-icon gold">🛍️</div>
+                        <div class="stat-icon gold"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
                         <div>
                             <div class="stat-label">Total Products</div>
                             <div class="stat-value" id="statTotal">—</div>
@@ -2005,7 +2055,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon green">✅</div>
+                        <div class="stat-icon green"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
                         <div>
                             <div class="stat-label">Visible on POS</div>
                             <div class="stat-value" id="statInStock">—</div>
@@ -2013,9 +2063,9 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon blue">🏷️</div>
+                        <div class="stat-icon blue"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
                         <div>
-                            <div class="stat-label">Categories</div>
+                            <div class="stat-label">Departments & Categories</div>
                             <div class="stat-value" id="statCats">—</div>
                             <div class="stat-sub">product groups</div>
                         </div>
@@ -2024,11 +2074,11 @@
 
                 <!-- Tabs -->
                 <div class="main-tabs">
-                    <button class="main-tab active" data-tab="products">🛍️ Products <span class="tab-badge"
+                    <button class="main-tab active" data-tab="products">Products <span class="tab-badge"
                             id="prodBadge">0</span></button>
-                    <button class="main-tab" data-tab="categories">🏷️ Categories <span class="tab-badge"
+                    <button class="main-tab" data-tab="categories">Categories & Departments <span class="tab-badge"
                             id="catBadge">0</span></button>
-                    <button class="main-tab" data-tab="financials">💰 Financials <span class="tab-badge"
+                    <button class="main-tab" data-tab="financials">Financials <span class="tab-badge"
                             id="finBadge">0</span></button>
                 </div>
 
@@ -2039,8 +2089,11 @@
                             <input type="text" id="searchInput"
                                 placeholder="Search products by name, SKU, description…">
                         </div>
+                        <select class="filter-select" id="mainCatFilter">
+                            <option value="">All Departments</option>
+                        </select>
                         <select class="filter-select" id="catFilter">
-                            <option value="">All Categories</option>
+                            <option value="">All Subcategories</option>
                         </select>
                         <select class="filter-select" id="sortSelect">
                             <option value="name">Name A–Z</option>
@@ -2049,7 +2102,7 @@
                         </select>
                         <div class="divider-v"></div>
                         <span class="result-count" id="resultCount">Loading…</span>
-                        <button class="btn btn-outline btn-sm" id="refreshBtn">↺ Refresh</button>
+                        <button class="btn btn-outline btn-sm" id="refreshBtn">Refresh</button>
                     </div>
 
                     <div class="table-card">
@@ -2059,7 +2112,8 @@
                                     <tr>
                                         <th style="width:56px;"></th>
                                         <th>Product</th>
-                                        <th>Category</th>
+                                        <th>Department</th>
+                                        <th>Subcategory</th>
                                         <th>Selling Price</th>
                                         <th>Cost Price</th>
                                         <th>SKU</th>
@@ -2068,15 +2122,12 @@
                                 </thead>
                                 <tbody id="productsBody">
                                     <!-- skeleton rows shown until JS loads real data -->
-                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name"></div><div class="skel skel-desc"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
-                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:55%"></div><div class="skel skel-desc" style="width:80%"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
-                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:70%"></div><div class="skel skel-desc" style="width:45%"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
-                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:40%"></div><div class="skel skel-desc"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
-                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:65%"></div><div class="skel skel-desc" style="width:30%"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
+                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name"></div><div class="skel skel-desc"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
+                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:55%"></div><div class="skel skel-desc" style="width:80%"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
+                                    <tr class="skeleton-row"><td><div class="skel skel-thumb"></div></td><td><div class="skel skel-name" style="width:70%"></div><div class="skel skel-desc" style="width:45%"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-chip"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-price"></div></td><td><div class="skel skel-sku"></div></td><td><div class="skel skel-btn"></div></td></tr>
                                     <tr>
-                                        <td colspan="7">
+                                        <td colspan="8">
                                             <div class="empty-state">
-                                                <div class="empty-state-icon">⏳</div>
                                                 <h3>Loading products…</h3>
                                             </div>
                                         </td>
@@ -2104,16 +2155,42 @@
                     </div>
                 </div>
 
-                <!-- CATEGORIES TAB -->
+                <!-- CATEGORIES & DEPARTMENTS TAB -->
                 <div class="tab-panel" id="tab-categories">
-                    <div class="toolbar" style="justify-content:space-between;">
-                        <span style="font-weight:700;font-size:0.95rem;">Product Categories</span>
-                        <button class="btn btn-primary btn-sm" id="addCatBtn">➕ Add Category</button>
+                    <!-- Main Categories (Departments) Section -->
+                    <div style="background:white;border-radius:10px;padding:1.25rem;box-shadow:0 2px 10px var(--shadow);border:1px solid #e0e0e0;margin-bottom:1.5rem;">
+                        <div class="category-section-header">
+                            <div>
+                                <span class="category-section-title">Main Categories (Departments)</span>
+                                <div class="category-section-desc">Manage top-level store branches (e.g. Books, Clothes, Blooms, Café). Fully customizable.</div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" id="addMainCatBtn">+ Add Main Category</button>
+                        </div>
+                        <div class="cat-grid" id="mainCatGrid">
+                            <div class="empty-state">
+                                <h3>Loading departments…</h3>
+                            </div>
+                        </div>
                     </div>
-                    <div class="cat-grid" id="catGrid">
-                        <div class="empty-state">
-                            <div class="empty-state-icon">⏳</div>
-                            <h3>Loading…</h3>
+
+                    <!-- Subcategories Section -->
+                    <div style="background:white;border-radius:10px;padding:1.25rem;box-shadow:0 2px 10px var(--shadow);border:1px solid #e0e0e0;">
+                        <div class="category-section-header">
+                            <div>
+                                <span class="category-section-title">Subcategories</span>
+                                <div class="category-section-desc">Specific product groups nested within each department.</div>
+                            </div>
+                            <div style="display:flex;gap:0.5rem;align-items:center;">
+                                <select class="filter-select" id="subcatDeptFilter" style="min-width:180px;">
+                                    <option value="">All Departments</option>
+                                </select>
+                                <button class="btn btn-primary btn-sm" id="addCatBtn">+ Add Subcategory</button>
+                            </div>
+                        </div>
+                        <div class="cat-grid" id="catGrid">
+                            <div class="empty-state">
+                                <h3>Loading subcategories…</h3>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2123,7 +2200,7 @@
                     <!-- Financial summary cards -->
                     <div class="fin-summary-row" id="finSummaryRow">
                         <div class="fin-summary-card">
-                            <div class="fin-summary-icon" style="background:linear-gradient(135deg,#c9a961,#a88850);">💰</div>
+                            <div class="fin-summary-icon" style="background:linear-gradient(135deg,#c9a961,#a88850);"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
                             <div>
                                 <div class="stat-label">Avg Profit Margin</div>
                                 <div class="stat-value" id="finAvgMargin">—</div>
@@ -2131,7 +2208,7 @@
                             </div>
                         </div>
                         <div class="fin-summary-card">
-                            <div class="fin-summary-icon" style="background:linear-gradient(135deg,#4caf50,#388e3c);">📈</div>
+                            <div class="fin-summary-icon" style="background:linear-gradient(135deg,#4caf50,#388e3c);"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
                             <div>
                                 <div class="stat-label">Highest Margin</div>
                                 <div class="stat-value" id="finHighMargin">—</div>
@@ -2139,7 +2216,7 @@
                             </div>
                         </div>
                         <div class="fin-summary-card">
-                            <div class="fin-summary-icon" style="background:linear-gradient(135deg,#2196f3,#1565c0);">🏷️</div>
+                            <div class="fin-summary-icon" style="background:linear-gradient(135deg,#2196f3,#1565c0);"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
                             <div>
                                 <div class="stat-label">Total Net Profit Potential</div>
                                 <div class="stat-value" id="finTotalNet">—</div>
@@ -2147,7 +2224,7 @@
                             </div>
                         </div>
                         <div class="fin-summary-card">
-                            <div class="fin-summary-icon" style="background:linear-gradient(135deg,#e91e63,#c2185b);">⚠️</div>
+                            <div class="fin-summary-icon" style="background:linear-gradient(135deg,#e91e63,#c2185b);"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
                             <div>
                                 <div class="stat-label">No Cost Set</div>
                                 <div class="stat-value" id="finNoCost">—</div>
@@ -2193,7 +2270,6 @@
                                 <tbody id="finTableBody">
                                     <tr><td colspan="7">
                                         <div class="empty-state">
-                                            <div class="empty-state-icon">⏳</div>
                                             <h3>Loading financials…</h3>
                                         </div>
                                     </td></tr>
@@ -2221,7 +2297,7 @@
 
                     <!-- Footer note -->
                     <p style="font-size:0.8rem;color:#999;margin-top:0.75rem;padding:0 0.25rem;">
-                        💡 <strong>Net Profit</strong> = Selling Price − Unit Cost &nbsp;|&nbsp;
+                        <strong>Net Profit</strong> = Selling Price − Unit Cost &nbsp;|&nbsp;
                         <strong>Margin</strong> = Net Profit ÷ Selling Price × 100.
                         Products with no cost price set are shown with — and flagged.
                     </p>
@@ -2251,7 +2327,7 @@
                         <div class="img-upload-wrap" id="imgDropZone">
                             <input type="file" id="imageFile" accept="image/*">
                             <img class="img-preview" id="imgPreview" alt="preview">
-                            <span class="img-upload-icon" id="uploadIcon">📷</span>
+                            <span class="img-upload-icon" id="uploadIcon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
                             <div class="img-upload-text" id="uploadText">Click or drag to upload product image</div>
                             <div class="img-upload-hint">JPG, PNG, WEBP · Max 2 MB · Recommended 400×400px</div>
                         </div>
@@ -2274,9 +2350,13 @@
                             placeholder="Short description shown on the cashier dashboard…"></textarea>
                     </div>
 
-                    <!-- Category -->
+                    <!-- Department & Subcategory -->
                     <div class="form-group">
-                        <label class="form-label">Category</label>
+                        <label class="form-label">Department / Main Category <span>*</span></label>
+                        <select class="form-control" id="prodMainCategory"></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Subcategory</label>
                         <select class="form-control" id="prodCategory"></select>
                     </div>
 
@@ -2328,21 +2408,78 @@
         </div>
     </div>
 
-    <!-- CATEGORY MODAL -->
-    <div class="modal-overlay" id="categoryModal">
+    <!-- MAIN CATEGORY (DEPARTMENT) MODAL -->
+    <div class="modal-overlay" id="mainCategoryModal">
         <div class="modal" style="max-width:min(420px, calc(100vw - 2rem));">
             <div class="modal-header">
-                <h2 id="catModalTitle">Add <span>Category</span></h2>
+                <h2 id="mainCatModalTitle">Add <span>Main Category</span></h2>
+                <button class="modal-close" id="closeMainCatModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editMainCatId">
+                <div class="form-grid" style="grid-template-columns:1fr;">
+                    <div class="form-group">
+                        <label class="form-label">Main Category Name <span>*</span></label>
+                        <input type="text" class="form-control" id="mainCatName"
+                            placeholder="e.g. Books, Clothes, Blooms, Café">
+                        <span class="form-error">Main category name is required.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="cancelMainCatModal">Cancel</button>
+                <button class="btn btn-primary" id="saveMainCatBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Save Main Category
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE MAIN CATEGORY MODAL -->
+    <div class="modal-overlay" id="deleteMainCategoryModal">
+        <div class="modal delete-modal">
+            <div class="modal-header">
+                <h2>Delete <span>Main Category</span></h2>
+                <button class="modal-close" id="closeDeleteMainCatModal">✕</button>
+            </div>
+            <div class="modal-body delete-body">
+                <div class="delete-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></div>
+                <h3>Delete this main category?</h3>
+                <p>You are about to delete <span class="delete-name" id="deleteMainCategoryName"></span>.<br>
+                    <span id="deleteMainCatWarning" style="color:var(--danger);font-weight:600;display:none;"></span>
+                    <span id="deleteMainCatSafe" style="color:#888;">Associated products and subcategories will have their department unassigned.</span>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="cancelDeleteMainCatModal">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteMainCatBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    Delete Main Category
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUBCATEGORY MODAL -->
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal" style="max-width:min(450px, calc(100vw - 2rem));">
+            <div class="modal-header">
+                <h2 id="catModalTitle">Add <span>Subcategory</span></h2>
                 <button class="modal-close" id="closeCatModal">✕</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editCatId">
                 <div class="form-grid" style="grid-template-columns:1fr;">
                     <div class="form-group">
-                        <label class="form-label">Category Name <span>*</span></label>
+                        <label class="form-label">Department / Main Category <span>*</span></label>
+                        <select class="form-control" id="subCatParent"></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Subcategory Name <span>*</span></label>
                         <input type="text" class="form-control" id="catName"
-                            placeholder="e.g. Milk Tea, Coffee, Snacks">
-                        <span class="form-error">Category name is required.</span>
+                            placeholder="e.g. Fiction, Tops, Bouquets, Cold Brew">
+                        <span class="form-error">Subcategory name is required.</span>
                     </div>
                 </div>
             </div>
@@ -2350,7 +2487,7 @@
                 <button class="btn btn-outline" id="cancelCatModal">Cancel</button>
                 <button class="btn btn-primary" id="saveCatBtn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                    Save Category
+                    Save Subcategory
                 </button>
             </div>
         </div>
@@ -2467,7 +2604,8 @@
         }
 
         /* STATE */
-        let allProducts = [], allCategories = [], deleteProdId = null, deleteCatId = null;
+        let allProducts = [], allCategories = [], allMainCategories = [];
+        let deleteProdId = null, deleteCatId = null, deleteMainCatId = null;
 
         /* PAGINATION STATE */
         let _pagedProducts = [];   // the filtered list currently being paginated
@@ -2495,63 +2633,198 @@
         /* MODAL HELPERS */
         function openModal(id) { document.getElementById(id).classList.add('open'); }
         function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-        ['productModal', 'categoryModal', 'deleteModal', 'deleteCategoryModal'].forEach(id => {
-            document.getElementById(id).addEventListener('click', e => {
-                if (e.target === document.getElementById(id)) closeModal(id);
-            });
+        ['productModal', 'mainCategoryModal', 'categoryModal', 'deleteModal', 'deleteMainCategoryModal', 'deleteCategoryModal'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('click', e => {
+                    if (e.target === el) closeModal(id);
+                });
+            }
         });
 
-        /* LOAD CATEGORIES */
+        /* LOAD CATEGORIES & MAIN CATEGORIES */
         async function loadCategories() {
             try {
-                const res = await fetch('/api/inventory/categories');
-                const data = await res.json();
-                if (!data.success) return;
-                allCategories = data.categories || [];
-                document.getElementById('statCats').textContent = allCategories.length;
-                document.getElementById('catBadge').textContent = allCategories.length;
+                const [mcRes, catRes] = await Promise.all([
+                    fetch('/api/inventory/main_categories'),
+                    fetch('/api/inventory/categories')
+                ]);
+                const mcData = await mcRes.json();
+                const catData = await catRes.json();
 
-                const cf = document.getElementById('catFilter');
-                const currentVal = cf.value;
-                cf.innerHTML = '<option value="">All Categories</option>' +
-                    allCategories.map(c => `<option value="${c.category_id}">${c.name}</option>`).join('');
-                cf.value = currentVal;
-
-                const pc = document.getElementById('prodCategory');
-                pc.innerHTML = '<option value="">— No Category —</option>' +
-                    allCategories.map(c => `<option value="${c.category_id}">${c.name}</option>`).join('');
-
-                // Render category grid
-                const grid = document.getElementById('catGrid');
-                if (!allCategories.length) {
-                    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏷️</div><h3>No categories yet</h3><p>Click "Add Category" to get started.</p></div>';
-                    return;
+                if (mcData.success) {
+                    allMainCategories = mcData.main_categories || [];
                 }
-                grid.innerHTML = allCategories.map(c => `
-                <div class="cat-card">
-                    <div class="cat-card-left">
-                        <h3>${c.name}</h3>
-                        <p>${c.product_count ?? 0} product${(c.product_count ?? 0) !== 1 ? 's' : ''}</p>
-                    </div>
-                    <div class="cat-card-actions">
-                        <button class="btn btn-outline btn-sm" onclick="openEditCategory(${c.category_id})" title="Edit category">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        </button>
-                        <button class="btn btn-delete btn-sm" onclick="openDeleteCategoryConfirm(${c.category_id},'${c.name.replace(/'/g, "\\'")}',${c.product_count ?? 0})" title="Delete category">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                        </button>
-                    </div>
-                </div>`).join('');
+                if (catData.success) {
+                    allCategories = catData.categories || [];
+                }
+
+                // Update stat badges
+                const totalGroups = allMainCategories.length + allCategories.length;
+                const statCatsEl = document.getElementById('statCats');
+                const catBadgeEl = document.getElementById('catBadge');
+                if (statCatsEl) statCatsEl.textContent = totalGroups;
+                if (catBadgeEl) catBadgeEl.textContent = totalGroups;
+
+                // 1. Populate main category filter (#mainCatFilter in toolbar)
+                const mcf = document.getElementById('mainCatFilter');
+                if (mcf) {
+                    const curMcVal = mcf.value;
+                    mcf.innerHTML = '<option value="">All Departments</option>' +
+                        allMainCategories.map(m => `<option value="${m.main_category_id}">${m.name}</option>`).join('');
+                    mcf.value = curMcVal;
+                }
+
+                // 2. Populate subcategory department filter (#subcatDeptFilter in tab-categories)
+                const scdf = document.getElementById('subcatDeptFilter');
+                if (scdf) {
+                    const curScdfVal = scdf.value;
+                    scdf.innerHTML = '<option value="">All Departments</option>' +
+                        allMainCategories.map(m => `<option value="${m.main_category_id}">${m.name}</option>`).join('');
+                    scdf.value = curScdfVal;
+                }
+
+                // 3. Populate product modal main category dropdown (#prodMainCategory)
+                const pmc = document.getElementById('prodMainCategory');
+                if (pmc) {
+                    const curPmc = pmc.value;
+                    pmc.innerHTML = '<option value="">— Select Department —</option>' +
+                        allMainCategories.map(m => `<option value="${m.main_category_id}">${m.name}</option>`).join('');
+                    pmc.value = curPmc;
+                }
+
+                // 4. Populate subcategory modal parent department dropdown (#subCatParent)
+                const scp = document.getElementById('subCatParent');
+                if (scp) {
+                    const curScp = scp.value;
+                    scp.innerHTML = '<option value="">— Select Department —</option>' +
+                        allMainCategories.map(m => `<option value="${m.main_category_id}">${m.name}</option>`).join('');
+                    scp.value = curScp;
+                }
+
+                // 5. Populate product subcategory dropdowns based on current selections
+                _updateCategoryFilterOptions();
+                _updateProductCategoryOptions();
+
+                // 6. Render Main Categories (Departments) Grid
+                _renderMainCategoryGrid();
+
+                // 7. Render Subcategories Grid
+                _renderSubCategoryGrid();
             } catch (e) { console.error(e); }
+        }
+
+        function _renderMainCategoryGrid() {
+            const grid = document.getElementById('mainCatGrid');
+            if (!grid) return;
+            if (!allMainCategories.length) {
+                grid.innerHTML = '<div class="empty-state"><h3>No departments yet</h3><p>Click "Add Main Category" to add a department like Books, Clothes, Blooms, or Café.</p></div>';
+                return;
+            }
+            grid.innerHTML = allMainCategories.map(m => `
+            <div class="cat-card">
+                <div class="cat-card-left">
+                    <h3>${m.name}</h3>
+                    <p>${m.product_count ?? 0} product${(m.product_count ?? 0) !== 1 ? 's' : ''} · ${m.subcategory_count ?? 0} subcategor${(m.subcategory_count ?? 0) !== 1 ? 'ies' : 'y'}</p>
+                </div>
+                <div class="cat-card-actions">
+                    <button class="btn btn-outline btn-sm" onclick="openEditMainCategory(${m.main_category_id})" title="Edit department">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="btn btn-delete btn-sm" onclick="openDeleteMainCategoryConfirm(${m.main_category_id},'${m.name.replace(/'/g, "\\'")}',${m.product_count ?? 0},${m.subcategory_count ?? 0})" title="Delete department">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                </div>
+            </div>`).join('');
+        }
+
+        function _renderSubCategoryGrid() {
+            const grid = document.getElementById('catGrid');
+            if (!grid) return;
+            const scdf = document.getElementById('subcatDeptFilter');
+            const deptFilterVal = scdf ? scdf.value : '';
+
+            let filtered = allCategories;
+            if (deptFilterVal) {
+                filtered = filtered.filter(c => String(c.main_category_id) === String(deptFilterVal));
+            }
+
+            if (!filtered.length) {
+                grid.innerHTML = '<div class="empty-state"><h3>No subcategories found</h3><p>Click "Add Subcategory" to get started.</p></div>';
+                return;
+            }
+
+            grid.innerHTML = filtered.map(c => `
+            <div class="cat-card">
+                <div class="cat-card-left">
+                    <h3>${c.name}</h3>
+                    <p style="margin-top:0.25rem;">
+                        <span class="dept-parent-badge">${c.main_category_name || 'Unassigned'}</span>
+                        <span style="color:#888;font-size:0.8rem;margin-left:0.4rem;">${c.product_count ?? 0} product${(c.product_count ?? 0) !== 1 ? 's' : ''}</span>
+                    </p>
+                </div>
+                <div class="cat-card-actions">
+                    <button class="btn btn-outline btn-sm" onclick="openEditCategory(${c.category_id})" title="Edit subcategory">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="btn btn-delete btn-sm" onclick="openDeleteCategoryConfirm(${c.category_id},'${c.name.replace(/'/g, "\\'")}',${c.product_count ?? 0})" title="Delete subcategory">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                </div>
+            </div>`).join('');
+        }
+
+        // Subcategory filter cascade in toolbar
+        function _updateCategoryFilterOptions() {
+            const cf = document.getElementById('catFilter');
+            if (!cf) return;
+            const mcf = document.getElementById('mainCatFilter');
+            const selectedMain = mcf ? mcf.value : '';
+            const curVal = cf.value;
+
+            let matching = allCategories;
+            if (selectedMain) {
+                matching = matching.filter(c => String(c.main_category_id) === String(selectedMain));
+            }
+            cf.innerHTML = '<option value="">All Subcategories</option>' +
+                matching.map(c => `<option value="${c.category_id}">${c.name}</option>`).join('');
+            if (matching.some(c => String(c.category_id) === String(curVal))) {
+                cf.value = curVal;
+            } else {
+                cf.value = '';
+            }
+        }
+
+        // Subcategory options cascade in product modal
+        function _updateProductCategoryOptions(selectedSubCatId = null) {
+            const pc = document.getElementById('prodCategory');
+            if (!pc) return;
+            const pmc = document.getElementById('prodMainCategory');
+            const selectedMain = pmc ? pmc.value : '';
+            const curVal = selectedSubCatId !== null ? selectedSubCatId : pc.value;
+
+            let matching = allCategories;
+            if (selectedMain) {
+                matching = matching.filter(c => String(c.main_category_id) === String(selectedMain));
+            }
+            pc.innerHTML = '<option value="">— No Subcategory —</option>' +
+                matching.map(c => `<option value="${c.category_id}">${c.name}</option>`).join('');
+            if (curVal && matching.some(c => String(c.category_id) === String(curVal))) {
+                pc.value = curVal;
+            } else {
+                pc.value = '';
+            }
         }
 
         /* LOAD PRODUCTS — fetch from REST, apply current filters/sort */
         async function loadProducts() {
             const q = document.getElementById('searchInput').value.trim();
-            const cat = document.getElementById('catFilter').value;
+            const mainCat = document.getElementById('mainCatFilter')?.value || '';
+            const cat = document.getElementById('catFilter')?.value || '';
             const sort = document.getElementById('sortSelect').value;
             const params = new URLSearchParams({ limit: 200, offset: 0 });
-            if (q) params.set('search', q);        // backend param is 'search', not 'q'
+            if (q) params.set('search', q);
+            if (mainCat) params.set('main_category_id', mainCat);
             if (cat) params.set('category_id', cat);
             params.set('sort', sort);
 
@@ -2569,13 +2842,15 @@
         function _applyProductStats(products) {
             // Re-apply client-side filters so search/sort still work on SSE updates
             const q = document.getElementById('searchInput').value.trim().toLowerCase();
-            const cat = document.getElementById('catFilter').value;
+            const mainCat = document.getElementById('mainCatFilter')?.value || '';
+            const cat = document.getElementById('catFilter')?.value || '';
             let filtered = products;
             if (q) filtered = filtered.filter(p =>
                 (p.name || '').toLowerCase().includes(q) ||
                 (p.sku || '').toLowerCase().includes(q) ||
                 (p.description || '').toLowerCase().includes(q)
             );
+            if (mainCat) filtered = filtered.filter(p => String(p.main_category_id) === String(mainCat));
             if (cat) filtered = filtered.filter(p => String(p.category_id) === String(cat));
 
             renderProducts(filtered);
@@ -2597,16 +2872,18 @@
             const thumb = p.image_url
                 ? `<img class="prod-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
                 : '';
-            const fallback = `<div class="prod-thumb-placeholder" ${p.image_url ? 'style="display:none"' : ''}>${p.icon || '☕'}</div>`;
+            const fallback = `<div class="prod-thumb-placeholder" ${p.image_url ? 'style="display:none"' : ''}><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`;
+            const deptChip = `<span class="dept-chip">${p.main_category_name || 'General'}</span>`;
             const catChip = p.category_name
                 ? `<span class="cat-chip">${p.category_name}</span>`
                 : `<span class="cat-chip none">Uncategorized</span>`;
             return `<tr>
             <td>${thumb}${fallback}</td>
             <td>
-                <div class="prod-name">${p.name}${p.cup_eligible ? '<span style="margin-left:0.4rem;font-size:0.68rem;background:#fff3cd;color:#856404;padding:0.1rem 0.45rem;border-radius:10px;font-weight:700;vertical-align:middle;">☕ Cup</span>' : ''}</div>
+                <div class="prod-name">${p.name}${p.cup_eligible ? '<span style="margin-left:0.4rem;font-size:0.68rem;background:#fff3cd;color:#856404;padding:0.1rem 0.45rem;border-radius:10px;font-weight:700;vertical-align:middle;">Cup Drink</span>' : ''}</div>
                 ${p.description ? `<div class="prod-desc">${p.description}</div>` : ''}
             </td>
+            <td>${deptChip}</td>
             <td>${catChip}</td>
             <td><span class="price-badge">₱${parseFloat(p.price || 0).toFixed(2)}</span></td>
             <td style="color:#888;">₱${parseFloat(p.cost || 0).toFixed(2)}</td>
@@ -2627,22 +2904,24 @@
 
         function _buildMobileCard(p) {
             const thumbHtml = p.image_url
-                ? `<img class="prod-mobile-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div class="prod-mobile-placeholder" style="display:none;">${p.icon || '☕'}</div>`
-                : `<div class="prod-mobile-placeholder">${p.icon || '☕'}</div>`;
+                ? `<img class="prod-mobile-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div class="prod-mobile-placeholder" style="display:none;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`
+                : `<div class="prod-mobile-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`;
+            const deptLabel = p.main_category_name || 'General';
             const catLabel = p.category_name || 'Uncategorized';
             return `<div class="prod-card-mobile">
                 ${thumbHtml}
                 <div class="prod-mobile-info">
-                    <div class="prod-mobile-name">${p.name}${p.cup_eligible ? ' <span style="font-size:0.68rem;background:#fff3cd;color:#856404;padding:0.1rem 0.45rem;border-radius:10px;font-weight:700;">☕ Cup</span>' : ''}</div>
+                    <div class="prod-mobile-name">${p.name}${p.cup_eligible ? ' <span style="font-size:0.68rem;background:#fff3cd;color:#856404;padding:0.1rem 0.45rem;border-radius:10px;font-weight:700;">Cup Drink</span>' : ''}</div>
                     <div class="prod-mobile-meta">
-                        <span>🏷️ ${catLabel}</span>
+                        <span class="dept-chip" style="font-size:0.75rem;">${deptLabel}</span>
+                        <span>${catLabel}</span>
                         ${p.sku ? `<span>SKU: ${p.sku}</span>` : ''}
                         ${p.description ? `<span style="width:100%;color:#999;">${p.description.substring(0, 50)}${p.description.length > 50 ? '…' : ''}</span>` : ''}
                     </div>
                 </div>
                 <div class="prod-mobile-price">₱${parseFloat(p.price || 0).toFixed(2)}</div>
                 <div class="prod-mobile-actions">
-                    <button class="btn btn-outline btn-sm" onclick="openEditProduct(${p.product_id})">✏️ Edit</button>
+                    <button class="btn btn-outline btn-sm" onclick="openEditProduct(${p.product_id})"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</button>
                     <button class="btn btn-delete btn-sm" onclick="openDeleteConfirm(${p.product_id},'${p.name.replace(/'/g, "\\'")}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete</button>
                 </div>
             </div>`;
@@ -2659,8 +2938,8 @@
             const total = _pagedProducts.length;
 
             if (!total) {
-                const emptyHtml = '<div class="empty-state"><div class="empty-state-icon">🛍️</div><h3>No products found</h3><p>Try adjusting filters or add a new product.</p></div>';
-                tbody.innerHTML = `<tr><td colspan="7">${emptyHtml}</td></tr>`;
+                const emptyHtml = '<div class="empty-state"><h3>No products found</h3><p>Try adjusting filters or add a new product.</p></div>';
+                tbody.innerHTML = `<tr><td colspan="8">${emptyHtml}</td></tr>`;
                 if (mobileCards) mobileCards.innerHTML = emptyHtml;
                 pagBar.style.display = 'none';
                 return;
@@ -2773,7 +3052,8 @@
             document.getElementById('modalTitle').innerHTML = 'Add <span>Product</span>';
             document.getElementById('editProductId').value = '';
             ['prodName', 'prodDesc', 'prodSku', 'prodPrice', 'prodCost'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('prodCategory').value = '';
+            document.getElementById('prodMainCategory').value = '';
+            _updateProductCategoryOptions('');
             document.getElementById('prodCupEligible').checked = false;
             clearImageBtn.click();
             clearValidation();
@@ -2782,6 +3062,11 @@
         ['closeProductModal', 'cancelProductModal'].forEach(id =>
             document.getElementById(id).addEventListener('click', () => closeModal('productModal'))
         );
+
+        // When main category changes inside Product Modal, update subcategories
+        document.getElementById('prodMainCategory').addEventListener('change', function() {
+            _updateProductCategoryOptions();
+        });
 
         /* EDIT PRODUCT */
         function openEditProduct(id) {
@@ -2794,7 +3079,8 @@
             document.getElementById('prodSku').value = p.sku || '';
             document.getElementById('prodPrice').value = p.price || 0;
             document.getElementById('prodCost').value = p.cost || 0;
-            document.getElementById('prodCategory').value = p.category_id || '';
+            document.getElementById('prodMainCategory').value = p.main_category_id || '';
+            _updateProductCategoryOptions(p.category_id || '');
             document.getElementById('prodCupEligible').checked = !!p.cup_eligible;
             // Image
             if (p.image_url) {
@@ -2824,7 +3110,7 @@
             if (!valid) return;
 
             const btn = document.getElementById('saveProductBtn');
-            btn.disabled = true; btn.innerHTML = '⏳ Saving…';
+            btn.disabled = true; btn.innerHTML = 'Saving…';
             const prodId = document.getElementById('editProductId').value;
 
             try {
@@ -2850,6 +3136,7 @@
                     reorder_point: 5,     // default
                     unit: 'pcs',          // size is chosen at POS per transaction
                     cup_eligible: document.getElementById('prodCupEligible').checked ? 1 : 0,
+                    main_category_id: document.getElementById('prodMainCategory').value || null,
                     category_id: document.getElementById('prodCategory').value || null,
                     image_url: imageUrl || null,
                 };
@@ -2859,12 +3146,12 @@
                 const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await res.json();
                 if (!data.success) throw new Error(data.message);
-                showToast('✅ ' + data.message, 'success');
+                showToast(data.message, 'success');
                 closeModal('productModal');
                 await loadProducts();
                 await loadCategories();
             } catch (e) {
-                showToast('❌ ' + e.message, 'error');
+                showToast(e.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Product';
@@ -2887,24 +3174,126 @@
         document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
             if (!deleteProdId) return;
             const btn = document.getElementById('confirmDeleteBtn');
-            btn.disabled = true; btn.textContent = '⏳ Deleting…';
+            btn.disabled = true; btn.textContent = 'Deleting…';
             try {
                 const res = await fetch(`/api/inventory/items/${deleteProdId}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (!data.success) throw new Error(data.message);
-                showToast('🗑️ ' + data.message, 'success');
+                showToast(data.message, 'success');
                 closeModal('deleteModal');
                 await loadProducts();
                 await loadCategories();
             } catch (e) {
-                showToast('❌ ' + e.message, 'error');
+                showToast(e.message, 'error');
             } finally {
                 btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete Product';
                 deleteProdId = null;
             }
         });
 
-        /* CATEGORY MODAL */
+        /* MAIN CATEGORY (DEPARTMENT) CRUD */
+        document.getElementById('addMainCatBtn').addEventListener('click', openAddMainCategory);
+
+        function openAddMainCategory() {
+            document.getElementById('mainCatModalTitle').innerHTML = 'Add <span>Main Category</span>';
+            document.getElementById('editMainCatId').value = '';
+            document.getElementById('mainCatName').value = '';
+            document.getElementById('mainCatName').classList.remove('error');
+            openModal('mainCategoryModal');
+        }
+
+        function openEditMainCategory(id) {
+            const m = allMainCategories.find(x => x.main_category_id === id);
+            if (!m) return;
+            document.getElementById('mainCatModalTitle').innerHTML = 'Edit <span>Main Category</span>';
+            document.getElementById('editMainCatId').value = m.main_category_id;
+            document.getElementById('mainCatName').value = m.name;
+            document.getElementById('mainCatName').classList.remove('error');
+            openModal('mainCategoryModal');
+        }
+
+        ['closeMainCatModal', 'cancelMainCatModal'].forEach(id =>
+            document.getElementById(id).addEventListener('click', () => closeModal('mainCategoryModal'))
+        );
+
+        document.getElementById('saveMainCatBtn').addEventListener('click', async () => {
+            const name = document.getElementById('mainCatName').value.trim();
+            if (!name) { document.getElementById('mainCatName').classList.add('error'); return; }
+            const btn = document.getElementById('saveMainCatBtn');
+            btn.disabled = true; btn.textContent = 'Saving…';
+            try {
+                const mainCatId = document.getElementById('editMainCatId').value;
+                const payload = { name };
+                let res, data;
+                if (mainCatId) {
+                    res = await fetch(`/api/inventory/main_categories/${mainCatId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    res = await fetch('/api/inventory/main_categories', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+                data = await res.json();
+                if (!data.success) throw new Error(data.message);
+                showToast(data.message, 'success');
+                closeModal('mainCategoryModal');
+                await loadCategories();
+                await loadProducts();
+            } catch (e) {
+                showToast(e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Main Category';
+            }
+        });
+
+        function openDeleteMainCategoryConfirm(id, name, productCount, subcatCount) {
+            deleteMainCatId = id;
+            document.getElementById('deleteMainCategoryName').textContent = `"${name}"`;
+            const warning = document.getElementById('deleteMainCatWarning');
+            const safe = document.getElementById('deleteMainCatSafe');
+            if (productCount > 0 || subcatCount > 0) {
+                warning.textContent = `This department contains ${productCount} product${productCount !== 1 ? 's' : ''} and ${subcatCount} subcategor${subcatCount !== 1 ? 'ies' : 'y'}. They will be unlinked.`;
+                warning.style.display = 'block';
+                safe.style.display = 'none';
+            } else {
+                warning.style.display = 'none';
+                safe.style.display = 'inline';
+            }
+            openModal('deleteMainCategoryModal');
+        }
+
+        ['closeDeleteMainCatModal', 'cancelDeleteMainCatModal'].forEach(id =>
+            document.getElementById(id).addEventListener('click', () => { closeModal('deleteMainCategoryModal'); deleteMainCatId = null; })
+        );
+
+        document.getElementById('confirmDeleteMainCatBtn').addEventListener('click', async () => {
+            if (!deleteMainCatId) return;
+            const btn = document.getElementById('confirmDeleteMainCatBtn');
+            btn.disabled = true; btn.textContent = 'Deleting…';
+            try {
+                const res = await fetch(`/api/inventory/main_categories/${deleteMainCatId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+                showToast(data.message, 'success');
+                closeModal('deleteMainCategoryModal');
+                await loadCategories();
+                await loadProducts();
+            } catch (e) {
+                showToast(e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete Main Category';
+                deleteMainCatId = null;
+            }
+        });
+
+        /* SUBCATEGORY MODAL & CRUD */
         document.getElementById('manageCatsBtn').addEventListener('click', () => {
             document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -2915,32 +3304,40 @@
         document.getElementById('addCatBtn').addEventListener('click', openAddCategory);
 
         function openAddCategory() {
-            document.getElementById('catModalTitle').innerHTML = 'Add <span>Category</span>';
+            document.getElementById('catModalTitle').innerHTML = 'Add <span>Subcategory</span>';
             document.getElementById('editCatId').value = '';
             document.getElementById('catName').value = '';
-            document.querySelector('#catName').classList.remove('error');
+            document.getElementById('catName').classList.remove('error');
+            // Default parent to active subcat filter if selected
+            const activeDept = document.getElementById('subcatDeptFilter')?.value || '';
+            document.getElementById('subCatParent').value = activeDept;
             openModal('categoryModal');
         }
+
         function openEditCategory(id) {
             const c = allCategories.find(x => x.category_id === id);
             if (!c) return;
-            document.getElementById('catModalTitle').innerHTML = 'Edit <span>Category</span>';
+            document.getElementById('catModalTitle').innerHTML = 'Edit <span>Subcategory</span>';
             document.getElementById('editCatId').value = c.category_id;
             document.getElementById('catName').value = c.name;
-            document.querySelector('#catName').classList.remove('error');
+            document.getElementById('subCatParent').value = c.main_category_id || '';
+            document.getElementById('catName').classList.remove('error');
             openModal('categoryModal');
         }
+
         ['closeCatModal', 'cancelCatModal'].forEach(id =>
             document.getElementById(id).addEventListener('click', () => closeModal('categoryModal'))
         );
+
         document.getElementById('saveCatBtn').addEventListener('click', async () => {
             const name = document.getElementById('catName').value.trim();
+            const main_category_id = document.getElementById('subCatParent').value || null;
             if (!name) { document.getElementById('catName').classList.add('error'); return; }
             const btn = document.getElementById('saveCatBtn');
-            btn.disabled = true; btn.textContent = '⏳ Saving…';
+            btn.disabled = true; btn.textContent = 'Saving…';
             try {
                 const catId = document.getElementById('editCatId').value;
-                const payload = { name };
+                const payload = { name, main_category_id };
                 let res, data;
                 if (catId) {
                     res = await fetch(`/api/inventory/categories/${catId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -2950,47 +3347,50 @@
                     data = await res.json();
                 }
                 if (!data.success) throw new Error(data.message);
-                showToast('✅ ' + data.message, 'success');
+                showToast(data.message, 'success');
                 closeModal('categoryModal');
                 await loadCategories();
+                await loadProducts();
             } catch (e) {
-                showToast('❌ ' + e.message, 'error');
+                showToast(e.message, 'error');
             } finally {
-                btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Category';
+                btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Subcategory';
             }
         });
 
-        /* DELETE CATEGORY */
+        /* DELETE SUBCATEGORY */
         function openDeleteCategoryConfirm(id, name, productCount) {
             deleteCatId = id;
             document.getElementById('deleteCategoryName').textContent = `"${name}"`;
             const warning = document.getElementById('deleteCatWarning');
             const safe = document.getElementById('deleteCatSafe');
             if (productCount > 0) {
-                warning.textContent = `⚠️ This category has ${productCount} product${productCount !== 1 ? 's' : ''}. Their category will be unassigned.`;
+                warning.textContent = `This subcategory has ${productCount} product${productCount !== 1 ? 's' : ''}. Their subcategory will be unassigned.`;
                 warning.style.display = 'block'; safe.style.display = 'none';
             } else {
                 warning.style.display = 'none'; safe.style.display = 'inline';
             }
             openModal('deleteCategoryModal');
         }
+
         ['closeDeleteCatModal', 'cancelDeleteCatModal'].forEach(id =>
             document.getElementById(id).addEventListener('click', () => { closeModal('deleteCategoryModal'); deleteCatId = null; })
         );
+
         document.getElementById('confirmDeleteCatBtn').addEventListener('click', async () => {
             if (!deleteCatId) return;
             const btn = document.getElementById('confirmDeleteCatBtn');
-            btn.disabled = true; btn.textContent = '⏳ Deleting…';
+            btn.disabled = true; btn.textContent = 'Deleting…';
             try {
                 const res = await fetch(`/api/inventory/categories/${deleteCatId}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (!data.success) throw new Error(data.message);
-                showToast('🗑️ ' + data.message, 'success');
+                showToast(data.message, 'success');
                 closeModal('deleteCategoryModal');
                 await loadCategories();
                 await loadProducts();
             } catch (e) {
-                showToast('❌ ' + e.message, 'error');
+                showToast(e.message, 'error');
             } finally {
                 btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete Category';
                 deleteCatId = null;
@@ -3004,9 +3404,23 @@
             _currentPage = 1;
             searchTimer = setTimeout(loadProducts, 350);
         });
+
+        // When main category filter changes in toolbar, cascade to catFilter and reload products
+        document.getElementById('mainCatFilter').addEventListener('change', () => {
+            _updateCategoryFilterOptions();
+            _currentPage = 1;
+            loadProducts();
+        });
+
         ['catFilter', 'sortSelect'].forEach(id =>
             document.getElementById(id).addEventListener('change', () => { _currentPage = 1; loadProducts(); })
         );
+
+        // Department filter for subcategories grid
+        document.getElementById('subcatDeptFilter').addEventListener('change', () => {
+            _renderSubCategoryGrid();
+        });
+
         document.getElementById('refreshBtn').addEventListener('click', () => { _currentPage = 1; loadProducts(); loadCategories(); });
 
         /* ── SSE: real-time product catalogue updates ─────────────────────────── */
@@ -3050,11 +3464,11 @@
         }
 
         function getHealthBadge(margin) {
-            if (margin === null) return { cls: 'nodata', label: '— No Cost Data' };
-            if (margin >= 60)  return { cls: 'excellent', label: '✦ Excellent' };
-            if (margin >= 40)  return { cls: 'good',      label: '✓ Good' };
-            if (margin >= 20)  return { cls: 'fair',      label: '⚡ Fair' };
-            return                     { cls: 'poor',     label: '▼ Low Margin' };
+            if (margin === null) return { cls: 'nodata', label: 'No Cost Data' };
+            if (margin >= 60)  return { cls: 'excellent', label: 'Excellent' };
+            if (margin >= 40)  return { cls: 'good',      label: 'Good' };
+            if (margin >= 20)  return { cls: 'fair',      label: 'Fair' };
+            return                     { cls: 'poor',     label: 'Low Margin' };
         }
 
         function calcFinancials(p) {
@@ -3186,8 +3600,8 @@
             // Desktop table
             const tbody = document.getElementById('finTableBody');
             if (!products.length) {
-                tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">💰</div><h3>No products match</h3><p>Try adjusting filters.</p></div></td></tr>`;
-                document.getElementById('finCardsMobile').innerHTML = `<div class="empty-state"><div class="empty-state-icon">💰</div><h3>No products match</h3></div>`;
+                tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No products match</h3><p>Try adjusting filters.</p></div></td></tr>`;
+                document.getElementById('finCardsMobile').innerHTML = `<div class="empty-state"><h3>No products match</h3></div>`;
                 document.getElementById('finPaginationBar').style.display = 'none';
                 return;
             }
