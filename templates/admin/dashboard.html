@@ -255,6 +255,14 @@
                 overflow: hidden;
             }
 
+            .card.border-danger {
+                border-color: var(--danger);
+            }
+
+            .card.border-warning {
+                border-color: var(--warning);
+            }
+
             .card::before {
                 content: '';
                 position: absolute;
@@ -1014,7 +1022,7 @@
                     </div>
                 </div>
 
-                <div class="card" id="dashLowStockCard" style="cursor:pointer; {% if out_stock_count|default(0) > 0 %}border-color: var(--danger);{% elif low_stock_count|default(0) > 0 %}border-color: var(--warning);{% endif %}" onclick="window.location='/inventory?stock=alert'" title="Click to manage stock alerts">
+                <div class="card {% if out_stock_count|default(0) > 0 %}border-danger{% elif low_stock_count|default(0) > 0 %}border-warning{% endif %}" id="dashLowStockCard" style="cursor: pointer;" onclick="window.location='/inventory?stock=alert'" title="Click to manage stock alerts">
                     <div class="card-icon {% if out_stock_count|default(0) > 0 %}danger{% elif low_stock_count|default(0) > 0 %}warning{% else %}success{% endif %}" id="dashLowStockIcon" title="Stock Alerts">
                         {% if out_stock_count|default(0) > 0 %}
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
@@ -1337,6 +1345,12 @@
                     }
                 }
                 if (cardEl) {
+                    cardEl.classList.remove('border-danger', 'border-warning');
+                    if (outCount > 0) {
+                        cardEl.classList.add('border-danger');
+                    } else if (lowCount > 0) {
+                        cardEl.classList.add('border-warning');
+                    }
                     cardEl.style.borderColor = outCount > 0 ? 'var(--danger)' : (lowCount > 0 ? 'var(--warning)' : '');
                 }
 
