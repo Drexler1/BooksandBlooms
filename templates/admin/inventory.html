@@ -3688,6 +3688,223 @@
             background: #fff;
             color: var(--dark-gold);
         }
+
+        /* ── STORE PRODUCTS MOBILE CARDS ── */
+        .store-products-mobile {
+            display: none;
+        }
+
+        .store-prod-card-mobile {
+            padding: 1rem 1.15rem;
+            border-bottom: 1px solid #f0f0f0;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            transition: background 0.15s ease;
+        }
+
+        .store-prod-card-mobile:last-child {
+            border-bottom: none;
+        }
+
+        .store-prod-card-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.65rem;
+        }
+
+        .store-prod-card-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .store-prod-card-title-wrap {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .store-prod-card-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            align-items: center;
+        }
+
+        .store-prod-card-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            background: #faf9f6;
+            padding: 0.65rem 0.85rem;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .store-prod-metric-col {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .store-prod-metric-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #888;
+        }
+
+        .store-prod-metric-val {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #222;
+            margin-top: 0.1rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .store-prod-card-mobile .btn-adjust-stock {
+            width: 100%;
+            padding: 0.6rem 1rem !important;
+            font-size: 0.88rem !important;
+        }
+
+        /* ── RESPONSIVE OVERRIDES FOR INVENTORY (≤ 768px) ── */
+        @media (max-width: 768px) {
+            .inv-tabs {
+                width: 100% !important;
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                padding: 0.4rem !important;
+                gap: 0.45rem !important;
+                border-radius: 10px !important;
+                margin: 1rem 0 !important;
+                scrollbar-width: none !important;
+            }
+            .inv-tabs::-webkit-scrollbar {
+                display: none !important;
+            }
+            .inv-tab {
+                white-space: nowrap !important;
+                flex-shrink: 0 !important;
+                padding: 0.55rem 0.95rem !important;
+                font-size: 0.83rem !important;
+            }
+
+            .store-products-header {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                padding: 1rem 1.15rem !important;
+                gap: 0.85rem !important;
+            }
+            .store-products-header .btn {
+                width: 100% !important;
+                justify-content: center !important;
+                min-height: 42px !important;
+            }
+
+            .store-products-toolbar {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                padding: 0.85rem 1rem !important;
+                gap: 0.6rem !important;
+            }
+            .store-products-toolbar .ing-search {
+                width: 100% !important;
+                min-width: unset !important;
+            }
+            .store-products-toolbar .filter-select {
+                width: 100% !important;
+                min-height: 42px !important;
+            }
+            #prodStockRefreshBtn {
+                width: 100% !important;
+                min-height: 42px !important;
+                justify-content: center !important;
+            }
+            #prodStockCount {
+                text-align: center !important;
+                width: 100% !important;
+            }
+
+            /* Switch Desktop Table to Mobile Cards */
+            .store-table-scroll-wrap {
+                display: none !important;
+            }
+            .store-products-mobile {
+                display: flex !important;
+                flex-direction: column !important;
+            }
+
+            /* Mobile Pagination */
+            .store-pagination-bar {
+                flex-direction: column !important;
+                align-items: center !important;
+                text-align: center !important;
+                gap: 0.85rem !important;
+                padding: 1rem !important;
+            }
+            .store-pagination-left {
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 0.5rem !important;
+                width: 100% !important;
+            }
+            .store-pagination-controls {
+                width: 100% !important;
+                justify-content: center !important;
+                flex-wrap: wrap !important;
+                gap: 0.4rem !important;
+            }
+            .store-page-btn {
+                min-width: 36px !important;
+                height: 36px !important;
+                font-size: 0.86rem !important;
+            }
+
+            /* Modal Footers on Mobile */
+            .modal-footer {
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+            .modal-footer .btn {
+                width: 100% !important;
+                justify-content: center !important;
+                min-height: 42px !important;
+            }
+
+            /* Quick Adjust Pills in Modal */
+            .quick-adj-btn-group {
+                flex-wrap: wrap !important;
+            }
+            .quick-adj-pill {
+                flex: 1 1 calc(25% - 0.4rem) !important;
+                min-width: 55px !important;
+                text-align: center !important;
+                min-height: 38px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .store-prod-card-metrics {
+                grid-template-columns: 1fr 1fr !important;
+            }
+            .store-prod-metric-col:last-child {
+                grid-column: 1 / -1 !important;
+                border-top: 1px dashed #e0e0e0 !important;
+                padding-top: 0.4rem !important;
+                margin-top: 0.2rem !important;
+            }
+        }
+
 </style>
 </head>
 
@@ -3903,6 +4120,11 @@
                                     <tr><td colspan="10" style="text-align:center;padding:2.5rem;color:#999;">Loading store products…</td></tr>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Store Products Mobile Card List (displayed on ≤ 768px) -->
+                        <div class="store-products-mobile" id="productsStockMobile">
+                            <div style="text-align:center;padding:2rem 1rem;color:#999;">Loading store products…</div>
                         </div>
 
                         <!-- Store Products Pagination Bar -->
@@ -6272,6 +6494,7 @@
             if (countEl) countEl.textContent = `${total} product${total !== 1 ? 's' : ''}`;
 
             const tbody = document.getElementById('prodStockBody');
+            const mobileCards = document.getElementById('productsStockMobile');
             const pagBar = document.getElementById('prodStockPaginationBar');
             const pagInfo = document.getElementById('prodStockPaginationInfo');
             const pagControls = document.getElementById('prodStockPaginationControls');
@@ -6279,10 +6502,12 @@
             if (!tbody) return;
 
             if (!total) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:3rem 1rem;color:#888;">
+                const emptyHtml = `<div style="text-align:center;padding:3rem 1rem;color:#888;">
                     <div style="font-size:1.05rem;font-weight:700;color:#555;">No matching store products found</div>
                     <p style="font-size:0.85rem;color:#999;margin-top:0.3rem;">Try adjusting search terms or department filter.</p>
-                </td></tr>`;
+                </div>`;
+                tbody.innerHTML = `<tr><td colspan="10">${emptyHtml}</td></tr>`;
+                if (mobileCards) mobileCards.innerHTML = emptyHtml;
                 if (pagBar) pagBar.style.display = 'none';
                 return;
             }
@@ -6295,6 +6520,7 @@
             const end = Math.min(start + _prodStockPageSize, total);
             const pageItems = _filteredStoreProducts.slice(start, end);
 
+            // 1. Desktop Table Rows
             tbody.innerHTML = pageItems.map(p => {
                 const thumb = p.image_url
                     ? `<img class="prod-thumb-img" src="${p.image_url}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
@@ -6347,6 +6573,74 @@
                     </td>
                 </tr>`;
             }).join('');
+
+            // 2. Mobile Responsive Cards
+            if (mobileCards) {
+                mobileCards.innerHTML = pageItems.map(p => {
+                    const thumb = p.image_url
+                        ? `<img class="prod-thumb-img" src="${p.image_url}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                        : '';
+                    const fallback = `<div class="prod-thumb-fallback" ${p.image_url ? 'style="display:none"' : ''}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`;
+                    const deptLabel = p.main_category_name || 'General';
+                    const catLabel = p.category_name || 'Uncategorized';
+
+                    const st = parseInt(p.stock) || 0;
+                    const rp = parseInt(p.reorder_point) || 5;
+                    const price = parseFloat(p.price || 0);
+                    const stockVal = price * st;
+                    const formattedStockVal = stockVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const formattedPrice = price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                    let statusBadge = '';
+                    const isTracked = (p.track_stock !== false && p.track_stock !== 0);
+                    if (!isTracked) {
+                        statusBadge = `<span class="stock-pill none" title="Stock tracking disabled"><span class="status-dot"></span>Untracked</span>`;
+                    } else if (st <= 0) {
+                        statusBadge = `<span class="stock-pill out" title="Out of stock! Threshold: ${rp}"><span class="status-dot"></span>Out of Stock</span>`;
+                    } else if (st <= rp) {
+                        statusBadge = `<span class="stock-pill low" title="Low stock warning! Threshold: ${rp}"><span class="status-dot"></span>Low Stock (${st})</span>`;
+                    } else {
+                        statusBadge = `<span class="stock-pill ok" title="Healthy inventory. Threshold: ${rp}"><span class="status-dot"></span>In Stock (${st})</span>`;
+                    }
+
+                    return `<div class="store-prod-card-mobile">
+                        <div class="store-prod-card-top">
+                            <div class="store-prod-card-info">
+                                <div class="prod-thumb-cell">
+                                    ${thumb}${fallback}
+                                </div>
+                                <div class="store-prod-card-title-wrap">
+                                    <div class="prod-stock-name">${escHtml(p.name)}${p.cup_eligible ? '<span style="margin-left:0.35rem;font-size:0.65rem;background:#fff3cd;color:#856404;padding:0.1rem 0.4rem;border-radius:10px;font-weight:700;display:inline-block;">Cup Drink</span>' : ''}</div>
+                                    <div class="prod-stock-sku">SKU: ${escHtml(p.sku || '—')}</div>
+                                </div>
+                            </div>
+                            <div>${statusBadge}</div>
+                        </div>
+                        <div class="store-prod-card-chips">
+                            <span class="dept-chip">${escHtml(deptLabel)}</span>
+                            <span class="cat-chip ${!p.category_name ? 'none' : ''}">${escHtml(catLabel)}</span>
+                        </div>
+                        <div class="store-prod-card-metrics">
+                            <div class="store-prod-metric-col">
+                                <span class="store-prod-metric-label">Current Stock</span>
+                                <span class="store-prod-metric-val">${st} <span style="font-size:0.75rem;color:#888;">${p.unit || 'pcs'}</span></span>
+                            </div>
+                            <div class="store-prod-metric-col">
+                                <span class="store-prod-metric-label">Unit Price</span>
+                                <span class="store-prod-metric-val">₱${formattedPrice}</span>
+                            </div>
+                            <div class="store-prod-metric-col">
+                                <span class="store-prod-metric-label">Stock Value</span>
+                                <span class="store-prod-metric-val" style="color:var(--dark-gold);">₱${formattedStockVal}</span>
+                            </div>
+                        </div>
+                        <button class="btn-adjust-stock" onclick="openAdjustProductStock(${p.product_id})" title="Quick restock or deduct units">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Adjust Stock
+                        </button>
+                    </div>`;
+                }).join('');
+            }
 
             // Show and render pagination bar
             if (pagBar) pagBar.style.display = 'flex';

@@ -1513,6 +1513,33 @@
             }
 
             /* Products table — hide on mobile, show card layout */
+            
+            /* Category Management Headers on Mobile */
+            .category-section-header {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 0.75rem !important;
+            }
+
+            .category-section-header .btn {
+                width: 100% !important;
+                justify-content: center !important;
+                min-height: 42px !important;
+            }
+
+            /* Financials Toolbar stack on mobile */
+            .tab-panel#tab-financials .toolbar {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 0.6rem !important;
+                padding: 0.85rem 1rem !important;
+            }
+
+            .tab-panel#tab-financials .toolbar .filter-select {
+                width: 100% !important;
+                min-height: 42px !important;
+            }
+
             .prod-table-desktop { display: none !important; }
             .prod-cards-mobile {
                 display: flex !important;
@@ -2038,9 +2065,27 @@
 
         @media (max-width: 600px) {
             .pagination-bar {
-                justify-content: center;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 0.75rem !important;
+                padding: 0.85rem 1rem !important;
+                text-align: center !important;
             }
-            .pagination-info { width: 100%; text-align: center; }
+            .pagination-info {
+                width: 100% !important;
+                text-align: center !important;
+            }
+            .pagination-controls {
+                width: 100% !important;
+                justify-content: center !important;
+                flex-wrap: wrap !important;
+                gap: 0.35rem !important;
+            }
+            .page-size-wrap {
+                width: 100% !important;
+                justify-content: center !important;
+                margin-top: 0.25rem !important;
+            }
         }
 
         /* ── iOS: prevent auto-zoom on input focus (font-size must be ≥ 16px) ── */
@@ -2104,6 +2149,40 @@
             .tab-badge {
                 display: none;
             }
+            /* Small mobile category cards */
+            .cat-card {
+                padding: 0.85rem 1rem !important;
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 0.65rem !important;
+            }
+
+            .cat-card-actions {
+                justify-content: flex-end !important;
+            }
+
+            /* Financials mobile 2x2 grid */
+            .fin-card-mobile-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 0.65rem !important;
+            }
+
+            /* Modal Footer and Dropzone */
+            #productModal .modal-footer {
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+
+            #productModal .modal-footer .btn {
+                width: 100% !important;
+                justify-content: center !important;
+                min-height: 44px !important;
+            }
+
+            .img-upload-wrap {
+                padding: 1rem 0.75rem !important;
+            }
+
         }
     </style>
 </head>
