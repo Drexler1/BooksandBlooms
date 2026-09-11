@@ -502,11 +502,12 @@
         .modal-header h3 span { color: var(--gold); }
 
         .modal-close {
-            background: none; border: none; color: #888; font-size: 1.4rem;
-            cursor: pointer; padding: 0; line-height: 1; transition: color 0.2s;
+            background: none; border: none; color: #888;
+            cursor: pointer; padding: 4px; line-height: 1; transition: color 0.2s, background 0.2s;
+            display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;
         }
 
-        .modal-close:hover { color: var(--white); }
+        .modal-close:hover { color: var(--gold); background: rgba(0,0,0,0.05); }
 
         .modal-body { padding: 1.5rem; }
 
@@ -1212,7 +1213,7 @@
             <div class="logo">
                 <div class="logo-text">
                     <h1>Books <span>&</span> Blooms</h1>
-                    <div class="logo-subtitle">CAFÉ</div>
+                    <div class="logo-subtitle">CAF&Eacute;</div>
                 </div>
             </div>
             <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation">
@@ -1229,18 +1230,18 @@
                         <p>{{ employee.role|capitalize if employee else 'Cashier' }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜ Logout</button></form>
+                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
             </div>
         </header>
 
         <!-- ── Nav ── -->
         <nav id="mainNav">
-            <button class="nav-close-btn" id="navCloseBtn">✕</button>
+            <button class="nav-close-btn" id="navCloseBtn" aria-label="Close navigation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             <ul>
-                <li><a href="{{ url_for('cashier_dashboard') }}">📠 POS</a></li>
-                <li><a href="{{ url_for('cashier_transactions') }}">📊 My Transactions</a></li>
-                <li><a href="{{ url_for('cashier_attendance') }}">📅 Attendance</a></li>
-                <li><a href="{{ url_for('cashier_inventory') }}" class="active">📦 Supply Monitor</a></li>
+                <li><a href="{{ url_for('cashier_dashboard') }}">POS</a></li>
+                <li><a href="{{ url_for('cashier_transactions') }}">My Transactions</a></li>
+                <li><a href="{{ url_for('cashier_attendance') }}">Attendance</a></li>
+                <li><a href="{{ url_for('cashier_inventory') }}" class="active">Supply Monitor</a></li>
             </ul>
         </nav>
 
@@ -1263,16 +1264,16 @@
                             <span id="connText">Online</span>
                         </span>
                         <button class="btn btn-alert btn-sm" id="stockAlertBtn">
-                            🔔 Stock Alert
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>Stock Alert
                             <span class="alert-badge" id="alertBadge">0</span>
                         </button>
-                        <button class="btn btn-outline btn-sm" onclick="refreshAll()">🔄 Refresh</button>
+                        <button class="btn btn-outline btn-sm" onclick="refreshAll()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>Refresh</button>
                     </div>
                 </div>
 
                 <!-- Info Banner -->
                 <div class="info-banner">
-                    <span>ℹ️</span>
+                    <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
                     <div>
                         <strong>Staff Supply Monitor</strong> — You can view stock levels, log what was used or damaged during your shift, and record restocks. All entries are timestamped with your name for accountability. Contact the admin for any unusual discrepancies.
                     </div>
@@ -1281,7 +1282,7 @@
                 <!-- Stats Row -->
                 <div class="stats-row">
                     <div class="stat-card">
-                        <div class="stat-icon gold">📦</div>
+                        <div class="stat-icon gold"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
                         <div>
                             <div class="stat-label">Total Items</div>
                             <div class="stat-value" id="statTotal">—</div>
@@ -1289,7 +1290,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon green">✅</div>
+                        <div class="stat-icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
                         <div>
                             <div class="stat-label">In Stock</div>
                             <div class="stat-value" id="statOk">—</div>
@@ -1297,7 +1298,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon orange">⚠️</div>
+                        <div class="stat-icon orange"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
                         <div>
                             <div class="stat-label">Low Stock</div>
                             <div class="stat-value" id="statLow">—</div>
@@ -1305,7 +1306,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon red">🚨</div>
+                        <div class="stat-icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
                         <div>
                             <div class="stat-label">Out of Stock</div>
                             <div class="stat-value" id="statOut">—</div>
@@ -1317,10 +1318,10 @@
                 <!-- Supply Table -->
                 <div class="section-card">
                     <div class="section-card-header">
-                        <h3>📋 Supply <span>Inventory</span></h3>
+                        <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>Supply <span>Inventory</span></h3>
                     </div>
                     <div class="toolbar">
-                        <input type="search" id="searchInput" class="search-input" placeholder="🔍  Search by name…" oninput="filterTable()">
+                        <input type="search" id="searchInput" class="search-input" placeholder="Search by name…" oninput="filterTable()">
                         <select id="filterType" class="filter-select" onchange="filterTable()">
                             <option value="">All Types</option>
                             <option value="ingredient">Ingredients</option>
@@ -1357,7 +1358,7 @@
                 <div class="al-card">
                     <div class="al-header">
                         <div class="al-header-left">
-                            <div class="al-icon">📋</div>
+                            <div class="al-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></div>
                             <div>
                                 <div class="al-title">Activity <span>Log</span></div>
                                 <div class="al-subtitle">Real-time stock change history</div>
@@ -1375,7 +1376,7 @@
                         </div>
                     </div>
                     <div class="al-search-bar">
-                        <span class="al-search-icon">🔍</span>
+                        <span class="al-search-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
                         <input type="text" id="logSearchInput" class="al-search-input" placeholder="Search item name, note, or staff…">
                         <select id="logDeltaFilter" class="al-delta-select">
                             <option value="">All Changes</option>
@@ -1398,7 +1399,7 @@
                 <!-- My Stock Requests -->
                 <div class="section-card" style="margin-top:1rem;">
                     <div class="section-card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                        <h3>📤 My Stock <span>Requests</span></h3>
+                        <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>My Stock <span>Requests</span></h3>
                         <button class="btn btn-primary btn-sm" onclick="openModal('requestItemModal')" style="font-size:0.82rem;">+ Request New Item</button>
                     </div>
                     <div class="supply-table-wrap">
@@ -1428,19 +1429,19 @@
     <div class="modal-overlay" id="stockAlertModal">
         <div class="modal alert-modal-w">
             <div class="modal-header">
-                <h3>🔔 Stock <span>Alert</span></h3>
-                <button class="modal-close" id="closeAlertModal">✕</button>
+                <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>Stock <span>Alert</span></h3>
+                <button class="modal-close" id="closeAlertModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body" id="alertModalBody">
                 <div class="alert-no-issues">
-                    <div class="alert-no-issues-icon">⏳</div>
+                    <div class="alert-no-issues-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
                     <p>Checking stock levels…</p>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" id="cancelAlertBtn">Close</button>
                 <button class="btn btn-warning" id="sendAlertBtn" style="display:none;">
-                    📧 Send Alert Email
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>Send Alert Email
                 </button>
             </div>
         </div>
@@ -1451,7 +1452,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Request <span>New Item</span></h3>
-                <button class="modal-close" onclick="closeModal('requestItemModal')">✕</button>
+                <button class="modal-close" onclick="closeModal('requestItemModal')" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body" style="display:flex;flex-direction:column;gap:1rem;">
                 <div>
@@ -1486,7 +1487,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('requestItemModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="submitItemRequest()">📤 Submit Request</button>
+                <button class="btn btn-primary" onclick="submitItemRequest()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>Submit Request</button>
             </div>
         </div>
     </div>
@@ -1496,7 +1497,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Log <span>Consumption</span></h3>
-                <button class="modal-close" onclick="closeModal('consumeModal')">✕</button>
+                <button class="modal-close" onclick="closeModal('consumeModal')" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body">
                 <div class="item-summary-box">
@@ -1522,7 +1523,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('consumeModal')">Cancel</button>
-                <button class="btn btn-warning" id="consumeSubmitBtn" onclick="submitConsume()">📉 Log Consumption</button>
+                <button class="btn btn-warning" id="consumeSubmitBtn" onclick="submitConsume()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>Log Consumption</button>
             </div>
         </div>
     </div>
@@ -1532,7 +1533,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Log <span>Restock</span></h3>
-                <button class="modal-close" onclick="closeModal('restockModal')">✕</button>
+                <button class="modal-close" onclick="closeModal('restockModal')" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body">
                 <div class="item-summary-box">
@@ -1551,7 +1552,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('restockModal')">Cancel</button>
-                <button class="btn btn-success" id="restockSubmitBtn" onclick="submitRestock()">📦 Confirm Restock</button>
+                <button class="btn btn-success" id="restockSubmitBtn" onclick="submitRestock()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>Confirm Restock</button>
             </div>
         </div>
     </div>
@@ -1633,7 +1634,7 @@
                 tbody.innerHTML = `
                     <tr><td colspan="7">
                         <div class="empty-state">
-                            <div class="empty-state-icon">📭</div>
+                            <div class="empty-state-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
                             <h4>No items found</h4>
                             <p>Try adjusting your search or filters.</p>
                         </div>
@@ -1646,7 +1647,7 @@
                     ? Math.min(100, Math.round((item.stock / (item.reorder_point * 3)) * 100))
                     : (item.stock > 0 ? 100 : 0);
 
-                const statusLabel = { ok: '✓ In Stock', low: '⚠ Low', out: '✗ Out' }[item.status] || item.status;
+                const statusLabel = { ok: 'In Stock', low: 'Low', out: 'Out' }[item.status] || item.status;
                 const typeBadge = item.type === 'ingredient'
                     ? `<span class="item-type-badge badge-ingredient">Ingredient</span>`
                     : `<span class="item-type-badge badge-packaging">Packaging</span>`;
@@ -1717,7 +1718,7 @@
                 if (!d.success || !d.log.length) {
                     _allLogRows = [];
                     container.innerHTML = `<div class="al-empty">
-                        <div class="al-empty-icon">📋</div>
+                        <div class="al-empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></div>
                         <div class="al-empty-title">No activity yet</div>
                         <div class="al-empty-sub">Log entries appear here after stock changes are made.</div>
                     </div>`;
@@ -1728,7 +1729,7 @@
                 renderLogFeed();
             } catch (err) {
                 container.innerHTML = `<div class="al-empty">
-                    <div class="al-empty-icon">⚠️</div>
+                    <div class="al-empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
                     <div class="al-empty-title">Failed to load</div>
                     <div class="al-empty-sub">Check your connection and try reloading.</div>
                 </div>`;
@@ -1758,7 +1759,7 @@
 
             if (!filtered.length) {
                 container.innerHTML = `<div class="al-empty">
-                    <div class="al-empty-icon">🔍</div>
+                    <div class="al-empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.8"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div>
                     <div class="al-empty-title">No matching entries</div>
                     <div class="al-empty-sub">Try adjusting your search or filter.</div>
                 </div>`;
@@ -1781,7 +1782,11 @@
                         const isPos   = row.delta >= 0;
                         const delta   = isPos ? `+${fmtNum(row.delta)}` : fmtNum(row.delta);
                         const srcCls  = row.source === 'sale' ? 'sale' : 'manual';
-                        const srcIcon = row.source === 'sale' ? '🛒' : (isPos ? '📦' : '📉');
+                        const srcIcon = row.source === 'sale'
+                            ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>'
+                            : (isPos
+                                ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>'
+                                : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>');
                         const timeStr = new Date(row.created_at).toLocaleTimeString('en-PH',
                             { hour:'2-digit', minute:'2-digit' });
                         return `
@@ -1869,10 +1874,10 @@
             const note       = document.getElementById('consumeNote').value.trim();
 
             if (usedRaw < 0 || damagedRaw < 0) {
-                showToast('❌ Quantities cannot be negative', 'error'); return;
+                showToast('Quantities cannot be negative', 'error'); return;
             }
             if (usedRaw + damagedRaw <= 0) {
-                showToast('❌ Enter at least one quantity greater than 0', 'error'); return;
+                showToast('Enter at least one quantity greater than 0', 'error'); return;
             }
 
             const btn = document.getElementById('consumeSubmitBtn');
@@ -1891,17 +1896,17 @@
                 });
                 const d = await r.json();
                 if (d.success) {
-                    showToast(`✅ ${d.message}`, 'success');
+                    showToast(d.message, 'success');
                     closeModal('consumeModal');
                     await refreshAll();
                 } else {
-                    showToast(`❌ ${d.message}`, 'error');
+                    showToast(d.message, 'error');
                 }
             } catch (_) {
-                showToast('❌ Network error. Please try again.', 'error');
+                showToast('Network error. Please try again.', 'error');
             }
 
-            btn.disabled = false; btn.innerHTML = '📉 Log Consumption';
+            btn.disabled = false; btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>Log Consumption';
         }
 
         /* ═══════════════════════════════════════
@@ -1912,7 +1917,7 @@
             const note = document.getElementById('restockNote').value.trim();
 
             if (!qty || qty <= 0) {
-                showToast('❌ Enter a valid quantity greater than 0', 'error'); return;
+                showToast('Enter a valid quantity greater than 0', 'error'); return;
             }
 
             const btn = document.getElementById('restockSubmitBtn');
@@ -1926,17 +1931,17 @@
                 });
                 const d = await r.json();
                 if (d.success) {
-                    showToast(`✅ ${d.message}`, 'success');
+                    showToast(d.message, 'success');
                     closeModal('restockModal');
                     await refreshAll();
                 } else {
-                    showToast(`❌ ${d.message}`, 'error');
+                    showToast(d.message, 'error');
                 }
             } catch (_) {
-                showToast('❌ Network error. Please try again.', 'error');
+                showToast('Network error. Please try again.', 'error');
             }
 
-            btn.disabled = false; btn.innerHTML = '📦 Confirm Restock';
+            btn.disabled = false; btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>Confirm Restock';
         }
 
         /* ═══════════════════════════════════════
@@ -2120,7 +2125,7 @@
             if (!alertItems.length) {
                 body.innerHTML = `
                 <div class="alert-no-issues">
-                    <div class="alert-no-issues-icon">✅</div>
+                    <div class="alert-no-issues-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
                     <p style="font-weight:700;color:#388e3c;font-size:0.95rem;">All stock levels are healthy!</p>
                     <p style="margin-top:0.4rem;color:#888;">No supplies are below their reorder point.</p>
                 </div>`;
@@ -2150,19 +2155,21 @@
 
                 body.innerHTML = `
                 <div class="alert-summary-banner ${isCritical ? 'critical' : ''}">
-                    <div class="alert-summary-icon">${isCritical ? '🚨' : '⚠️'}</div>
+                    <div class="alert-summary-icon">${isCritical
+                        ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>'
+                        : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>'}</div>
                     <div>
                         <div class="alert-summary-title">${isCritical ? 'Critical stock alert!' : 'Low stock warning'}</div>
                         <div class="alert-summary-sub">${alertItems.length} item${alertItems.length !== 1 ? 's' : ''} need${alertItems.length === 1 ? 's' : ''} attention — reviewed as of now</div>
                     </div>
                 </div>
                 <div class="alert-counts">
-                    ${outCount ? `<span class="alert-count-chip out">🚨 ${outCount} Out of Stock</span>` : ''}
-                    ${lowCount ? `<span class="alert-count-chip low">⚠️ ${lowCount} Low Stock</span>` : ''}
+                    ${outCount ? `<span class="alert-count-chip out"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon></svg>${outCount} Out of Stock</span>` : ''}
+                    ${lowCount ? `<span class="alert-count-chip low"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>${lowCount} Low Stock</span>` : ''}
                 </div>
                 <div class="alert-items-list">${itemRows}</div>
                 <div class="alert-recipient-box">
-                    📧 Alert will be sent to: <strong>${recipientEmail}</strong>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>Alert will be sent to: <strong>${recipientEmail}</strong>
                 </div>`;
                 sendBtn.style.display = 'inline-flex';
             }
@@ -2175,22 +2182,22 @@
         document.getElementById('sendAlertBtn').addEventListener('click', async () => {
             const btn = document.getElementById('sendAlertBtn');
             btn.disabled = true;
-            btn.innerHTML = '⏳ Sending…';
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin-icon" style="vertical-align:-1px;margin-right:4px;"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path></svg>Sending…';
             try {
                 const res  = await fetch('/api/settings/email/send-low-stock-alert', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`✅ ${data.message || 'Alert email sent!'}`, 'success');
+                    showToast(data.message || 'Alert email sent!', 'success');
                     closeModal('stockAlertModal');
                 } else {
-                    showToast(`❌ ${data.message || 'Failed to send alert'}`, 'error');
+                    showToast(data.message || 'Failed to send alert', 'error');
                     btn.disabled = false;
-                    btn.innerHTML = '📧 Send Alert Email';
+                    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>Send Alert Email';
                 }
             } catch (_) {
-                showToast('❌ Network error — could not send alert', 'error');
+                showToast('Network error — could not send alert', 'error');
                 btn.disabled = false;
-                btn.innerHTML = '📧 Send Alert Email';
+                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>Send Alert Email';
             }
         });
 

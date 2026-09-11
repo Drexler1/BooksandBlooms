@@ -1081,7 +1081,9 @@
 
         .identity-lock {
             color: var(--gold);
-            font-size: 1.1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Action grid */
@@ -1959,7 +1961,7 @@
                 
                 <div class="logo-text">
                     <h1>Books <span>&</span> Blooms</h1>
-                    <div class="logo-subtitle">CAFÉ</div>
+                    <div class="logo-subtitle">CAF&Eacute;</div>
                 </div>
             </div>
             <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation">
@@ -1976,18 +1978,18 @@
                         <p>{{ employee.role|capitalize if employee else 'Cashier' }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜ Logout</button></form>
+                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
             </div>
         </header>
 
         <!-- NAV -->
         <nav id="mainNav">
-            <button class="nav-close-btn" id="navCloseBtn">✕</button>
+            <button class="nav-close-btn" id="navCloseBtn" aria-label="Close navigation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             <ul>
-                <li><a href="{{ url_for('cashier_dashboard') }}">📠 POS</a></li>
-                <li><a href="{{ url_for('cashier_transactions') }}">📊 My Transactions</a></li>
-                <li><a href="{{ url_for('cashier_attendance') }}" class="active">📅 Attendance</a></li>
-                <li><a href="{{ url_for('cashier_inventory') }}">📦 Supply Monitor</a></li>
+                <li><a href="{{ url_for('cashier_dashboard') }}">POS</a></li>
+                <li><a href="{{ url_for('cashier_transactions') }}">My Transactions</a></li>
+                <li><a href="{{ url_for('cashier_attendance') }}" class="active">Attendance</a></li>
+                <li><a href="{{ url_for('cashier_inventory') }}">Supply Monitor</a></li>
             </ul>
         </nav>
 
@@ -2004,15 +2006,15 @@
                         <p class="page-subtitle">View your clock-in history and total hours worked.</p>
                     </div>
                     <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
-                        <button class="btn btn-outline" id="openOTModal">⏱ Request Overtime</button>
-                        <button class="btn btn-primary" id="openClockModal">📋 Clock In / Out</button>
+                        <button class="btn btn-outline" id="openOTModal"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Request Overtime</button>
+                        <button class="btn btn-primary" id="openClockModal"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>Clock In / Out</button>
                     </div>
                 </div>
 
                 <!-- Summary Cards -->
                 <div class="summary-cards">
                     <div class="stat-card">
-                        <div class="stat-icon green">✅</div>
+                        <div class="stat-icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
                         <div>
                             <div class="stat-label">Today's Status</div>
                             <div class="stat-value" id="statStatus">—</div>
@@ -2020,7 +2022,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon blue">⏱</div>
+                        <div class="stat-icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
                         <div>
                             <div class="stat-label">Hours Today</div>
                             <div class="stat-value" id="statHoursToday">—</div>
@@ -2028,7 +2030,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon gold">📅</div>
+                        <div class="stat-icon gold"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
                         <div>
                             <div class="stat-label">Period Hours</div>
                             <div class="stat-value" id="statPeriodHours">—</div>
@@ -2085,7 +2087,7 @@
                                     <tr>
                                         <td colspan="9">
                                             <div class="empty-state">
-                                                <div class="empty-icon">📋</div>
+                                                <div class="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
                                                 <p>No records found.</p>
                                             </div>
                                         </td>
@@ -2104,7 +2106,7 @@
                         <!-- Calendar -->
                         <div class="panel-card">
                             <div class="panel-header">
-                                <h3>📅 Calendar</h3>
+                                <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Calendar</h3>
                             </div>
                             <div class="panel-body">
                                 <div class="cal-header">
@@ -2127,7 +2129,7 @@
                         <!-- Period Summary -->
                         <div class="panel-card">
                             <div class="panel-header">
-                                <h3>📊 Period Summary</h3>
+                                <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>Period Summary</h3>
                             </div>
                             <div class="panel-body">
                                 <div class="hours-summary">
@@ -2154,10 +2156,10 @@
             <div class="table-card" style="margin-top:1.5rem;">
                 <div class="table-card-header">
                     <div>
-                        <h3>⏱ My Overtime Requests</h3>
+                        <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>My Overtime Requests</h3>
                         <div class="record-count" id="otRecordCount">Loading…</div>
                     </div>
-                    <button class="btn btn-outline btn-sm" id="refreshOTBtn">↺ Refresh</button>
+                    <button class="btn btn-outline btn-sm" id="refreshOTBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>Refresh</button>
                 </div>
                 <div class="table-wrapper">
                     <table>
@@ -2173,7 +2175,7 @@
                             </tr>
                         </thead>
                         <tbody id="otTableBody">
-                            <tr><td colspan="7"><div class="empty-state"><div class="empty-icon">⏱</div><p>No overtime requests yet.</p></div></td></tr>
+                            <tr><td colspan="7"><div class="empty-state"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div><p>No overtime requests yet.</p></div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2189,7 +2191,7 @@
 
             <div class="modal-header">
                 <h2>Clock <span>In / Out</span></h2>
-                <button class="modal-close" id="closeAttendanceModal">✕</button>
+                <button class="modal-close" id="closeAttendanceModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
 
             <div class="modal-body">
@@ -2221,7 +2223,7 @@
                         <div class="identity-name" id="bannerName">Loading…</div>
                         <div class="identity-role">Cashier · Verified Identity</div>
                     </div>
-                    <div class="identity-lock">🔒</div>
+                    <div class="identity-lock"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
                 </div>
 
                 <!-- Hidden: cashier's own employee_id, set on page load -->
@@ -2233,12 +2235,12 @@
                     <div class="step-section-label">Choose action</div>
                     <div class="shift-grid">
                         <div class="shift-option" onclick="selectAction('clock_in', this)">
-                            <span class="s-icon">🟢</span>
+                            <span class="s-icon" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#e8f5e9;color:#2e7d32;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                             <div class="s-name">Clock In</div>
                             <div class="s-time">Start Work Shift</div>
                         </div>
                         <div class="shift-option" onclick="selectAction('clock_out', this)">
-                            <span class="s-icon">🔴</span>
+                            <span class="s-icon" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#ffebee;color:#c62828;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
                             <div class="s-name">Clock Out</div>
                             <div class="s-time">End Work Shift</div>
                         </div>
@@ -2270,11 +2272,11 @@
                         </div>
                         <div class="face-actions">
                             <button class="btn btn-primary" id="verifyBtn" onclick="verifyIdentity()">
-                                🔍 Verify Identity
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>Verify Identity
                             </button>
                         </div>
                         <p class="face-tip">
-                            💡 <strong>Face verification:</strong> Look directly at the camera and hold still.
+                            <strong>Face verification:</strong> Look directly at the camera and hold still.
                             The system will match your face automatically.
                         </p>
                     </div>
@@ -2283,7 +2285,7 @@
                 <!-- Step 4: Confirm -->
                 <div class="step-panel" id="panelStep4">
                     <div class="confirm-card">
-                        <span class="confirm-success-icon">✅</span>
+                        <span class="confirm-success-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></span>
                         <div class="confirm-avatar" id="confirmInitial">C</div>
                         <div class="confirm-type-badge" id="confirmBadge"></div>
                         <div class="confirm-name" id="confirmEmployeeName">—</div>
@@ -2323,18 +2325,18 @@
         <div class="modal" style="max-width:min(480px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2>Request <span>Overtime</span></h2>
-                <button class="modal-close" id="closeOTModal">✕</button>
+                <button class="modal-close" id="closeOTModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body" style="padding:1.5rem;">
                 <p style="color:#666;margin-bottom:1.25rem;font-size:0.93rem;">Submit a request to extend your working hours. Your manager will review and approve or deny it.</p>
 
                 <div style="margin-bottom:1rem;">
-                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">📅 Date</label>
+                    <label style="font-weight:600;display:flex;align-items:center;gap:5px;margin-bottom:0.35rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Date</label>
                     <input type="date" id="otDate" class="date-input" style="width:100%;box-sizing:border-box;">
                 </div>
 
                 <div style="margin-bottom:1rem;">
-                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">⏱ Extended Hours <span style="color:#c62828;">*</span></label>
+                    <label style="font-weight:600;display:flex;align-items:center;gap:5px;margin-bottom:0.35rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Extended Hours <span style="color:#c62828;">*</span></label>
                     <select id="otHours" style="width:100%;padding:0.55rem 0.75rem;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;background:white;">
                         <option value="">— Select hours —</option>
                         <option value="0.5">0.5 hour</option>
@@ -2350,7 +2352,7 @@
                 </div>
 
                 <div style="margin-bottom:1.25rem;">
-                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">📝 Reason <span style="color:#c62828;">*</span></label>
+                    <label style="font-weight:600;display:flex;align-items:center;gap:5px;margin-bottom:0.35rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>Reason <span style="color:#c62828;">*</span></label>
                     <textarea id="otReason" rows="3" maxlength="500" placeholder="Briefly describe why you need overtime…"
                         style="width:100%;box-sizing:border-box;padding:0.6rem 0.75rem;border:1px solid #ddd;border-radius:8px;font-size:0.93rem;resize:vertical;font-family:inherit;"></textarea>
                     <div style="text-align:right;font-size:0.78rem;color:#aaa;" id="otReasonCount">0 / 500</div>
@@ -2367,7 +2369,9 @@
 
             <!-- Success panel (hidden until request is accepted) -->
             <div id="otSuccessPanel" style="display:none;text-align:center;padding:2.5rem 2rem 2rem;">
-                <div style="font-size:3rem;margin-bottom:0.75rem;">✅</div>
+                <div class="success-icon-wrap" style="width:60px;height:60px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;color:#2e7d32;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                </div>
                 <h3 style="color:#2e7d32;margin:0 0 0.5rem;font-size:1.2rem;">Request Submitted!</h3>
                 <p style="color:#555;font-size:0.9rem;margin:0 0 1.5rem;">
                     Your overtime request has been sent.<br>The manager will review and notify you.
@@ -2554,7 +2558,7 @@
                 const badge = document.getElementById('confirmBadge');
                 if (badge) {
                     badge.className = `confirm-type-badge ${isClockIn ? 'clock-in' : 'clock-out'}`;
-                    badge.textContent = isClockIn ? '🟢 Clock In' : '🔴 Clock Out';
+                    badge.textContent = isClockIn ? 'Clock In' : 'Clock Out';
                 }
 
                 // Show late-deduction banner if applicable
@@ -2571,14 +2575,14 @@
                     lateBanner.style.background = '#fff3e0';
                     lateBanner.style.border = '1px solid #ffb74d';
                     lateBanner.style.color = '#e65100';
-                    lateBanner.innerHTML = `⚠️ You clocked in <strong>${data.late_minutes} minute(s)</strong> past your shift start.<br>
+                    lateBanner.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>Late Notice</span><br>You clocked in <strong>${data.late_minutes} minute(s)</strong> past your shift start.<br>
                         A <strong>₱${parseFloat(data.late_deduction || 0).toFixed(2)} deduction</strong> has been applied.<br>
                         <span style="font-size:0.82rem;color:#795548;">Submit an overtime request to have this waived.</span>`;
                 } else {
                     lateBanner.style.display = 'none';
                 }
                 showStep(4);
-                showToast('✅ Attendance recorded!', 'success');
+                showToast('Attendance recorded!', 'success');
                 loadMyAttendance();
                 setTimeout(closeCashierAttendance, 3000);
             } catch { showToast('System error recording attendance.', 'error'); }
@@ -2671,7 +2675,7 @@
 
                 if (!body) return;
                 if (records.length === 0) {
-                    body.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📋</div><p>No attendance records found for this period.</p></div></td></tr>`;
+                    body.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div><p>No attendance records found for this period.</p></div></td></tr>`;
                     return;
                 }
 
@@ -2692,7 +2696,7 @@
                     let deductCell = '—';
                     if (deduction > 0) {
                         if (waived) {
-                            deductCell = `<span style="color:#388e3c;font-size:0.82rem;font-weight:600;">Waived ✅</span>`;
+                            deductCell = `<span style="color:#388e3c;font-size:0.82rem;font-weight:600;">Waived</span>`;
                         } else if (otStatus === 'pending') {
                             deductCell = `<span style="color:#c62828;font-weight:600;">−₱${deduction.toFixed(2)}</span>
                                 <span style="display:block;font-size:0.75rem;color:#e65100;">OT pending (waive on approval)</span>`;
@@ -2712,7 +2716,7 @@
                         <td class="time-cell">${r.clock_out || '<span class="time-cell missing">—</span>'}</td>
                         <td><span class="hours-chip ${fulfill ? 'over' : (isComplete && r.hours_worked ? 'short' : '')}">${hours}</span></td>
                         <td>${fulfill
-                            ? '<span class="badge badge-present">✅ Yes</span>'
+                            ? '<span class="badge badge-present">Yes</span>'
                             : '<span class="badge" style="background:#ffebee;color:#c62828;">No</span>'}</td>
                         <td>${lateMin > 0
                             ? `<span class="badge" style="background:#fff3e0;color:#e65100;">${lateMin}M LATE</span>`
@@ -2745,7 +2749,7 @@
                 setEl('statStatus', 'In');
                 setEl('statStatusSub', `clocked in at ${inProgress.clock_in || '—'}`);
             } else if (todayComplete.length) {
-                setEl('statStatus', '✓ Done');
+                setEl('statStatus', 'Done');
                 setEl('statStatusSub', 'shift completed');
             } else {
                 setEl('statStatus', '—');
@@ -2840,7 +2844,7 @@
            DYNAMIC SHIFTS  —  fetched from /api/shifts (DB-backed)
            ══════════════════════════════════════════════════════ */
 
-        const SHIFT_ICONS = ['🌅','☀️','🌙','⭐','🔆','🌟','💫','🌠','🏙️','🌃'];
+        const SHIFT_ICONS = ['','','','','','','','','',''];
 
         function fmt12(t) {
             if (!t) return '—';
@@ -3004,11 +3008,11 @@
                     const rows = data.requests || [];
                     if (countEl) countEl.textContent = `${rows.length} request${rows.length !== 1 ? 's' : ''}`;
                     if (!rows.length) {
-                        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">⏱</div><p>No overtime requests yet.</p></div></td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div><p>No overtime requests yet.</p></div></td></tr>';
                         return;
                     }
                     const statusBadge = s => {
-                        const map = { pending: ['#fff8e1','#f59e0b','⏳ Pending'], approved: ['#e8f5e9','#388e3c','✅ Approved'], denied: ['#ffebee','#c62828','❌ Denied'], cancelled: ['#f5f5f5','#888','Cancelled'] };
+                        const map = { pending: ['#fff8e1','#f59e0b','Pending'], approved: ['#e8f5e9','#388e3c','Approved'], denied: ['#ffebee','#c62828','Denied'], cancelled: ['#f5f5f5','#888','Cancelled'] };
                         const [bg, color, label] = map[s] || ['#f5f5f5','#555', s];
                         return `<span style="background:${bg};color:${color};padding:2px 10px;border-radius:20px;font-size:0.82rem;font-weight:600;">${label}</span>`;
                     };
@@ -3091,30 +3095,30 @@
                     if (data.locked) {
                         isMismatchLocked = true;
                         showToast(data.message, 'error');
-                        if (btn) { btn.disabled = true; btn.textContent = '🔒 Locked'; btn.style.background = '#7f1d1d'; }
+                        if (btn) { btn.disabled = true; btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Locked'; btn.style.background = '#7f1d1d'; }
                         const lockMs = (data.message.match(/(\d+)s/)?.[1] || 30) * 1000;
                         setTimeout(async () => {
                             isMismatchLocked = false;
                             await fetch('/reset_liveness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_id }) }).catch(() => { });
                             if (overlayEl) { overlayEl.textContent = ''; overlayEl.style.color = ''; }
-                            if (btn) { btn.disabled = false; btn.textContent = '🔍 Verify Identity'; btn.style.background = ''; }
+                            if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>Verify Identity'; btn.style.background = ''; }
                         }, lockMs);
                     } else if (data.mismatch) {
                         isMismatchLocked = true;
-                        showToast('🚫 Face does not match. Attendance denied.', 'error');
-                        if (btn) { btn.disabled = true; btn.textContent = '🚫 Face Mismatch'; btn.style.background = '#c0392b'; }
+                        showToast('Face does not match. Attendance denied.', 'error');
+                        if (btn) { btn.disabled = true; btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>Face Mismatch'; btn.style.background = '#c0392b'; }
                         setTimeout(async () => {
                             isMismatchLocked = false;
                             await fetch('/reset_liveness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_id }) }).catch(() => { });
                             if (overlayEl) { overlayEl.textContent = ''; overlayEl.style.color = ''; }
-                            if (btn) { btn.disabled = false; btn.textContent = '🔍 Verify Identity'; btn.style.background = ''; }
+                            if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>Verify Identity'; btn.style.background = ''; }
                         }, 5000);
                     }
                     return;
                 }
 
                 isMismatchLocked = false;
-                showToast('🔓 ' + data.message, 'success');
+                showToast(data.message, 'success');
                 await saveAttendance(imageData, data.verify_token);
 
             } catch (err) {
@@ -3122,7 +3126,7 @@
                 if (overlayEl) overlayEl.textContent = 'Connection error – retrying…';
             } finally {
                 isVerifying = false;
-                if (btn) { btn.disabled = false; btn.textContent = '🔍 Verify Identity'; }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>Verify Identity'; }
             }
         }
 

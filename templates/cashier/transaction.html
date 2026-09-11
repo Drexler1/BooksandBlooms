@@ -157,25 +157,25 @@
             color: var(--gold);
         }
 
-        .logout-btn {
-            background: var(--danger);
-            color: white;
-            border: none;
-            padding: 0.45rem 0.95rem;
-            border-radius: 6px;
-            font-weight: 600;
+        .btn-logout {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(220, 53, 69, 0.15);
+            border: 1px solid rgba(220, 53, 69, 0.3);
+            color: #ff6b6b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            font-size: 0.82rem;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-block;
-            white-space: nowrap;
+            transition: all 0.2s;
         }
 
-        .logout-btn:hover {
-            background: #c82333;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+        .btn-logout:hover {
+            background: rgba(220, 53, 69, 0.3);
+            border-color: #dc3545;
+            color: #fff;
+            transform: translateY(-1px);
         }
 
         /* ── Nav ── */
@@ -213,6 +213,7 @@
         nav a {
             display: flex;
             align-items: center;
+            gap: 0.5rem;
             padding: 0 1.6rem;
             text-decoration: none;
             color: #aaa;
@@ -384,7 +385,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
+            color: #fff;
             flex-shrink: 0;
         }
 
@@ -1067,7 +1068,7 @@
             <div class="logo">
                 <div class="logo-text">
                     <h1>Books <span>&</span> Blooms</h1>
-                    <div class="logo-subtitle">CAFÉ</div>
+                    <div class="logo-subtitle">CAF&Eacute;</div>
                 </div>
             </div>
             <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation">
@@ -1084,18 +1085,18 @@
                         <p>{{ employee.role|capitalize if employee else 'Cashier' }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜ Logout</button></form>
+                <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn-logout" title="Logout" aria-label="Logout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button></form>
             </div>
         </header>
 
         <!-- NAV -->
         <nav id="mainNav">
-            <button class="nav-close-btn" id="navCloseBtn">✕</button>
+            <button class="nav-close-btn" id="navCloseBtn" aria-label="Close navigation"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             <ul>
-                <li><a href="{{ url_for('cashier_dashboard') }}">📠 POS</a></li>
-                <li><a href="{{ url_for('cashier_transactions') }}" class="active">📊 My Transactions</a></li>
-                <li><a href="{{ url_for('cashier_attendance') }}">📅 Attendance</a></li>
-                <li><a href="{{ url_for('cashier_inventory') }}">📦 Supply Monitor</a></li>
+                <li><a href="{{ url_for('cashier_dashboard') }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>POS</a></li>
+                <li><a href="{{ url_for('cashier_transactions') }}" class="active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>My Transactions</a></li>
+                <li><a href="{{ url_for('cashier_attendance') }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Attendance</a></li>
+                <li><a href="{{ url_for('cashier_inventory') }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>Supply Monitor</a></li>
             </ul>
         </nav>
 
@@ -1111,13 +1112,15 @@
                         <h1 class="page-title">Transactions</h1>
                         <p class="page-subtitle">View your sales history and transaction records.</p>
                     </div>
-                    <button class="btn btn-outline" id="exportBtn">📥 Export</button>
+                    <button class="btn btn-outline" id="exportBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Export</button>
                 </div>
 
                 <!-- Summary Cards -->
                 <div class="summary-cards">
                     <div class="stat-card">
-                        <div class="stat-icon gold">💰</div>
+                        <div class="stat-icon gold">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
                         <div>
                             <div class="stat-label">Today's Sales</div>
                             <div class="stat-value" id="statToday">—</div>
@@ -1125,7 +1128,9 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon blue">🧾</div>
+                        <div class="stat-icon blue">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
                         <div>
                             <div class="stat-label">Transactions</div>
                             <div class="stat-value" id="statCount">—</div>
@@ -1133,7 +1138,9 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon green">📈</div>
+                        <div class="stat-icon green">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                        </div>
                         <div>
                             <div class="stat-label">Avg. Order</div>
                             <div class="stat-value" id="statAvg">—</div>
@@ -1141,7 +1148,9 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon purple">🏷️</div>
+                        <div class="stat-icon purple">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                        </div>
                         <div>
                             <div class="stat-label">Discounted</div>
                             <div class="stat-value" id="statRefunds">—</div>
@@ -1153,7 +1162,7 @@
                 <!-- Controls -->
                 <div class="controls-bar">
                     <input class="search-input" type="text" id="searchInput"
-                        placeholder="🔍  Search by ID or customer…">
+                        placeholder="Search by ID or customer…">
                     <input class="date-input" type="date" id="dateFilter">
                     <select class="filter-select" id="filterStatus">
                         <option value="">All Statuses</option>
@@ -1161,7 +1170,7 @@
                         <option value="pending">Pending</option>
                         <option value="refunded">Refunded</option>
                     </select>
-                    <button class="btn btn-outline btn-sm" id="clearFilters">✕ Clear</button>
+                    <button class="btn btn-outline btn-sm" id="clearFilters"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Clear</button>
                 </div>
 
                 <!-- Table -->
@@ -1207,12 +1216,12 @@
         <div class="modal">
             <div class="modal-header">
                 <h2>Transaction <span>Receipt</span></h2>
-                <button class="modal-close" id="closeModal">✕</button>
+                <button class="modal-close" id="closeModal" aria-label="Close modal"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body" id="receiptBody"></div>
             <div class="modal-footer">
                 <button class="btn btn-outline" id="closeReceiptBtn">Close</button>
-                <button class="btn btn-primary" onclick="window.print()">🖨️ Print</button>
+                <button class="btn btn-primary" onclick="window.print()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print</button>
             </div>
         </div>
     </div>
@@ -1283,7 +1292,7 @@
                 applyFilters();
                 updateSummaryCards();
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#999">⚠️ ${e.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#999">${e.message}</td></tr>`;
             }
         }
 
@@ -1360,7 +1369,7 @@
                     <td><span class="badge ${badgeClass}">${t.status}</span></td>
                     <td class="txn-amount">${fmt(t.total)}${discBadge}</td>
                     <td style="font-size:0.82rem">${dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})} ${dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</td>
-                    <td><button class="btn btn-outline btn-sm" onclick="viewReceipt(${t.id})">🧾 View</button></td>
+                    <td><button class="btn btn-outline btn-sm" onclick="viewReceipt(${t.id})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>View</button></td>
                 </tr>`;
             }).join('') || `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#999">No transactions found</td></tr>`;
         }
@@ -1373,7 +1382,7 @@
                 if (!d.success) throw new Error(d.message);
                 showReceiptModal(d.transaction);
             } catch (e) {
-                showToast('❌ ' + e.message, 'error');
+                showToast(e.message, 'error');
             }
         }
 
@@ -1429,7 +1438,7 @@
 
             document.getElementById('receiptBody').innerHTML = `
             <div style="text-align:center;margin-bottom:1.1rem">
-                <div style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:700">📚 Books &amp; Blooms Café</div>
+                <div style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:700">Books &amp; Blooms Café</div>
                 <div style="font-size:0.72rem;color:#999;letter-spacing:2px;text-transform:uppercase;margin-top:0.2rem">Official Receipt · VAT Reg</div>
                 <div style="margin-top:0.35rem;display:inline-block;background:var(--light-gray);border-radius:6px;padding:0.15rem 0.7rem;font-size:0.75rem;font-weight:700;color:#666;font-family:monospace">TXN #${receipt.transaction_id}</div>
                 <div style="font-size:0.75rem;color:#888;margin-top:0.25rem">${dtStr}</div>
@@ -1453,7 +1462,7 @@
             ${vatBlock}
             <div style="text-align:center;font-size:0.75rem;color:#aaa;margin-top:0.75rem;line-height:1.6">
                 <div>Served by: <strong style="color:#666">${receipt.cashier_name || '—'}</strong></div>
-                <div style="margin-top:0.25rem">Thank you for visiting Books &amp; Blooms Café! ☕</div>
+                <div style="margin-top:0.25rem">Thank you for visiting Books &amp; Blooms Café!</div>
                 <div style="margin-top:0.15rem;font-size:0.68rem;letter-spacing:0.5px">This serves as your official receipt.</div>
             </div>`;
 
@@ -1488,7 +1497,7 @@
             a.download = `transactions_${today}.csv`;
             a.click();
             URL.revokeObjectURL(url);
-            showToast(`✅ Exported ${filtered.length} transaction${filtered.length !== 1 ? 's' : ''}`, 'success');
+            showToast(`Exported ${filtered.length} transaction${filtered.length !== 1 ? 's' : ''}`, 'success');
         }
 
         /* ── Event listeners ── */
