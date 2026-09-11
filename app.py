@@ -3328,6 +3328,8 @@ def dashboard():
         app.logger.error(f"[dashboard] low-stock query failed: {exc}")
         low_stock_items = []
     low_stock_count = len(low_stock_items)
+    out_stock_count = sum(1 for i in low_stock_items if i.get("status") == "out")
+    low_stock_only_count = sum(1 for i in low_stock_items if i.get("status") == "low")
 
     # ── All sales metrics — served from cache ─────────────────────────────────
     try:
@@ -3352,6 +3354,8 @@ def dashboard():
         transaction_change=d.get("transaction_change") or 0,
         low_stock_count=low_stock_count,
         new_low_stock_count=low_stock_count,
+        out_stock_count=out_stock_count,
+        low_stock_only_count=low_stock_only_count,
         top_product_name=d.get("top_product_name") or "—",
         top_product_units=d.get("top_product_units") or 0,
         top_product_scope=d.get("top_product_scope") or "today",
@@ -8679,9 +8683,14 @@ def _stock_status(stock, reorder_point, track_stock=1):
     """Return 'untracked', 'out', 'low', or 'ok' based on stock vs reorder threshold."""
     if not track_stock:
         return "untracked"
-    if stock == 0:
+    try:
+        s = float(stock)
+        rp = float(reorder_point)
+    except (TypeError, ValueError):
+        return "ok"
+    if s <= 0:
         return "out"
-    if stock <= reorder_point:
+    if s <= rp:
         return "low"
     return "ok"
 
@@ -8705,7 +8714,7 @@ def api_inventory_stats():
             SELECT
                 COUNT(*)                                        AS total_products,
                 SUM(stock)                                      AS total_units,
-                SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END)     AS out_of_stock,
+                SUM(CASE WHEN stock <= 0 THEN 1 ELSE 0 END)     AS out_of_stock,
                 SUM(CASE WHEN stock > 0 AND stock <= reorder_point THEN 1 ELSE 0 END) AS low_stock,
                 SUM(stock * cost)                               AS inventory_cost,
                 SUM(stock * price)                              AS inventory_value
@@ -8748,7 +8757,15 @@ def api_inventory_low_stock():
         limit = 50
     try:
         items = _get_low_stock_items(limit=limit)
-        return jsonify({"success": True, "items": items, "count": len(items)})
+        out_count = sum(1 for i in items if i.get("status") == "out")
+        low_count = sum(1 for i in items if i.get("status") == "low")
+        return jsonify({
+            "success": True,
+            "items": items,
+            "count": len(items),
+            "out_count": out_count,
+            "low_count": low_count,
+        })
     except Exception as exc:
         app.logger.error(f"[inventory] low-stock API: {exc}")
         return jsonify({"success": False, "message": str(exc)}), 500

@@ -4030,12 +4030,12 @@
                             <div class="stat-sub" id="lowStockSub">click to filter</div>
                         </div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card clickable" id="outStockCard" onclick="filterToOut()">
                         <div class="stat-icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
                         <div>
                             <div class="stat-label">Out of Stock</div>
                             <div class="stat-value" id="statOut">—</div>
-                            <div class="stat-sub">needs immediate restock</div>
+                            <div class="stat-sub" id="outStockSub">click to filter</div>
                         </div>
                     </div>
                 </div>
@@ -6337,20 +6337,71 @@
 
         // Click low stock stat card to filter
         window.filterToLow = function() {
-            const tabBtn = document.querySelector('.inv-tab[data-tab="store-products"]');
-            if (tabBtn) tabBtn.click();
-            const filterEl = document.getElementById('prodStockStatusFilter');
-            if (filterEl) {
-                filterEl.value = 'low';
-                filterAndRenderStoreProducts();
+            const storeLowCount = allStoreProducts.filter(p => {
+                const isTracked = (p.track_stock !== false && p.track_stock !== 0);
+                if (!isTracked) return false;
+                const st = parseInt(p.stock) || 0;
+                const rp = parseInt(p.reorder_point) || 5;
+                return st > 0 && st <= rp;
+            }).length;
+
+            const invLowItems = (typeof allItems !== 'undefined' && Array.isArray(allItems)) ? allItems.filter(i => getStatus(i) === 'low') : [];
+            const cupLowCount = invLowItems.filter(i => (typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit))).length;
+            const ingLowCount = invLowItems.filter(i => !(typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit))).length;
+
+            const activeTab = document.querySelector('.inv-tab.active')?.dataset?.tab || 'store-products';
+
+            if (activeTab === 'ingredients' || (storeLowCount === 0 && cupLowCount === 0 && ingLowCount > 0)) {
+                const tabBtn = document.querySelector('.inv-tab[data-tab="ingredients"]');
+                if (tabBtn) tabBtn.click();
+                const sel = document.getElementById('ingStockFilter');
+                if (sel) {
+                    sel.value = 'low';
+                    stockFilter = 'low';
+                    renderIngredients();
+                }
+            } else if (activeTab === 'cafe-supplies' || (storeLowCount === 0 && cupLowCount > 0)) {
+                const tabBtn = document.querySelector('.inv-tab[data-tab="cafe-supplies"]');
+                if (tabBtn) tabBtn.click();
+            } else {
+                const tabBtn = document.querySelector('.inv-tab[data-tab="store-products"]');
+                if (tabBtn) tabBtn.click();
+                const filterEl = document.getElementById('prodStockStatusFilter');
+                if (filterEl) {
+                    filterEl.value = 'low';
+                    filterAndRenderStoreProducts();
+                }
             }
         };
 
         // Click out of stock stat card to filter
-        const outStatCard = document.querySelector('.stat-card:has(#statOut)') || document.getElementById('statOut')?.closest('.stat-card');
-        if (outStatCard) {
-            outStatCard.style.cursor = 'pointer';
-            outStatCard.addEventListener('click', () => {
+        window.filterToOut = function() {
+            const storeOutCount = allStoreProducts.filter(p => {
+                const isTracked = (p.track_stock !== false && p.track_stock !== 0);
+                if (!isTracked) return false;
+                const st = parseInt(p.stock) || 0;
+                return st <= 0;
+            }).length;
+
+            const invOutItems = (typeof allItems !== 'undefined' && Array.isArray(allItems)) ? allItems.filter(i => getStatus(i) === 'out') : [];
+            const cupOutCount = invOutItems.filter(i => (typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit))).length;
+            const ingOutCount = invOutItems.filter(i => !(typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit))).length;
+
+            const activeTab = document.querySelector('.inv-tab.active')?.dataset?.tab || 'store-products';
+
+            if (activeTab === 'ingredients' || (storeOutCount === 0 && cupOutCount === 0 && ingOutCount > 0)) {
+                const tabBtn = document.querySelector('.inv-tab[data-tab="ingredients"]');
+                if (tabBtn) tabBtn.click();
+                const sel = document.getElementById('ingStockFilter');
+                if (sel) {
+                    sel.value = 'out';
+                    stockFilter = 'out';
+                    renderIngredients();
+                }
+            } else if (activeTab === 'cafe-supplies' || (storeOutCount === 0 && cupOutCount > 0)) {
+                const tabBtn = document.querySelector('.inv-tab[data-tab="cafe-supplies"]');
+                if (tabBtn) tabBtn.click();
+            } else {
                 const tabBtn = document.querySelector('.inv-tab[data-tab="store-products"]');
                 if (tabBtn) tabBtn.click();
                 const filterEl = document.getElementById('prodStockStatusFilter');
@@ -6358,8 +6409,8 @@
                     filterEl.value = 'out';
                     filterAndRenderStoreProducts();
                 }
-            });
-        }
+            }
+        };
 
         async function loadStoreProducts() {
             try {
@@ -6392,27 +6443,8 @@
         }
 
         function _updateUnifiedStats() {
-            let ok = 0, low = 0, out = 0;
-            allStoreProducts.forEach(p => {
-                const isTracked = (p.track_stock !== false && p.track_stock !== 0);
-                if (!isTracked) {
-                    ok++;
-                    return;
-                }
-                const st = parseInt(p.stock) || 0;
-                const rp = parseInt(p.reorder_point) || 5;
-                if (st <= 0) out++;
-                else if (st <= rp) low++;
-                else ok++;
-            });
-            const statTot = document.getElementById('statTotal');
-            const statOkEl = document.getElementById('statOk');
-            const statLowEl = document.getElementById('statLow');
-            const statOutEl = document.getElementById('statOut');
-            if (statTot)   statTot.textContent = allStoreProducts.length;
-            if (statOkEl)  statOkEl.textContent = ok;
-            if (statLowEl) statLowEl.textContent = low;
-            if (statOutEl) statOutEl.textContent = out;
+            const badge = document.getElementById('prodStockBadge');
+            if (badge) badge.textContent = allStoreProducts.length;
         }
 
         function _populateDeptFilter() {
@@ -6810,8 +6842,18 @@
             if (_origLoadAll) await _origLoadAll();
             await loadStoreProducts();
         };
-        // Also call loadStoreProducts immediately
-        loadStoreProducts();
+        // Also call loadStoreProducts immediately and process URL query params
+        loadStoreProducts().then(() => {
+            const params = new URLSearchParams(window.location.search);
+            const s = (params.get('stock') || '').toLowerCase();
+            if (s === 'low') {
+                setTimeout(() => { if (typeof window.filterToLow === 'function') window.filterToLow(); }, 250);
+            } else if (s === 'out') {
+                setTimeout(() => { if (typeof window.filterToOut === 'function') window.filterToOut(); }, 250);
+            } else if (s === 'alert') {
+                setTimeout(() => { if (typeof openAlertModal === 'function') openAlertModal(); }, 350);
+            }
+        });
 </script>
 </body>
 </html>
