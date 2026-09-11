@@ -12079,44 +12079,57 @@ def _daily_summary_thread():
     """
     import time as _time
 
+    last_sent_date = None
+
     with app.app_context():
         while True:
             send_hour, send_minute = _get_daily_summary_send_time()
             now = datetime.now(PHT)
+            today = now.date()
             target = now.replace(
                 hour=send_hour, minute=send_minute, second=0, microsecond=0
             )
-            missed_by = (now - target).total_seconds()
-            if 0 <= missed_by <= 3600:
-                # Missed the window by up to 1 hour (e.g. server just started,
-                # or schedule was saved after the target time) — send right away.
+
+            if last_sent_date == today:
+                # Already sent today's summary — next scheduled send is tomorrow
+                target += timedelta(days=1)
+            else:
+                missed_by = (now - target).total_seconds()
+                if 0 <= missed_by <= 3600:
+                    # Missed the window by up to 1 hour (e.g. server just started,
+                    # or schedule was saved after the target time) — send right away.
+                    app.logger.info(
+                        f"[daily_summary] Missed window by {missed_by/60:.1f} min; "
+                        "sending now to catch up."
+                    )
+                    try:
+                        _send_daily_sales_summary_email(target_date=today)
+                        last_sent_date = today
+                    except Exception as _exc:
+                        app.logger.error(f"[daily_summary] Catch-up send error: {_exc}")
+                    # After catch-up, sleep until tomorrow's window
+                    target += timedelta(days=1)
+                elif now >= target:
+                    # Missed by more than 1 hour — don't send a stale summary,
+                    # just wait for tomorrow's window.
+                    target += timedelta(days=1)
+
+            now = datetime.now(PHT)
+            sleep_sec = (target - now).total_seconds()
+            if sleep_sec > 0:
                 app.logger.info(
-                    f"[daily_summary] Missed window by {missed_by/60:.1f} min; "
-                    "sending now to catch up."
+                    f"[daily_summary] Next send at {target.strftime('%H:%M')} "
+                    f"({sleep_sec/3600:.2f}h away)"
                 )
-                today = datetime.now(PHT).date()
+                _time.sleep(max(sleep_sec, 1))
+
+            today = datetime.now(PHT).date()
+            if last_sent_date != today:
                 try:
                     _send_daily_sales_summary_email(target_date=today)
+                    last_sent_date = today
                 except Exception as _exc:
-                    app.logger.error(f"[daily_summary] Catch-up send error: {_exc}")
-                # After catch-up, sleep until tomorrow's window
-                target += timedelta(days=1)
-            elif now >= target:
-                # Missed by more than 1 hour — don't send a stale summary,
-                # just wait for tomorrow's window.
-                target += timedelta(days=1)
-
-            sleep_sec = (target - now).total_seconds()
-            app.logger.info(
-                f"[daily_summary] Next send at {target.strftime('%H:%M')} "
-                f"({sleep_sec/3600:.2f}h away)"
-            )
-            _time.sleep(max(sleep_sec, 1))
-            today = datetime.now(PHT).date()
-            try:
-                _send_daily_sales_summary_email(target_date=today)
-            except Exception as _exc:
-                app.logger.error(f"[daily_summary] Nightly send error: {_exc}")
+                    app.logger.error(f"[daily_summary] Nightly send error: {_exc}")
 
 
 if not getattr(app, "_daily_summary_thread_started", False):
