@@ -986,7 +986,7 @@
                         </svg>
                     </div>
                     <div class="card-title">Today's Sales</div>
-                    <div class="card-value">₱{{ today_sales | default('—') }}</div>
+                    <div class="card-value">₱{{ today_sales if (today_sales is not none and today_sales != 'None') else '0.00' }}</div>
                     <div class="card-change {{ 'positive' if sales_change >= 0 else 'negative' }}">
                         <span>{{ '↑' if sales_change >= 0 else '↓' }} {{ sales_change | abs }}%</span>
                         <span style="color: #666; font-weight: 500;">vs yesterday</span>
@@ -1003,7 +1003,7 @@
                         </svg>
                     </div>
                     <div class="card-title">Transactions</div>
-                    <div class="card-value">{{ transaction_count | default('—') }}</div>
+                    <div class="card-value">{{ transaction_count if (transaction_count is not none and transaction_count != 'None') else '0' }}</div>
                     <div class="card-change {{ 'positive' if transaction_change >= 0 else 'negative' }}">
                         <span>{{ '↑' if transaction_change >= 0 else '↓' }} {{ transaction_change | abs }}%</span>
                         <span style="color: #666; font-weight: 500;">vs yesterday</span>
@@ -1020,7 +1020,7 @@
                         </svg>
                     </div>
                     <div class="card-title">Low Stock Items</div>
-                    <div class="card-value" id="dashLowStockCount">{{ low_stock_count | default('—') }}</div>
+                    <div class="card-value" id="dashLowStockCount">{{ low_stock_count if (low_stock_count is not none and low_stock_count != 'None') else '0' }}</div>
                     <div class="card-change negative" id="dashLowStockChange">
                         <span id="dashLowStockBadge">↑ {{ new_low_stock_count | default(0) }} items</span>
                         <span style="color: #666; font-weight: 500;">need restock</span>
@@ -1034,12 +1034,13 @@
                         </svg>
                     </div>
                     <div class="card-title">Top Selling</div>
-                    <div class="card-value">{{ top_product_name | default('—') }}</div>
+                    <div class="card-value">{{ top_product_name if (top_product_name and top_product_name != 'None') else '—' }}</div>
                     <div class="card-change positive">
                         <span>{{ top_product_units | default(0) }} sold</span>
-                        <span style="color: #666; font-weight: 500;">today</span>
+                        <span style="color: #666; font-weight: 500;">{{ top_product_scope | default('today') }}</span>
                     </div>
                 </div>
+
             </div>
 
             <!-- Analytics Grid -->
