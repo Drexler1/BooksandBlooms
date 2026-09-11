@@ -965,7 +965,11 @@
         }
 
         .ing-search::before {
-            content: '🔍';
+            content: '';
+            width: 14px;
+            height: 14px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888888' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat center;
+            background-size: contain;
             position: absolute;
             left: 0.6rem;
             top: 50%;
@@ -3234,6 +3238,214 @@
 
 
 
+
+        /* ── INVENTORY TABS & NAVIGATION ── */
+        .inv-tabs {
+            display: flex;
+            gap: 0.35rem;
+            margin: 1.5rem 0 1.25rem;
+            background: white;
+            border-radius: 10px;
+            padding: 0.35rem;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 10px var(--shadow);
+            width: fit-content;
+            flex-wrap: wrap;
+        }
+
+        .inv-tab {
+            padding: 0.6rem 1.3rem;
+            border-radius: 7px;
+            border: none;
+            background: transparent;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #777;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .inv-tab:hover {
+            color: var(--black);
+            background: #f8f8f8;
+        }
+
+        .inv-tab.active {
+            background: var(--black);
+            color: var(--gold);
+        }
+
+        .inv-tab .tab-badge {
+            background: var(--gold);
+            color: var(--black);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 20px;
+        }
+
+        .inv-tab.active .tab-badge {
+            background: var(--gold);
+            color: var(--black);
+        }
+
+        .inv-tab-panel {
+            display: none;
+        }
+
+        .inv-tab-panel.active {
+            display: block;
+        }
+
+        /* ── DEDICATED STORE PRODUCTS STOCK TABLE ── */
+        .dept-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.22rem 0.6rem;
+            border-radius: 14px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            background: #f0ebe1;
+            color: #6d4c41;
+            border: 1px solid #d7ccc8;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+        }
+
+        .cat-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.2rem 0.55rem;
+            border-radius: 12px;
+            font-size: 0.74rem;
+            font-weight: 600;
+            background: #f0f4f8;
+            color: #37474f;
+            border: 1px solid #cfd8dc;
+            white-space: nowrap;
+        }
+
+        .cat-chip.none {
+            background: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
+        }
+
+        .stock-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.22rem 0.65rem;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+        }
+
+        .stock-pill.ok  { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .stock-pill.low { background: #fff8e1; color: #e65100; border: 1px solid #ffe082; }
+        .stock-pill.out { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+
+        .stock-pill .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .stock-pill.ok .status-dot  { background: #2e7d32; }
+        .stock-pill.low .status-dot { background: #e65100; }
+        .stock-pill.out .status-dot { background: #c62828; }
+
+        .prod-thumb-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .prod-thumb-img {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .prod-thumb-fallback {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .prod-stock-name {
+            font-weight: 700;
+            color: var(--black);
+            font-size: 0.92rem;
+            line-height: 1.25;
+        }
+
+        .prod-stock-sku {
+            font-size: 0.75rem;
+            color: #888;
+            font-family: monospace;
+            margin-top: 0.15rem;
+        }
+
+        .stock-qty-val {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--black);
+        }
+
+        .stock-qty-unit {
+            font-size: 0.75rem;
+            color: #888;
+            font-weight: 500;
+            margin-left: 0.2rem;
+        }
+
+        .stock-threshold-val {
+            font-size: 0.85rem;
+            color: #666;
+            font-weight: 600;
+        }
+
+        /* Adjust Stock Quick Modal */
+        .quick-adj-btn-group {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.5rem;
+        }
+
+        .quick-adj-pill {
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            background: #f9f9f9;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .quick-adj-pill:hover {
+            border-color: var(--gold);
+            background: #fff;
+            color: var(--dark-gold);
+        }
 </style>
 </head>
 
@@ -3243,7 +3455,7 @@
 
         <!-- ── OFFLINE STATUS BAR ── -->
         <div id="offlineBar" class="offline-bar" style="display:none;">
-            <span class="offline-bar-icon">📡</span>
+            <span class="offline-bar-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></span>
             <span id="offlineBarMsg">You are offline — changes are saved locally and will sync when reconnected.</span>
             <span id="offlinePendingBadge" class="offline-pending-badge" style="display:none;">0 pending</span>
             <button id="syncNowBtn" class="offline-sync-btn" style="display:none;" onclick="manualSync()">↑ Sync
@@ -3276,7 +3488,7 @@
                         <p>{{ session.get('role')|capitalize }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜] Logout</button></form>
+                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
             </div>
         </header>
 
@@ -3308,10 +3520,10 @@
                         </p>
                     </div>
                     <div class="header-btns">
-                        <button class="btn btn-outline" id="refreshBtn">↺ Refresh</button>
-                        <button class="btn btn-outline" id="dailyReportBtn">📋 Daily Report</button>
+                        <button class="btn btn-outline" id="refreshBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh</button>
+                        <button class="btn btn-outline" id="dailyReportBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Daily Report</button>
                         <button class="btn btn-alert" id="stockAlertBtn">
-                            🔔 Stock Alert
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Stock Alert
                             <span class="alert-badge" id="alertBadge">0</span>
                         </button>
                         <div id="connIndicator" class="conn-indicator online" title="Connection status">
@@ -3324,7 +3536,7 @@
 
                 <!-- Info Banner -->
                 <div class="info-banner">
-                    <span style="font-size:1.2rem;flex-shrink:0;">✅</span>
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#e8f5e9;border-radius:50%;color:#2e7d32;flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
                     <div>
                         <strong>Auto-deduction enabled:</strong> Cup stock is automatically reduced each time a matching
                         product is sold on the cashier dashboard.
@@ -3336,7 +3548,7 @@
                 <!-- Stats -->
                 <div class="stats-row">
                     <div class="stat-card">
-                        <div class="stat-icon gold">📦</div>
+                        <div class="stat-icon gold"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
                         <div>
                             <div class="stat-label">Total Inventory Items</div>
                             <div class="stat-value" id="statTotal">—</div>
@@ -3344,7 +3556,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon green">✅</div>
+                        <div class="stat-icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
                         <div>
                             <div class="stat-label">Stocked</div>
                             <div class="stat-value" id="statOk">—</div>
@@ -3352,7 +3564,7 @@
                         </div>
                     </div>
                     <div class="stat-card clickable" id="lowStockCard" onclick="filterToLow()">
-                        <div class="stat-icon orange">⚠️</div>
+                        <div class="stat-icon orange"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
                         <div>
                             <div class="stat-label">Low Stock</div>
                             <div class="stat-value" id="statLow">—</div>
@@ -3360,7 +3572,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon red">🚨</div>
+                        <div class="stat-icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
                         <div>
                             <div class="stat-label">Out of Stock</div>
                             <div class="stat-value" id="statOut">—</div>
@@ -3369,16 +3581,101 @@
                     </div>
                 </div>
 
-                <!-- Cup Packaging + Deduction Log -->
+                
+                <!-- MAIN NAVIGATION TABS FOR INVENTORY -->
+                <div class="inv-tabs" id="invTabs">
+                    <button class="inv-tab active" data-tab="store-products">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                        Store Products <span class="tab-badge" id="prodStockBadge">0</span>
+                    </button>
+                    <button class="inv-tab" data-tab="cafe-supplies">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/></svg>
+                        Cup Packaging & Deduction Log
+                    </button>
+                    <button class="inv-tab" data-tab="ingredients">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        Ingredients & Supplies
+                    </button>
+                    <button class="inv-tab" data-tab="stock-requests">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Stock Requests
+                    </button>
+                </div>
+
+                <!-- ════ TAB 1: DEDICATED STORE PRODUCTS STOCK TRACKING ════ -->
+                <div class="inv-tab-panel active" id="tab-store-products">
+                    <div class="ingredient-section" style="margin-top:0;">
+                        <div class="ingredient-section-header">
+                            <div>
+                                <h3 style="font-size:1.25rem;">Store Products <span>Stock Tracking</span></h3>
+                                <p style="font-size:0.8rem;color:#777;margin-top:2px;">Live inventory tracking, reorder alert thresholds, and stock value across all branch departments.</p>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:0.75rem;">
+                                <a href="/product_management" class="btn btn-outline btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    Manage Products & Pricing
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Dedicated Store Products Toolbar -->
+                        <div class="ing-toolbar" style="flex-wrap:wrap;gap:0.65rem;">
+                            <div class="ing-search" style="min-width:240px;flex:1;">
+                                <input type="text" id="prodStockSearch" placeholder="Search product name, SKU, description…">
+                            </div>
+                            <select class="filter-select" id="prodStockDeptFilter">
+                                <option value="">All Departments</option>
+                            </select>
+                            <select class="filter-select" id="prodStockCatFilter">
+                                <option value="">All Subcategories</option>
+                            </select>
+                            <select class="filter-select" id="prodStockStatusFilter">
+                                <option value="">All Stock Statuses</option>
+                                <option value="ok">In Stock</option>
+                                <option value="low">Low Stock Warning</option>
+                                <option value="out">Out of Stock</option>
+                            </select>
+                            <button class="btn btn-outline btn-sm" id="prodStockRefreshBtn" style="padding:0.6rem 0.95rem;">Refresh</button>
+                            <span class="result-count" id="prodStockCount" style="align-self:center;font-size:0.82rem;color:#888;font-weight:600;">Loading…</span>
+                        </div>
+
+                        <!-- Dedicated Store Products Table -->
+                        <div class="ing-table-wrap">
+                            <table class="ing-table" id="productsStockTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:50px;"></th>
+                                        <th>Product Name & SKU</th>
+                                        <th>Department</th>
+                                        <th>Subcategory</th>
+                                        <th>Current Stock</th>
+                                        <th>Reorder Point</th>
+                                        <th>Unit Price</th>
+                                        <th>Stock Value</th>
+                                        <th>Stock Status</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="prodStockBody">
+                                    <tr><td colspan="10" style="text-align:center;padding:2.5rem;color:#999;">Loading store products…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ════ TAB 2: CAFÉ PACKAGING & LOGS ════ -->
+                <div class="inv-tab-panel" id="tab-cafe-supplies">
+<!-- Cup Packaging + Deduction Log -->
                 <div class="inv-layout">
 
                     <!-- CUP PACKAGING -->
                     <div class="section-card">
                         <div class="section-card-header">
-                            <h3>☕ Cup <span>Packaging</span></h3>
+                            <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>Cup <span>Packaging</span></h3>
                             <div style="display:flex;align-items:center;gap:0.75rem;">
                                 <span style="font-size:0.75rem;color:#888;font-family:'DM Sans',sans-serif;">Auto-deducted on each sale</span>
-                                <button class="add-cup-btn" id="openAddCupSizeBtn">＋ Add Cup Size</button>
+                                <button class="add-cup-btn" id="openAddCupSizeBtn">+ Add Cup Size</button>
                             </div>
                         </div>
                         <div class="section-card-body">
@@ -3393,7 +3690,7 @@
                     <!-- AUTO-DEDUCTION LOG -->
                     <div class="section-card">
                         <div class="section-card-header">
-                            <h3>📋 Deduction <span>Log</span></h3>
+                            <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Deduction <span>Log</span></h3>
                             <span style="font-size:0.75rem;color:#888;font-family:'DM Sans',sans-serif;">Recent
                                 activity</span>
                         </div>
@@ -3409,13 +3706,18 @@
                 <!-- OFFLINE PENDING QUEUE PANEL -->
                 <div class="offline-queue-panel" id="offlineQueuePanel">
                     <div class="offline-queue-header">
-                        <h3>📡 Pending Offline Changes</h3>
+                        <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>Pending Offline Changes</h3>
                         <span class="queue-count-chip" id="queueCountChip">0</span>
                     </div>
                     <div class="offline-queue-list" id="offlineQueueList"></div>
                 </div>
 
-                <!-- INGREDIENTS TABLE -->
+                
+                </div>
+
+                <!-- ════ TAB 3: INGREDIENTS & SUPPLIES ════ -->
+                <div class="inv-tab-panel" id="tab-ingredients">
+<!-- INGREDIENTS TABLE -->
                 <div class="ingredient-section">
                     <div class="ingredient-section-header">
                         <h3> Ingredients & <span>Supplies</span></h3>
@@ -3457,7 +3759,7 @@
                                 <tr>
                                     <td colspan="7">
                                         <div class="empty-state">
-                                            <div class="empty-state-icon">⏳</div>
+                                            <div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
                                             <h3>Loading…</h3>
                                         </div>
                                     </td>
@@ -3474,7 +3776,7 @@
                 ═══════════════════════════════════════════════════════════ -->
                 <div class="section-card" id="stockRequestsPanel" style="margin-top:1.5rem;">
                     <div class="section-card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                        <h3>📥 Stock Requests <span id="pendingBadge" style="display:none;background:var(--danger);color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:12px;margin-left:8px;vertical-align:middle;"></span></h3>
+                        <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Stock Requests <span id="pendingBadge" style="display:none;background:var(--danger);color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:12px;margin-left:8px;vertical-align:middle;"></span></h3>
                         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
                             <button class="btn btn-sm btn-outline" id="srFilterAll" onclick="srSetFilter('all')" style="font-size:0.8rem;">All</button>
                             <button class="btn btn-sm btn-primary" id="srFilterPending" onclick="srSetFilter('pending')" style="font-size:0.8rem;">Pending</button>
@@ -3511,13 +3813,13 @@
                     <!-- Panel header with date picker + actions -->
                     <div class="eod-panel-header">
                         <div class="eod-panel-title-group">
-                            <h3 class="eod-panel-title">📋 Daily Inventory Report</h3>
+                            <h3 class="eod-panel-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Daily Inventory Report</h3>
                             <p class="eod-panel-sub">Beginning · Consumed (Used + Damaged) · Ending stock per item</p>
                         </div>
                         <div class="eod-panel-controls">
                             <input type="date" id="eodDatePicker" class="eod-date-input">
                             <button class="btn btn-primary btn-sm" id="generateReportBtn">Generate</button>
-                            <button class="btn btn-outline btn-sm" id="printReportBtn">🖨 Print</button>
+                            <button class="btn btn-outline btn-sm" id="printReportBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print</button>
                             <button class="btn btn-outline btn-sm" id="closeEodPanel">✕ Close</button>
                         </div>
                     </div>
@@ -3525,7 +3827,7 @@
                     <!-- Report body — injected by JS -->
                     <div id="eodReportBody">
                         <div class="eod-empty-state">
-                            <div style="font-size:2.5rem;margin-bottom:0.5rem;">📋</div>
+                            <div style="margin-bottom:0.5rem;"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
                             <p>Select a date and click <strong>Generate</strong> to view the report.</p>
                         </div>
                     </div>
@@ -3542,19 +3844,19 @@
     <div class="modal-overlay" id="stockAlertModal">
         <div class="modal alert-modal-w">
             <div class="modal-header">
-                <h2>🔔 Stock <span>Alert Notification</span></h2>
+                <h2><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Stock <span>Alert Notification</span></h2>
                 <button class="modal-close" id="closeAlertModal">✕</button>
             </div>
             <div class="modal-body" id="alertModalBody">
                 <div class="alert-no-issues">
-                    <div class="alert-no-issues-icon">⏳</div>
+                    <div class="alert-no-issues-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
                     <p>Checking stock levels…</p>
                 </div>
             </div>
             <div class="modal-footer" id="alertModalFooter">
                 <button class="btn btn-outline" id="cancelAlertBtn">Cancel</button>
                 <button class="btn btn-danger" id="sendAlertBtn" style="display:none;">
-                    📧 Send Alert Email
+                    Send Alert Email
                 </button>
             </div>
         </div>
@@ -3614,7 +3916,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" id="cancelIngModal">Cancel</button>
-                <button class="btn btn-primary" id="saveIngBtn">💾 Save</button>
+                <button class="btn btn-primary" id="saveIngBtn">Save</button>
             </div>
         </div>
     </div>
@@ -3630,7 +3932,7 @@
             <div class="modal-body">
                 <!-- Live preview card -->
                 <div class="cup-size-preview" id="cupSizePreview">
-                    <div class="preview-icon">🥤</div>
+                    <div class="preview-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/></svg></div>
                     <div class="preview-label" id="cupPreviewLabel">New Cup</div>
                     <div class="preview-hint">Auto-deducted on each sale</div>
                 </div>
@@ -3680,7 +3982,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" id="cancelAddCupSizeBtn">Cancel</button>
-                <button class="btn btn-primary" id="saveAddCupSizeBtn">➕ Add Cup Size</button>
+                <button class="btn btn-primary" id="saveAddCupSizeBtn">Add Cup Size</button>
             </div>
         </div>
     </div>
@@ -3716,7 +4018,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" id="cancelAdjModal">Cancel</button>
-                <button class="btn btn-primary" id="saveAdjBtn">✅ Apply Adjustment</button>
+                <button class="btn btn-primary" id="saveAdjBtn">Apply Adjustment</button>
             </div>
         </div>
     </div>
@@ -3744,7 +4046,7 @@
                 <!-- Used + Damaged inputs side by side -->
                 <div class="consume-split-row">
                     <div class="consume-split-card used-card">
-                        <div class="consume-split-icon">✅</div>
+                        <div class="consume-split-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
                         <div class="consume-split-label">Used</div>
                         <div class="consume-split-desc">Successfully consumed</div>
                         <input type="number" class="consume-qty-input" id="consumeUsedQty"
@@ -3752,7 +4054,7 @@
                     </div>
                     <div class="consume-split-plus">+</div>
                     <div class="consume-split-card damaged-card">
-                        <div class="consume-split-icon">⚠️</div>
+                        <div class="consume-split-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
                         <div class="consume-split-label">Damaged</div>
                         <div class="consume-split-desc">Spoiled, wasted, or lost</div>
                         <input type="number" class="consume-qty-input" id="consumeDamagedQty"
@@ -4064,7 +4366,7 @@
         function onOffline() {
             _isOnline = false;
             updateConnUI();
-            showToast('📡 You are offline. Changes saved locally.', 'warning');
+            showToast('You are offline. Changes saved locally.', 'warning');
         }
 
         async function onOnline() {
@@ -4072,10 +4374,10 @@
             updateConnUI();
             const queue = await getQueue();
             if (queue.length > 0) {
-                showToast(`🔄 Back online — syncing ${queue.length} pending change${queue.length > 1 ? 's' : ''}…`, 'info');
+                showToast(`Back online — syncing ${queue.length} pending change${queue.length > 1 ? 's' : ''}…`, 'info');
                 await syncQueue();
             } else {
-                showToast('✅ Back online.', 'success');
+                showToast('Back online.', 'success');
                 await loadAll(); // refresh from server
             }
         }
@@ -4222,17 +4524,17 @@
             await renderQueuePanel();
 
             if (failed === 0 && succeeded > 0) {
-                showToast(`✅ Synced ${succeeded} change${succeeded > 1 ? 's' : ''} successfully.`, 'success');
+                showToast(`Synced ${succeeded} change${succeeded > 1 ? 's' : ''} successfully.`, 'success');
                 await loadDeductionLog();
             } else if (failed > 0) {
-                showToast(`⚠️ ${failed} change${failed > 1 ? 's' : ''} failed to sync. Will retry when online.`, 'error');
+                showToast(`${failed} change${failed > 1 ? 's' : ''} failed to sync. Will retry when online.`, 'error');
             }
         }
 
         async function manualSync() {
             if (!_isOnline) {
                 const reachable = await pingServer();
-                if (!reachable) { showToast('❌ Still no connection.', 'error'); return; }
+                if (!reachable) { showToast('Still no connection.', 'error'); return; }
                 _isOnline = true;
                 updateConnUI();
             }
@@ -4265,7 +4567,7 @@
         // Cup size data — populated dynamically from /api/inv_items/cup-sizes
         // These arrays are rebuilt each time loadAll() runs.
         let CUP_SIZES = ['8oz', '12oz', '16oz']; // fallback until first fetch
-        const CUP_ICONS = {}; // unit → emoji (always 🥤 for cups)
+        const CUP_ICONS = {};
         const CUP_NAMES = {}; // unit → display name
 
         // Rebuild CUP_* from a live list of cup items
@@ -4276,7 +4578,7 @@
                 .sort((a, b) => parseInt(a.unit) - parseInt(b.unit))
                 .forEach(c => {
                     CUP_SIZES.push(c.unit);
-                    CUP_ICONS[c.unit] = '🥤';
+                    CUP_ICONS[c.unit] = '';
                     CUP_NAMES[c.unit] = c.name;
                 });
             // Layout is flex-nowrap — no inline style override needed
@@ -4361,7 +4663,7 @@
             const cachedItem = await cacheApplyEdit(id || null, payload);
             const detail = id ? `Updated "${payload.name}"` : `New: "${payload.name}"`;
             await enqueue({ type: 'save', id: id ? parseInt(id) : null, payload, label: payload.name, detail });
-            showToast(`📡 Offline — "${payload.name}" saved locally.`, 'warning');
+            showToast(`Offline — "${payload.name}" saved locally.`, 'warning');
             return { success: true, offline: true, item: cachedItem };
         }
 
@@ -4382,7 +4684,7 @@
             await cacheDeleteItem(parseInt(id));
             const itemName = allItems.find(i => i.id === parseInt(id))?.name || `Item #${id}`;
             await enqueue({ type: 'delete', id: parseInt(id), label: itemName, detail: 'Marked for deletion' });
-            showToast(`📡 Offline — "${itemName}" will be deleted on sync.`, 'warning');
+            showToast(`Offline — "${itemName}" will be deleted on sync.`, 'warning');
             return { success: true, offline: true };
         }
 
@@ -4404,7 +4706,7 @@
             const itemName = allItems.find(i => i.id === parseInt(id))?.name || `Item #${id}`;
             const sign = delta > 0 ? `+${delta}` : `${delta}`;
             await enqueue({ type: 'adjust', payload: { id: parseInt(id), delta, note }, label: itemName, detail: `${sign} units${note ? ' — ' + note : ''}` });
-            showToast(`📡 Offline — stock change (${sign}) queued.`, 'warning');
+            showToast(`Offline — stock change (${sign}) queued.`, 'warning');
             return { success: true, offline: true, new_stock: newStock ?? '?' };
         }
 
@@ -4464,11 +4766,11 @@
                 return `<div class="cup-card ${status !== 'ok' ? status : ''}">
                 <button class="cup-delete-btn" title="Remove this cup size"
                     onclick="deleteCupSize(${cup.id || 'null'},'${cup.unit}',event)">✕</button>
-                <div class="cup-icon">${CUP_ICONS[cup.unit] || '🥤'}</div>
+                <div class="cup-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/></svg></div>
                 <div class="cup-label">${CUP_NAMES[cup.unit] || cup.unit}${pendingDot}</div>
                 <div class="cup-count ${countClass}">${cup.stock}</div>
                 <div class="cup-unit">pcs remaining</div>
-                <div class="cup-status ${status}">${status === 'ok' ? '✓ In Stock' : status === 'low' ? '⚠ Low' : '✕ Out'}</div>
+                <div class="cup-status ${status}">${status === "ok" ? "In Stock" : status === "low" ? "Low Stock" : "Out of Stock"}</div>
                 ${cup.id ? `
                 <div class="cup-adj-row">
                     <button class="adj-btn" onclick="quickAdjCup('${cup.unit}', 1)">+</button>
@@ -4478,7 +4780,7 @@
                 <button class="cup-restock-btn" onclick="openAdjModal(${cup.id},'${cup.name.replace(/'/g, "\\'")}',${cup.stock},'${cup.unit}')">Adjust Stock</button>
                 <div class="cup-reorder-note">Reorder at ≤${cup.reorder_point || 20}</div>
                 ` : `
-                <button class="cup-restock-btn" onclick="initCup('${cup.unit}')">➕ Initialize</button>
+                <button class="cup-restock-btn" onclick="initCup('${cup.unit}')">Initialize</button>
                 `}
             </div>`;
             }).join('');
@@ -4501,7 +4803,7 @@
                 delete CUP_ICONS[unit];
                 delete CUP_NAMES[unit];
                 renderCups();
-                showToast(`🗑 ${unit} cup size removed`, 'success');
+                showToast(` ${unit} cup size removed`, 'success');
                 return;
             }
             const label = CUP_NAMES[unit] || unit;
@@ -4513,13 +4815,13 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`🗑 ${label} removed`, 'success');
+                    showToast(` ${label} removed`, 'success');
                     await loadAll();
                 } else {
-                    showToast('❌ ' + (data.message || 'Could not remove cup size'), 'error');
+                    showToast(data.message || 'Could not remove cup size', 'error');
                 }
             } catch (err) {
-                showToast('❌ Network error', 'error');
+                showToast('Network error', 'error');
             }
         }
 
@@ -4528,10 +4830,10 @@
             const payload = { name, type: 'packaging', stock: 0, unit, reorder_point: 20, note: 'Cup packaging — auto-deducted on sales' };
             const data = await saveItem(payload, null);
             if (data.success) {
-                showToast(`✅ ${name} initialized`, 'success');
+                showToast(`${name} initialized`, 'success');
                 await loadAll();
             } else {
-                showToast('❌ ' + (data.message || 'Error'), 'error');
+                showToast(data.message || 'Error', 'error');
             }
         }
 
@@ -4570,7 +4872,7 @@
                 </td>
                 <td data-label="Unit" style="color:#888;">${item.unit || 'pcs'}</td>
                 <td data-label="Reorder At" style="color:#aaa;font-size:0.82rem;">${item.reorder_point || 10}</td>
-                <td data-label="Status"><span class="status-chip ${status}">${status === 'ok' ? '✓ OK' : status === 'low' ? '⚠ Low' : '✕ Out'}</span></td>
+                <td data-label="Status"><span class="status-chip ${status}">${status === "ok" ? "In Stock" : status === "low" ? "Low Stock" : "Out of Stock"}</span></td>
                 <td data-label="Actions">
                     <div class="action-btns">
                         <button class="btn btn-consume btn-sm" onclick="openConsumeModal(${item.id},'${item.name.replace(/'/g, "\\'")}',${item.stock},'${item.unit}')">Consume</button>
@@ -4603,7 +4905,7 @@
                         log.innerHTML = data.log.map(entry => {
                             const delta = entry.delta > 0 ? `+${entry.delta}` : entry.delta;
                             const cls = entry.delta > 0 ? 'pos' : 'neg';
-                            const icon = entry.source === 'sale' ? '↓' : '✎';
+                            const icon = entry.source === 'sale' ? '↓' : 'Edit';
                             const iconClass = entry.source === 'sale' ? 'sale' : 'manual';
                             return `<div class="log-item">
                             <div class="log-icon ${iconClass}">${icon}</div>
@@ -4620,7 +4922,7 @@
             } catch (_) { }
             // No log endpoint yet — show placeholder
             log.innerHTML = `<div class="empty-log">
-            <div style="font-size:2rem;opacity:0.3;margin-bottom:0.5rem;">📋</div>
+            <div style="margin-bottom:0.5rem;opacity:0.4;"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
             <div>Deduction log will appear here</div>
             <div style="font-size:0.78rem;color:#ddd;margin-top:0.25rem;">Cup deductions are recorded automatically on each sale.</div>
         </div>`;
@@ -4669,7 +4971,7 @@
             document.getElementById('ingName').classList.remove('error');
 
             const btn = document.getElementById('saveIngBtn');
-            btn.disabled = true; btn.innerHTML = '⏳ Saving…';
+            btn.disabled = true; btn.innerHTML = 'Saving…';
 
             const id = document.getElementById('editIngId').value;
             const payload = {
@@ -4683,13 +4985,13 @@
 
             const data = await saveItem(payload, id || null);
             if (data && data.success) {
-                showToast('✅ Saved', 'success');
+                showToast('Saved successfully', 'success');
                 closeModal('ingredientModal');
                 await loadAll();
             } else {
-                showToast('❌ ' + ((data && data.message) || 'Error saving'), 'error');
+                showToast(((data && data.message) || 'Error saving'), 'error');
             }
-            btn.disabled = false; btn.innerHTML = '💾 Save';
+            btn.disabled = false; btn.innerHTML = 'Save';
         });
 
         /* ════════════════════════════════════════════
@@ -4739,7 +5041,7 @@
             // Validation error
             const errEl = document.getElementById('consumeError');
             if (total > _consumeCurrentStock) {
-                errEl.textContent = `⚠ Total (${+total.toFixed(4)}) exceeds current stock (${_consumeCurrentStock} ${_consumeItemUnit})`;
+                errEl.textContent = `Total (${+total.toFixed(4)}) exceeds current stock (${_consumeCurrentStock} ${_consumeItemUnit})`;
                 errEl.style.display = 'block';
             } else {
                 errEl.style.display = 'none';
@@ -4763,15 +5065,15 @@
             const note       = document.getElementById('consumeNote').value.trim();
             const total      = usedQty + damagedQty;
 
-            if (total <= 0) { showToast('❌ Enter at least one quantity (Used or Damaged)', 'error'); return; }
-            if (usedQty < 0 || damagedQty < 0) { showToast('❌ Quantities cannot be negative', 'error'); return; }
+            if (total <= 0) { showToast('Enter at least one quantity (Used or Damaged)', 'error'); return; }
+            if (usedQty < 0 || damagedQty < 0) { showToast('Quantities cannot be negative', 'error'); return; }
             if (total > _consumeCurrentStock) {
-                showToast(`❌ Total ${total} exceeds stock (${_consumeCurrentStock} ${_consumeItemUnit})`, 'error');
+                showToast(`Total ${total} exceeds stock (${_consumeCurrentStock} ${_consumeItemUnit})`, 'error');
                 return;
             }
 
             const btn = document.getElementById('saveConsumeBtn');
-            btn.disabled = true; btn.innerHTML = '⏳ Saving…';
+            btn.disabled = true; btn.innerHTML = 'Saving…';
 
             try {
                 const res = await fetch('/api/inv_items/consume', {
@@ -4784,14 +5086,14 @@
                     const parts = [];
                     if (usedQty    > 0) parts.push(`${usedQty} ${_consumeItemUnit} used`);
                     if (damagedQty > 0) parts.push(`${damagedQty} ${_consumeItemUnit} damaged`);
-                    showToast(`✅ ${parts.join(', ')} — ${data.new_stock} ${_consumeItemUnit} remaining`, 'success');
+                    showToast(`${parts.join(', ')} — ${data.new_stock} ${_consumeItemUnit} remaining`, 'success');
                     closeModal('consumeModal');
                     await loadAll();
                 } else {
-                    showToast('❌ ' + (data.message || 'Failed to record consumption'), 'error');
+                    showToast(data.message || 'Failed to record consumption', 'error');
                 }
             } catch (e) {
-                showToast('❌ Network error', 'error');
+                showToast('Network error', 'error');
             }
             btn.disabled = false; btn.innerHTML = 'Record Consumption';
         });
@@ -4879,7 +5181,7 @@
             }
 
             const btn = document.getElementById('saveAddCupSizeBtn');
-            btn.disabled = true; btn.innerHTML = '⏳ Adding…';
+            btn.disabled = true; btn.innerHTML = 'Adding…';
 
             try {
                 const res = await fetch('/api/inv_items/cup-sizes', {
@@ -4889,7 +5191,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`✅ ${data.name} added to cup inventory!`, 'success');
+                    showToast(`${data.name} added to cup inventory!`, 'success');
                     closeModal('addCupSizeModal');
                     await loadAll();
                 } else {
@@ -4901,28 +5203,28 @@
                 errEl.style.display = 'block';
             }
 
-            btn.disabled = false; btn.innerHTML = '➕ Add Cup Size';
+            btn.disabled = false; btn.innerHTML = 'Add Cup Size';
         });
 
         document.getElementById('saveAdjBtn').addEventListener('click', async () => {
             const id = document.getElementById('adjItemId').value;
             const qty = parseFloat(document.getElementById('adjQty').value) || 0;
-            if (qty <= 0) { showToast('❌ Enter a valid quantity', 'error'); return; }
+            if (qty <= 0) { showToast('Enter a valid quantity', 'error'); return; }
             const delta = adjDirection === 'sub' ? -qty : qty;
             const note = document.getElementById('adjNote').value.trim();
 
             const btn = document.getElementById('saveAdjBtn');
-            btn.disabled = true; btn.innerHTML = '⏳ Applying…';
+            btn.disabled = true; btn.innerHTML = 'Applying…';
 
             const data = await adjustStock(id, delta, note);
             if (data && data.success) {
-                showToast(`✅ Stock updated to ${data.new_stock ?? '?'}`, 'success');
+                showToast(`Stock updated to ${data.new_stock ?? '?'}`, 'success');
                 closeModal('adjustModal');
                 await loadAll();
             } else {
-                showToast('❌ ' + ((data && data.message) || 'Error'), 'error');
+                showToast(((data && data.message) || 'Error'), 'error');
             }
-            btn.disabled = false; btn.innerHTML = '✅ Apply Adjustment';
+            btn.disabled = false; btn.innerHTML = 'Apply Adjustment';
         });
 
         /* ════════════════════════════════════════════
@@ -4941,14 +5243,14 @@
         document.getElementById('confirmDeleteIngBtn').addEventListener('click', async () => {
             if (!deleteItemId) return;
             const btn = document.getElementById('confirmDeleteIngBtn');
-            btn.disabled = true; btn.textContent = '⏳ Deleting…';
+            btn.disabled = true; btn.textContent = 'Deleting…';
             const data = await deleteItem(deleteItemId);
             if (data && data.success) {
                 showToast('Item removed', 'success');
                 closeModal('deleteIngModal');
                 await loadAll();
             } else {
-                showToast('❌ ' + ((data && data.message) || 'Error'), 'error');
+                showToast(((data && data.message) || 'Error'), 'error');
             }
             btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete';
             deleteItemId = null;
@@ -5023,18 +5325,18 @@
             if (!date) { showToast('Please select a date', 'error'); return; }
 
             const body = document.getElementById('eodReportBody');
-            body.innerHTML = `<div class="eod-empty-state"><div style="font-size:2.5rem;margin-bottom:0.5rem;">⏳</div><p>Generating report…</p></div>`;
+            body.innerHTML = `<div class="eod-empty-state"><div style="margin-bottom:0.5rem;"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><p>Generating report…</p></div>`;
 
             let data;
             try {
                 const res = await fetch(`/api/inv_items/eod-report?date=${encodeURIComponent(date)}`);
                 data = await res.json();
             } catch (e) {
-                body.innerHTML = `<div class="eod-empty-state"><div style="font-size:2.5rem;">❌</div><p>Network error — could not fetch report.</p></div>`;
+                body.innerHTML = `<div class="eod-empty-state"><div style="margin-bottom:0.5rem;"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><p>Network error — could not fetch report.</p></div>`;
                 return;
             }
             if (!data.success) {
-                body.innerHTML = `<div class="eod-empty-state"><div style="font-size:2.5rem;">❌</div><p>${escHtml(data.message || 'Error loading report')}</p></div>`;
+                body.innerHTML = `<div class="eod-empty-state"><div style="margin-bottom:0.5rem;"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><p>${escHtml(data.message || 'Error loading report')}</p></div>`;
                 return;
             }
 
@@ -5043,7 +5345,7 @@
             const counts = data.counts || {};
 
             if (!items.length) {
-                body.innerHTML = `<div class="eod-empty-state"><div style="font-size:2.5rem;">📭</div><p>No inventory items found.</p></div>`;
+                body.innerHTML = `<div class="eod-empty-state"><div style="margin-bottom:0.5rem;"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><p>No inventory items found.</p></div>`;
                 return;
             }
 
@@ -5141,15 +5443,15 @@
             const outCnt = counts.out_of_stock || 0;
             if (lowCnt > 0 || outCnt > 0) {
                 alertHtml = `<div class="eod-alert-strip">
-                    <strong style="font-size:0.82rem;color:#666;align-self:center;">⚠️ Stock Alerts:</strong>
-                    ${outCnt > 0 ? `<span class="eod-alert-chip out-chip">🚨 ${outCnt} Out of Stock</span>` : ''}
-                    ${lowCnt > 0 ? `<span class="eod-alert-chip">⚠️ ${lowCnt} Low Stock</span>` : ''}
+                    <strong style="font-size:0.82rem;color:#666;align-self:center;">Stock Alerts:</strong>
+                    ${outCnt > 0 ? `<span class="eod-alert-chip out-chip">${outCnt} Out of Stock</span>` : ''}
+                    ${lowCnt > 0 ? `<span class="eod-alert-chip">${lowCnt} Low Stock</span>` : ''}
                 </div>`;
             }
 
             body.innerHTML = `
                 ${kpiHtml}
-                <div class="eod-date-heading">📅 Report for ${escHtml(dispDate)}</div>
+                <div class="eod-date-heading">Report for ${escHtml(dispDate)}</div>
                 <div class="eod-table-wrap">
                     <table class="eod-table">
                         <thead>
@@ -5197,7 +5499,7 @@
             const body = document.getElementById('alertModalBody');
             const sendBtn = document.getElementById('sendAlertBtn');
             sendBtn.style.display = 'none';
-            body.innerHTML = `<div class="alert-no-issues"><div class="alert-no-issues-icon">⏳</div><p>Checking stock levels…</p></div>`;
+            body.innerHTML = `<div class="alert-no-issues"><div class="alert-no-issues-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><p>Checking stock levels…</p></div>`;
 
             // Re-use already-loaded data
             const lowItems = allItems.filter(i => getStatus(i) === 'low');
@@ -5207,7 +5509,7 @@
             if (!alertItems.length) {
                 body.innerHTML = `
                 <div class="alert-no-issues">
-                    <div class="alert-no-issues-icon">✅</div>
+                    <div class="alert-no-issues-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <p style="font-weight:700;color:#388e3c;font-size:0.95rem;">All stock levels are healthy!</p>
                     <p style="margin-top:0.4rem;">No ingredients or supplies are below their reorder point.</p>
                 </div>`;
@@ -5240,19 +5542,19 @@
 
                 body.innerHTML = `
                 <div class="alert-summary-banner ${isCritical ? 'critical' : ''}">
-                    <div class="alert-summary-icon">${isCritical ? '🚨' : '⚠️'}</div>
+                    <div class="alert-summary-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
                     <div>
                         <div class="alert-summary-title">${isCritical ? 'Critical stock alert!' : 'Low stock warning'}</div>
                         <div class="alert-summary-sub">${alertItems.length} item${alertItems.length !== 1 ? 's' : ''} need${alertItems.length === 1 ? 's' : ''} attention — reviewed as of now</div>
                     </div>
                 </div>
                 <div class="alert-counts">
-                    ${outCount ? `<span class="alert-count-chip out">🚨 ${outCount} Out of Stock</span>` : ''}
-                    ${lowCount ? `<span class="alert-count-chip low">⚠️ ${lowCount} Low Stock</span>` : ''}
+                    ${outCount ? `<span class="alert-count-chip out">${outCount} Out of Stock</span>` : ''}
+                    ${lowCount ? `<span class="alert-count-chip low">${lowCount} Low Stock</span>` : ''}
                 </div>
                 <div class="alert-items-list">${itemRows}</div>
                 <div class="alert-recipient-box">
-                    📧 Alert will be sent to: <strong>${recipientEmail}</strong>
+                    Alert will be sent to: <strong>${recipientEmail}</strong>
                     &nbsp;·&nbsp; <a href="{{ url_for('admin_settings') }}" style="color:var(--dark-gold);font-size:0.8rem;">Change in Settings</a>
                 </div>`;
                 sendBtn.style.display = 'inline-flex';
@@ -5269,22 +5571,22 @@
         document.getElementById('sendAlertBtn').addEventListener('click', async () => {
             const btn = document.getElementById('sendAlertBtn');
             btn.disabled = true;
-            btn.innerHTML = '⏳ Sending…';
+            btn.innerHTML = 'Sending…';
 
             try {
                 const res = await fetch('/api/settings/email/send-low-stock-alert', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`✅ ${data.message || 'Alert email sent!'}`, 'success');
+                    showToast(`${data.message || 'Alert email sent!'}`, 'success');
                     closeModal('stockAlertModal');
                 } else {
-                    showToast(`❌ ${data.message || 'Failed to send alert'}`, 'error');
+                    showToast(`${data.message || 'Failed to send alert'}`, 'error');
                 }
             } catch (e) {
-                showToast('❌ Network error — could not send alert', 'error');
+                showToast('Network error — could not send alert', 'error');
             }
             btn.disabled = false;
-            btn.innerHTML = '📧 Send Alert Email';
+            btn.innerHTML = 'Send Alert Email';
         });
 
         /* INIT */
@@ -5414,7 +5716,7 @@
                     </td>
                     <td style="padding:0.75rem 1rem;">
                         ${r.status === 'pending' ? `
-                            <button class="btn btn-sm" style="background:var(--success);color:#fff;font-size:0.78rem;margin-right:4px;" onclick="openSrReview(${r.id},'approve','${escHtml(r.item_name)}')">✓ Approve</button>
+                            <button class="btn btn-sm" style="background:var(--success);color:#fff;font-size:0.78rem;margin-right:4px;" onclick="openSrReview(${r.id},'approve','${escHtml(r.item_name)}')">Approve</button>
                             <button class="btn btn-sm btn-danger" style="font-size:0.78rem;" onclick="openSrReview(${r.id},'reject','${escHtml(r.item_name)}')">✕ Reject</button>
                         ` : `<span style="color:#333;font-size:0.8rem;">Reviewed by ${escHtml(r.reviewed_by || '—')}<br><span style="font-size:0.72rem;color:#444;">${escHtml(r.reviewed_at || '')}</span></span>`}
                     </td>
@@ -5443,7 +5745,7 @@
             document.getElementById('srReviewAction').textContent   = action === 'approve' ? 'Approve' : 'Reject';
             document.getElementById('srReviewNote').value = '';
             const btn = document.getElementById('srConfirmBtn');
-            btn.textContent = action === 'approve' ? '✓ Approve' : '✕ Reject';
+            btn.textContent = action === 'approve' ? 'Approve' : 'Reject';
             btn.style.background = action === 'approve' ? 'var(--success)' : 'var(--danger)';
             btn.style.color = '#fff';
             btn.style.border = 'none';
@@ -5474,7 +5776,388 @@
             setInterval(updatePendingBadge, 60000);
         });
 
-    </script>
+    
+        /* ═══════════════════════════════════════════════════════════════
+           STORE PRODUCTS DEDICATED STOCK TRACKING SYSTEM
+        ═══════════════════════════════════════════════════════════════ */
+        let allStoreProducts = [];
+        let allStoreMainCats = [];
+        let allStoreSubCats  = [];
+        let activeAdjProd    = null;
+
+        // Tab Switching
+        document.querySelectorAll('.inv-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.inv-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.inv-tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                const targetId = 'tab-' + tab.dataset.tab;
+                const panel = document.getElementById(targetId);
+                if (panel) panel.classList.add('active');
+            });
+        });
+
+        // Click low stock stat card to filter
+        window.filterToLow = function() {
+            const tabBtn = document.querySelector('.inv-tab[data-tab="store-products"]');
+            if (tabBtn) tabBtn.click();
+            const filterEl = document.getElementById('prodStockStatusFilter');
+            if (filterEl) {
+                filterEl.value = 'low';
+                filterAndRenderStoreProducts();
+            }
+        };
+
+        // Click out of stock stat card to filter
+        const outStatCard = document.querySelector('.stat-card:has(#statOut)') || document.getElementById('statOut')?.closest('.stat-card');
+        if (outStatCard) {
+            outStatCard.style.cursor = 'pointer';
+            outStatCard.addEventListener('click', () => {
+                const tabBtn = document.querySelector('.inv-tab[data-tab="store-products"]');
+                if (tabBtn) tabBtn.click();
+                const filterEl = document.getElementById('prodStockStatusFilter');
+                if (filterEl) {
+                    filterEl.value = 'out';
+                    filterAndRenderStoreProducts();
+                }
+            });
+        }
+
+        async function loadStoreProducts() {
+            try {
+                const [pRes, mcRes, cRes] = await Promise.all([
+                    fetch('/api/inventory/items?limit=500'),
+                    fetch('/api/inventory/main_categories'),
+                    fetch('/api/inventory/categories')
+                ]);
+                const pData  = await pRes.json();
+                const mcData = await mcRes.json();
+                const cData  = await cRes.json();
+
+                if (pData.success) {
+                    allStoreProducts = pData.items || pData.products || [];
+                    document.getElementById('prodStockBadge').textContent = allStoreProducts.length;
+                    _updateUnifiedStats();
+                }
+                if (mcData.success) {
+                    allStoreMainCats = mcData.main_categories || [];
+                    _populateDeptFilter();
+                }
+                if (cData.success) {
+                    allStoreSubCats = cData.categories || [];
+                }
+
+                filterAndRenderStoreProducts();
+            } catch (err) {
+                console.error('[inventory] loadStoreProducts error:', err);
+            }
+        }
+
+        function _updateUnifiedStats() {
+            let ok = 0, low = 0, out = 0;
+            allStoreProducts.forEach(p => {
+                const st = parseInt(p.stock) || 0;
+                const rp = parseInt(p.reorder_point) || 5;
+                if (st <= 0) out++;
+                else if (st <= rp) low++;
+                else ok++;
+            });
+            const statTot = document.getElementById('statTotal');
+            const statOkEl = document.getElementById('statOk');
+            const statLowEl = document.getElementById('statLow');
+            const statOutEl = document.getElementById('statOut');
+            if (statTot)   statTot.textContent = allStoreProducts.length;
+            if (statOkEl)  statOkEl.textContent = ok;
+            if (statLowEl) statLowEl.textContent = low;
+            if (statOutEl) statOutEl.textContent = out;
+        }
+
+        function _populateDeptFilter() {
+            const deptSelect = document.getElementById('prodStockDeptFilter');
+            if (!deptSelect) return;
+            const cur = deptSelect.value;
+            deptSelect.innerHTML = '<option value="">All Departments</option>' +
+                allStoreMainCats.map(m => `<option value="${m.main_category_id}">${escHtml(m.name)}</option>`).join('');
+            if (allStoreMainCats.some(m => String(m.main_category_id) === String(cur))) {
+                deptSelect.value = cur;
+            }
+            _updateSubCatFilter();
+        }
+
+        function _updateSubCatFilter() {
+            const deptSelect = document.getElementById('prodStockDeptFilter');
+            const catSelect  = document.getElementById('prodStockCatFilter');
+            if (!catSelect) return;
+            const selDept = deptSelect ? deptSelect.value : '';
+            const curCat = catSelect.value;
+
+            let matching = allStoreSubCats;
+            if (selDept) {
+                matching = matching.filter(c => String(c.main_category_id) === String(selDept));
+            }
+            catSelect.innerHTML = '<option value="">All Subcategories</option>' +
+                matching.map(c => `<option value="${c.category_id}">${escHtml(c.name)}</option>`).join('');
+            if (matching.some(c => String(c.category_id) === String(curCat))) {
+                catSelect.value = curCat;
+            } else {
+                catSelect.value = '';
+            }
+        }
+
+        function filterAndRenderStoreProducts() {
+            const q = (document.getElementById('prodStockSearch')?.value || '').trim().toLowerCase();
+            const deptId = document.getElementById('prodStockDeptFilter')?.value || '';
+            const catId  = document.getElementById('prodStockCatFilter')?.value || '';
+            const status = document.getElementById('prodStockStatusFilter')?.value || '';
+
+            let filtered = allStoreProducts.filter(p => {
+                if (q) {
+                    const matchQ = (p.name || '').toLowerCase().includes(q) ||
+                                   (p.sku || '').toLowerCase().includes(q) ||
+                                   (p.description || '').toLowerCase().includes(q) ||
+                                   (p.main_category_name || '').toLowerCase().includes(q);
+                    if (!matchQ) return false;
+                }
+                if (deptId && String(p.main_category_id) !== String(deptId)) return false;
+                if (catId && String(p.category_id) !== String(catId)) return false;
+                if (status) {
+                    const st = parseInt(p.stock) || 0;
+                    const rp = parseInt(p.reorder_point) || 5;
+                    if (status === 'out' && st > 0) return false;
+                    if (status === 'low' && (st <= 0 || st > rp)) return false;
+                    if (status === 'ok'  && st <= rp) return false;
+                }
+                return true;
+            });
+
+            const countEl = document.getElementById('prodStockCount');
+            if (countEl) countEl.textContent = `${filtered.length} product${filtered.length !== 1 ? 's' : ''}`;
+
+            const tbody = document.getElementById('prodStockBody');
+            if (!tbody) return;
+
+            if (!filtered.length) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:3rem 1rem;color:#888;">
+                    <div style="font-size:1.1rem;font-weight:700;color:#555;">No matching store products found</div>
+                    <p style="font-size:0.85rem;color:#999;margin-top:0.3rem;">Try adjusting search terms or department filter.</p>
+                </td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(p => {
+                const thumb = p.image_url
+                    ? `<img class="prod-thumb-img" src="${p.image_url}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                    : '';
+                const fallback = `<div class="prod-thumb-fallback" ${p.image_url ? 'style="display:none"' : ''}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`;
+                const deptLabel = p.main_category_name || 'General';
+                const catLabel = p.category_name || 'Uncategorized';
+
+                const st = parseInt(p.stock) || 0;
+                const rp = parseInt(p.reorder_point) || 5;
+                const price = parseFloat(p.price || 0);
+                const stockVal = (price * st).toFixed(2);
+
+                let statusBadge = '';
+                if (st <= 0) {
+                    statusBadge = `<span class="stock-pill out" title="Out of stock! Threshold: ${rp}"><span class="status-dot"></span>Out of Stock</span>`;
+                } else if (st <= rp) {
+                    statusBadge = `<span class="stock-pill low" title="Low stock warning! Threshold: ${rp}"><span class="status-dot"></span>Low Stock Warning</span>`;
+                } else {
+                    statusBadge = `<span class="stock-pill ok" title="Healthy inventory. Threshold: ${rp}"><span class="status-dot"></span>In Stock</span>`;
+                }
+
+                return `<tr>
+                    <td style="width:50px;">
+                        <div class="prod-thumb-cell">
+                            ${thumb}${fallback}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="prod-stock-name">${escHtml(p.name)}${p.cup_eligible ? '<span style="margin-left:0.35rem;font-size:0.65rem;background:#fff3cd;color:#856404;padding:0.1rem 0.4rem;border-radius:10px;font-weight:700;vertical-align:middle;">Cup Drink</span>' : ''}</div>
+                        <div class="prod-stock-sku">SKU: ${escHtml(p.sku || '—')}</div>
+                    </td>
+                    <td><span class="dept-chip">${escHtml(deptLabel)}</span></td>
+                    <td><span class="cat-chip ${!p.category_name ? 'none' : ''}">${escHtml(catLabel)}</span></td>
+                    <td><span class="stock-qty-val">${st}</span><span class="stock-qty-unit">${p.unit || 'pcs'}</span></td>
+                    <td><span class="stock-threshold-val">${rp}</span><span class="stock-qty-unit">${p.unit || 'pcs'}</span></td>
+                    <td style="font-weight:600;">₱${price.toFixed(2)}</td>
+                    <td style="font-weight:700;color:var(--dark-gold);">₱${stockVal}</td>
+                    <td>${statusBadge}</td>
+                    <td style="text-align:right;">
+                        <button class="btn btn-outline btn-sm" onclick="openAdjustProductStock(${p.product_id})" title="Quick restock or deduct units">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Adjust Stock
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Toolbar listeners
+        document.getElementById('prodStockSearch')?.addEventListener('input', filterAndRenderStoreProducts);
+        document.getElementById('prodStockDeptFilter')?.addEventListener('change', () => {
+            _updateSubCatFilter();
+            filterAndRenderStoreProducts();
+        });
+        document.getElementById('prodStockCatFilter')?.addEventListener('change', filterAndRenderStoreProducts);
+        document.getElementById('prodStockStatusFilter')?.addEventListener('change', filterAndRenderStoreProducts);
+        document.getElementById('prodStockRefreshBtn')?.addEventListener('click', loadStoreProducts);
+
+        // Quick Product Stock Adjustment Modal
+        window.openAdjustProductStock = function(prodId) {
+            const p = allStoreProducts.find(x => x.product_id === prodId);
+            if (!p) return;
+            activeAdjProd = p;
+
+            document.getElementById('adjProdId').value = p.product_id;
+            document.getElementById('adjProdName').textContent = p.name;
+            document.getElementById('adjProdDept').textContent = p.main_category_name || 'General';
+            document.getElementById('adjProdCurrent').textContent = `${p.stock ?? 0} ${p.unit || 'pcs'}`;
+            document.getElementById('adjProdDelta').value = '';
+            document.getElementById('adjProdNote').value = '';
+
+            const st = parseInt(p.stock) || 0;
+            const rp = parseInt(p.reorder_point) || 5;
+            const statusPill = document.getElementById('adjProdStatusPill');
+            if (st <= 0) {
+                statusPill.innerHTML = `<span class="stock-pill out"><span class="status-dot"></span>Out of Stock (0 units)</span>`;
+            } else if (st <= rp) {
+                statusPill.innerHTML = `<span class="stock-pill low"><span class="status-dot"></span>Low Stock Warning (${st} units remaining, threshold: ${rp})</span>`;
+            } else {
+                statusPill.innerHTML = `<span class="stock-pill ok"><span class="status-dot"></span>In Stock (${st} units available)</span>`;
+            }
+
+            _updateProjectedStock();
+            openModal('adjustProductStockModal');
+        };
+
+        window._quickDelta = function(delta) {
+            const inp = document.getElementById('adjProdDelta');
+            if (!inp) return;
+            const cur = parseInt(inp.value, 10) || 0;
+            inp.value = cur + delta;
+            _updateProjectedStock();
+        };
+
+        function _updateProjectedStock() {
+            if (!activeAdjProd) return;
+            const delta = parseInt(document.getElementById('adjProdDelta').value, 10) || 0;
+            const cur = parseInt(activeAdjProd.stock, 10) || 0;
+            const proj = Math.max(0, cur + delta);
+            const projEl = document.getElementById('adjProdProjected');
+            if (projEl) {
+                projEl.textContent = `${proj} ${activeAdjProd.unit || 'pcs'}`;
+                if (proj === 0) projEl.style.color = 'var(--danger)';
+                else if (proj <= (activeAdjProd.reorder_point || 5)) projEl.style.color = '#e65100';
+                else projEl.style.color = 'var(--success)';
+            }
+        }
+
+        document.getElementById('adjProdDelta')?.addEventListener('input', _updateProjectedStock);
+
+        ['closeAdjustProductStockModal', 'cancelAdjustProductStockModal'].forEach(id => {
+            document.getElementById(id)?.addEventListener('click', () => closeModal('adjustProductStockModal'));
+        });
+
+        document.getElementById('saveAdjustProductStockBtn')?.addEventListener('click', async () => {
+            if (!activeAdjProd) return;
+            const delta = parseInt(document.getElementById('adjProdDelta').value, 10);
+            if (isNaN(delta) || delta === 0) {
+                showToast('Please enter a non-zero adjustment quantity', 'error');
+                return;
+            }
+            const note = (document.getElementById('adjProdNote').value || '').trim();
+            const btn = document.getElementById('saveAdjustProductStockBtn');
+            btn.disabled = true;
+            btn.innerHTML = 'Saving…';
+
+            try {
+                const res = await fetch('/api/inventory/restock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_id: activeAdjProd.product_id,
+                        adjustment: delta,
+                        note: note || 'Inventory manual adjustment'
+                    })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message || 'Failed to adjust stock');
+                showToast(data.message || 'Stock updated successfully', 'success');
+                closeModal('adjustProductStockModal');
+                await loadStoreProducts();
+            } catch (err) {
+                showToast(err.message || 'Error updating stock', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Save Stock Update';
+            }
+        });
+
+        // Hook loadStoreProducts into loadAll
+        const _origLoadAll = window.loadAll;
+        window.loadAll = async function() {
+            if (_origLoadAll) await _origLoadAll();
+            await loadStoreProducts();
+        };
+        // Also call loadStoreProducts immediately
+        loadStoreProducts();
+</script>
+
+    <!-- ═══ QUICK ADJUST PRODUCT STOCK MODAL ═══ -->
+    <div class="modal-overlay" id="adjustProductStockModal">
+        <div class="modal" style="max-width:min(450px, calc(100vw - 2rem));">
+            <div class="modal-header">
+                <h2>Adjust <span>Product Stock</span></h2>
+                <button class="modal-close" id="closeAdjustProductStockModal">✕</button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem 1.5rem;">
+                <input type="hidden" id="adjProdId">
+                <div style="margin-bottom:1.1rem;padding:0.9rem 1rem;background:#f9f8f5;border-radius:8px;border:1px solid #eedec4;">
+                    <div style="font-weight:700;font-size:1.05rem;color:var(--black);" id="adjProdName">—</div>
+                    <div style="display:flex;justify-content:space-between;margin-top:0.4rem;font-size:0.85rem;color:#666;">
+                        <span>Department: <strong id="adjProdDept" style="color:#444;">—</strong></span>
+                        <span>Current Stock: <strong id="adjProdCurrent" style="color:var(--gold);font-size:1rem;">0</strong></span>
+                    </div>
+                    <div style="margin-top:0.6rem;" id="adjProdStatusPill"></div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1rem;">
+                    <label class="form-label" style="font-weight:700;font-size:0.85rem;color:var(--black);display:block;margin-bottom:0.4rem;">Stock Change Quantity (+ or -)</label>
+                    <input type="number" class="form-control" id="adjProdDelta" placeholder="e.g. 10 or -5" style="font-size:1.1rem;font-weight:700;">
+                    <span class="form-hint" style="font-size:0.78rem;color:#888;margin-top:0.25rem;display:block;">Positive to add incoming stock, negative to deduct consumed or damaged units.</span>
+                    <div class="quick-adj-btn-group" style="display:flex;gap:0.4rem;margin-top:0.5rem;">
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+5)">+5</button>
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+10)">+10</button>
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(+25)">+25</button>
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(-1)">-1</button>
+                        <button type="button" class="quick-adj-pill" onclick="_quickDelta(-5)">-5</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.1rem;">
+                    <label class="form-label" style="font-weight:700;font-size:0.85rem;color:var(--black);display:block;margin-bottom:0.4rem;">Adjustment Reason / Note</label>
+                    <input type="text" class="form-control" id="adjProdNote" placeholder="e.g. Supplier restocking, physical inventory recount, damaged">
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.85rem 1rem;background:#f5f5f5;border-radius:6px;font-size:0.88rem;">
+                    <span>Projected Resulting Stock:</span>
+                    <strong id="adjProdProjected" style="font-size:1.15rem;color:var(--black);">0</strong>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:1rem 1.5rem;display:flex;justify-content:flex-end;gap:0.75rem;">
+                <button class="btn btn-outline" id="cancelAdjustProductStockModal">Cancel</button>
+                <button class="btn btn-primary" id="saveAdjustProductStockBtn">Save Stock Update</button>
+            </div>
+        </div>
+    </div>
 </body>
 
-</html>
+</html
+                </div>
+
+                <!-- ════ TAB 4: STOCK REQUESTS ════ -->
+                <div class="inv-tab-panel" id="tab-stock-requests">
+
+                </div>
+>
