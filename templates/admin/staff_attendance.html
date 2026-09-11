@@ -2791,9 +2791,7 @@
                             </button>
                         </div>
                         <p class="face-tip">
-                            <strong>Liveness check:</strong> When prompted, slowly nod your head <strong>UP</strong>
-                            then <strong>DOWN</strong> to confirm you are present. The system will then match your face
-                            automatically.
+                            <strong>Face verification:</strong> Look directly at the camera with your face centered and well-lit. The system will match your face automatically.
                         </p>
                     </div>
                 </div>
@@ -3003,9 +3001,9 @@
                 state.currentStep = step;
 
                 if (step === 3) {
-                    // Reset overlay message and liveness state when entering Face Verify step
+                    // Reset overlay message when entering Face Verify step
                     const overlay = document.getElementById("verifyOverlay");
-                    if (overlay) overlay.textContent = "⬆️ Move your head UP";
+                    if (overlay) overlay.textContent = "Position your face in frame";
                     lastCaptureTime = 0;   // allow immediate first send
 
                     // Tell backend to clear any stale liveness session for this employee
@@ -4048,10 +4046,9 @@
          * Captures one frame from the live camera, sends it to /verify_face,
          * and on success calls saveAttendance() to record clock-in/out.
          * 
-         * The backend implements liveness detection (head-nod challenge) and
-         * cosine-distance face matching via Facenet-512.  Feedback messages
-         * like "Move head UP / DOWN" are shown in the camera overlay until
-         * the liveness check passes and the face is confirmed.
+         * Cosine-distance face matching via Facenet. Feedback messages
+         * like "Align your face" are shown in the camera overlay until
+         * the face is matched and confirmed.
          */
         async function verifyIdentity() {
 
@@ -4178,8 +4175,7 @@
          * autoVerifyLoop()
          * ─────────────────
          * Runs while the user is on Step 3 (Face Verify).
-         * Sends a frame every 2.5 seconds; the backend's liveness challenge
-         * guides the user (UP → DOWN nod) until liveness passes and the face
+         * Sends a frame every 2.5 seconds until the face
          * is matched, then attendance is recorded automatically.
          *
          * Interval is intentionally generous (2.5 s) so the server has time to

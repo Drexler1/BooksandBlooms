@@ -1441,39 +1441,53 @@ def detect_face_strict(img, gray, registration_mode=False):
     Run Haar cascade detection and enforce positional / size constraints.
     Returns (x, y, w, h) on success or raises ValueError with user-facing message.
 
-    registration_mode=True  →  disables blur gate entirely (webcam auto-exposure
-                                takes several seconds to settle, so early frames
-                                always fail the blur check), relaxes distance and
-                                centering tolerances, and uses softer Haar params.
+    Multi-pass detection:
+      1. Natural grayscale (best when background has bright lighting / backlight)
+      2. CLAHE (Contrast Limited Adaptive Histogram Equalization - boosts local face contrast)
+      3. Global histogram equalization (boosts overall dim / underexposed frames)
+      4. Soft fallback pass with relaxed neighbors
     """
     cv2, np = _get_cv2_np()
     frame_h, frame_w = img.shape[:2]
 
-    # ── Histogram equalisation: boosts contrast for dim / low-light webcams ─
-    gray_eq = cv2.equalizeHist(gray)
-
     # ── Blur check ───────────────────────────────────────────────────────────
-    # Skipped entirely during registration because:
-    #   • The first N frames are always dark while the sensor adjusts exposure
-    #   • JPEG compression at low quality produces artificially low variance
-    #   • A slightly soft face frame is still sufficient for FaceNet-512
-    # Only enforced during live verification where image quality matters more.
+    # Relaxed to 8.0 for 320x240 webcams where normal focus/lighting can yield lower variance.
     if not registration_mode:
         blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
-        if blur_score < 15:
+        if blur_score < 8.0:
             raise ValueError(
                 f"Image too blurry – hold the camera steady (score: {blur_score:.1f})"
             )
 
-    # ── Haar cascade ─────────────────────────────────────────────────────────
-    # Relaxed parameters during registration so dim / slightly off-center
-    # faces still detect.  scaleFactor=1.1 catches more scale steps;
-    # minNeighbors=3 (vs 5) accepts faces with less repeated confirmation.
-    scale = 1.1 if registration_mode else 1.2
-    neighbors = 3 if registration_mode else 4
-    faces = _get_face_cascade().detectMultiScale(
-        gray_eq, scaleFactor=scale, minNeighbors=neighbors, minSize=(50, 50)
+    cascade = _get_face_cascade()
+
+    # ── Multi-pass Haar cascade ──────────────────────────────────────────────
+    # Pass 1: Natural grayscale
+    faces = cascade.detectMultiScale(
+        gray, scaleFactor=1.1, minNeighbors=3, minSize=(36, 36)
     )
+
+    # Pass 2: CLAHE for uneven lighting / bright background
+    if len(faces) == 0:
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        gray_clahe = clahe.apply(gray)
+        faces = cascade.detectMultiScale(
+            gray_clahe, scaleFactor=1.1, minNeighbors=3, minSize=(36, 36)
+        )
+
+    # Pass 3: Global histogram equalization
+    if len(faces) == 0:
+        gray_eq = cv2.equalizeHist(gray)
+        faces = cascade.detectMultiScale(
+            gray_eq, scaleFactor=1.1, minNeighbors=3, minSize=(36, 36)
+        )
+
+    # Pass 4: Soft fallback with minNeighbors=2 for subtle angles / dim frames
+    if len(faces) == 0:
+        faces = cascade.detectMultiScale(
+            gray, scaleFactor=1.08, minNeighbors=2, minSize=(32, 32)
+        )
+
     if len(faces) == 0:
         raise ValueError("No face detected – look directly at the camera")
 
@@ -1483,15 +1497,15 @@ def detect_face_strict(img, gray, registration_mode=False):
 
     # ── Distance check ───────────────────────────────────────────────────────
     ratio = (w * h) / (frame_w * frame_h)
-    min_ratio = 0.03 if registration_mode else 0.04
+    min_ratio = 0.025
     if ratio < min_ratio:
         raise ValueError("Move closer to the camera")
-    if ratio > 0.65:
+    if ratio > 0.70:
         raise ValueError("Move slightly back from the camera")
 
     # ── Centering check ──────────────────────────────────────────────────────
     cx, cy = x + w // 2, y + h // 2
-    tolerance = 0.38 if registration_mode else 0.35
+    tolerance = 0.40
     if abs(cx - frame_w // 2) > frame_w * tolerance:
         raise ValueError("Center your face horizontally")
     if abs(cy - frame_h // 2) > frame_h * tolerance:
@@ -1770,9 +1784,9 @@ def register_face_frame():
             captured = len(sess["embeddings"])
 
             step_msgs = {
-                1: "⬆️ Now slowly move head UP",
-                2: "⬇️ Now move head DOWN",
-                3: "✅ Face capture complete",
+                1: "Frame 1 captured — hold steady",
+                2: "Frame 2 captured — almost done",
+                3: "Face capture complete",
             }
             msg = step_msgs.get(captured, f"Frame {captured} captured")
 
@@ -1937,11 +1951,18 @@ def verify_face():
     try:
         _cv2_local, _ = _get_cv2_np()
         img, gray = decode_base64_image(image_data)
-        # The browser mirrors the canvas — flip back to natural orientation
-        # so Haar detection works correctly (trained on unmirrored faces).
-        img = _cv2_local.flip(img, 1)
-        gray = _cv2_local.flip(gray, 1)
-        x, y, w, h = detect_face_strict(img, gray)
+        # The browser mirrors the canvas — try natural (flipped) orientation first,
+        # fallback to raw orientation if needed.
+        img_flipped = _cv2_local.flip(img, 1)
+        gray_flipped = _cv2_local.flip(gray, 1)
+        try:
+            x, y, w, h = detect_face_strict(img_flipped, gray_flipped)
+            img, gray = img_flipped, gray_flipped
+        except ValueError as e1:
+            try:
+                x, y, w, h = detect_face_strict(img, gray)
+            except ValueError:
+                raise e1
     except ValueError as e:
         return jsonify({"success": False, "message": str(e)})
 
@@ -1966,9 +1987,9 @@ def verify_face():
     # Head-nod challenge removed. The client's autoVerifyLoop() sends a fresh
     # frame every 2.5 s; we track the face bounding-box centroid across calls
     # to detect a perfectly static source (photo / screen replay).
-    # A real webcam always has minor natural movement (≥1 px shift over ~15 s).
-    STATIC_FRAME_LIMIT = 6   # consecutive frames with <3 px shift → reject
-    STATIC_SHIFT_PX    = 3   # minimum pixel movement to count as "live"
+    # A real webcam always has minor natural movement (≥1 px shift over ~25 s).
+    STATIC_FRAME_LIMIT = 10   # consecutive frames with <2 px shift → reject
+    STATIC_SHIFT_PX    = 2    # minimum pixel movement to count as "live"
 
     center_y = y + h // 2
 
@@ -2025,7 +2046,7 @@ def verify_face():
 
     last_frame_time[employee_id] = now
 
-    MATCH_THRESHOLD = 0.30
+    MATCH_THRESHOLD = 0.40
     if distance >= MATCH_THRESHOLD:
         # ── Increment server-side mismatch counter ───────────────────────────
         fm = face_mismatch_counts.get(employee_id, {"count": 0, "locked_until": None})
