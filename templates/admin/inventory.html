@@ -3301,7 +3301,247 @@
             display: block;
         }
 
-        /* ── DEDICATED STORE PRODUCTS STOCK TABLE ── */
+                /* ── DEDICATED STORE PRODUCTS STOCK SECTION & TABLE ── */
+        .store-products-section {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .store-products-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.15rem 1.4rem;
+            border-bottom: 2px solid var(--gold);
+            background: var(--black);
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .store-products-header h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.35rem;
+            font-weight: 500;
+            color: var(--white);
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+
+        .store-products-header h3 span {
+            color: var(--gold);
+            font-style: italic;
+        }
+
+        .store-products-header p {
+            font-size: 0.8rem;
+            color: #b0b0b0;
+            margin-top: 3px;
+            margin-bottom: 0;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .store-products-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 1rem 1.25rem;
+            background: #fdfdfd;
+            border-bottom: 1px solid #eee;
+            flex-wrap: wrap;
+        }
+
+        .store-table-scroll-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            background: #fff;
+        }
+
+        .store-stock-table {
+            width: 100%;
+            min-width: 1100px;
+            border-collapse: collapse;
+            font-family: 'DM Sans', sans-serif;
+            table-layout: auto;
+        }
+
+        .store-stock-table thead {
+            background: #1e1e1e !important;
+            color: #e6c875 !important;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        .store-stock-table th {
+            padding: 0.9rem 1.1rem !important;
+            font-weight: 700 !important;
+            font-size: 0.74rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.6px !important;
+            white-space: nowrap !important;
+            color: #d4af37 !important;
+            border-bottom: 2px solid #2d2d2d !important;
+            border-top: none !important;
+        }
+
+        .store-stock-table td {
+            padding: 0.85rem 1.1rem !important;
+            border-bottom: 1px solid #f0f0f0 !important;
+            font-size: 0.88rem !important;
+            vertical-align: middle !important;
+            color: #2c2c2c !important;
+            display: table-cell !important;
+        }
+
+        .store-stock-table tbody tr {
+            display: table-row !important;
+            background: transparent !important;
+            transition: background 0.15s ease;
+        }
+
+        .store-stock-table tbody tr:hover {
+            background: #faf7f0 !important;
+        }
+
+        .store-stock-table td.num-cell {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .btn-adjust-stock {
+            white-space: nowrap !important;
+            min-width: 120px;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            padding: 0.45rem 0.85rem !important;
+            font-size: 0.82rem !important;
+            font-weight: 600 !important;
+            border-radius: 7px !important;
+            border: 1px solid #d4af37 !important;
+            color: #8c6d1f !important;
+            background: #fffbf0 !important;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            text-decoration: none;
+        }
+
+        .btn-adjust-stock:hover {
+            background: var(--gold) !important;
+            color: var(--black) !important;
+            border-color: var(--gold) !important;
+            box-shadow: 0 2px 6px rgba(201, 169, 97, 0.35);
+        }
+
+        /* ── STORE PRODUCTS PAGINATION BAR ── */
+        .store-pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.9rem 1.3rem;
+            border-top: 1px solid #eee;
+            background: #faf9f6;
+            flex-wrap: wrap;
+            gap: 0.85rem;
+        }
+
+        .store-pagination-left {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+        }
+
+        .store-pagination-info {
+            font-size: 0.83rem;
+            color: #666;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .store-page-size-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.82rem;
+            color: #777;
+            font-weight: 500;
+        }
+
+        .store-page-size-select {
+            padding: 0.28rem 0.55rem;
+            border-radius: 6px;
+            border: 1px solid #d5d5d5;
+            background: #fff;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #333;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .store-page-size-select:focus {
+            border-color: var(--gold);
+        }
+
+        .store-pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .store-page-btn {
+            min-width: 34px;
+            height: 34px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 7px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #444;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 0.45rem;
+        }
+
+        .store-page-btn:hover:not(:disabled) {
+            border-color: var(--gold);
+            color: var(--dark-gold);
+            background: #fffdf8;
+        }
+
+        .store-page-btn.active {
+            background: var(--black);
+            color: var(--gold);
+            border-color: var(--black);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+        }
+
+        .store-page-btn:disabled {
+            opacity: 0.38;
+            cursor: not-allowed;
+            border-color: #eee;
+            background: #f8f8f8;
+        }
+
+        .store-page-btn.ellipsis {
+            border: none;
+            background: transparent;
+            cursor: default;
+            color: #999;
+            font-size: 1rem;
+        }
+
         .dept-chip {
             display: inline-flex;
             align-items: center;
@@ -3350,6 +3590,7 @@
         .stock-pill.ok  { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
         .stock-pill.low { background: #fff8e1; color: #e65100; border: 1px solid #ffe082; }
         .stock-pill.out { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .stock-pill.none { background: #f0f0f0; color: #777; border: 1px solid #dcdcdc; }
 
         .stock-pill .status-dot {
             width: 7px;
@@ -3362,6 +3603,7 @@
         .stock-pill.ok .status-dot  { background: #2e7d32; }
         .stock-pill.low .status-dot { background: #e65100; }
         .stock-pill.out .status-dot { background: #c62828; }
+        .stock-pill.none .status-dot { background: #999; }
 
         .prod-thumb-cell {
             display: flex;
@@ -3604,14 +3846,14 @@
 
                 <!-- ════ TAB 1: DEDICATED STORE PRODUCTS STOCK TRACKING ════ -->
                 <div class="inv-tab-panel active" id="tab-store-products">
-                    <div class="ingredient-section" style="margin-top:0;">
-                        <div class="ingredient-section-header">
+                    <div class="store-products-section" style="margin-top:0;">
+                        <div class="store-products-header">
                             <div>
-                                <h3 style="font-size:1.25rem;">Store Products <span>Stock Tracking</span></h3>
-                                <p style="font-size:0.8rem;color:#777;margin-top:2px;">Live inventory tracking, reorder alert thresholds, and stock value across all branch departments.</p>
+                                <h3>Store Products <span>Stock Tracking</span></h3>
+                                <p>Live inventory tracking, reorder alert thresholds, and stock value across all branch departments.</p>
                             </div>
                             <div style="display:flex;align-items:center;gap:0.75rem;">
-                                <a href="/product_management" class="btn btn-outline btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem;">
+                                <a href="/product_management" class="btn btn-outline btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem;border-color:rgba(201,169,97,0.5);color:#f5deb3;">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     Manage Products & Pricing
                                 </a>
@@ -3619,7 +3861,7 @@
                         </div>
 
                         <!-- Dedicated Store Products Toolbar -->
-                        <div class="ing-toolbar" style="flex-wrap:wrap;gap:0.65rem;">
+                        <div class="store-products-toolbar">
                             <div class="ing-search" style="min-width:240px;flex:1;">
                                 <input type="text" id="prodStockSearch" placeholder="Search product name, SKU, description…">
                             </div>
@@ -3640,27 +3882,45 @@
                             <span class="result-count" id="prodStockCount" style="align-self:center;font-size:0.82rem;color:#888;font-weight:600;">Loading…</span>
                         </div>
 
-                        <!-- Dedicated Store Products Table -->
-                        <div class="ing-table-wrap">
-                            <table class="ing-table" id="productsStockTable">
+                        <!-- Dedicated Store Products Scroll Table Wrapper -->
+                        <div class="store-table-scroll-wrap">
+                            <table class="store-stock-table" id="productsStockTable">
                                 <thead>
                                     <tr>
-                                        <th style="width:50px;"></th>
-                                        <th>Product Name & SKU</th>
-                                        <th>Department</th>
-                                        <th>Subcategory</th>
-                                        <th>Current Stock</th>
-                                        <th>Reorder Point</th>
-                                        <th>Unit Price</th>
-                                        <th>Stock Value</th>
-                                        <th>Stock Status</th>
-                                        <th style="text-align:right;">Actions</th>
+                                        <th style="width:52px;text-align:center;"></th>
+                                        <th style="min-width:220px;text-align:left;">Product Name & SKU</th>
+                                        <th style="min-width:115px;text-align:left;">Department</th>
+                                        <th style="min-width:115px;text-align:left;">Subcategory</th>
+                                        <th style="min-width:110px;text-align:right;">Current Stock</th>
+                                        <th style="min-width:100px;text-align:right;">Reorder Point</th>
+                                        <th style="min-width:100px;text-align:right;">Unit Price</th>
+                                        <th style="min-width:120px;text-align:right;">Stock Value</th>
+                                        <th style="min-width:140px;text-align:center;">Stock Status</th>
+                                        <th style="min-width:135px;text-align:right;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="prodStockBody">
                                     <tr><td colspan="10" style="text-align:center;padding:2.5rem;color:#999;">Loading store products…</td></tr>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Store Products Pagination Bar -->
+                        <div class="store-pagination-bar" id="prodStockPaginationBar" style="display:none;">
+                            <div class="store-pagination-left">
+                                <span class="store-pagination-info" id="prodStockPaginationInfo">Showing 0 products</span>
+                                <div class="store-page-size-wrap">
+                                    <label for="prodStockPageSize">Show</label>
+                                    <select id="prodStockPageSize" class="store-page-size-select">
+                                        <option value="10" selected>10</option>
+                                        <option value="25">25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                    <span>per page</span>
+                                </div>
+                            </div>
+                            <div class="store-pagination-controls" id="prodStockPaginationControls"></div>
                         </div>
                     </div>
                 </div>
@@ -5965,13 +6225,17 @@
             }
         }
 
+                let _prodStockCurrentPage = 1;
+        let _prodStockPageSize = 10;
+        let _filteredStoreProducts = [];
+
         function filterAndRenderStoreProducts() {
             const q = (document.getElementById('prodStockSearch')?.value || '').trim().toLowerCase();
             const deptId = document.getElementById('prodStockDeptFilter')?.value || '';
             const catId  = document.getElementById('prodStockCatFilter')?.value || '';
             const status = document.getElementById('prodStockStatusFilter')?.value || '';
 
-            let filtered = allStoreProducts.filter(p => {
+            _filteredStoreProducts = allStoreProducts.filter(p => {
                 if (q) {
                     const matchQ = (p.name || '').toLowerCase().includes(q) ||
                                    (p.sku || '').toLowerCase().includes(q) ||
@@ -5998,21 +6262,40 @@
                 return true;
             });
 
+            _prodStockCurrentPage = 1;
+            renderStoreProductsPage();
+        }
+
+        function renderStoreProductsPage() {
+            const total = _filteredStoreProducts.length;
             const countEl = document.getElementById('prodStockCount');
-            if (countEl) countEl.textContent = `${filtered.length} product${filtered.length !== 1 ? 's' : ''}`;
+            if (countEl) countEl.textContent = `${total} product${total !== 1 ? 's' : ''}`;
 
             const tbody = document.getElementById('prodStockBody');
+            const pagBar = document.getElementById('prodStockPaginationBar');
+            const pagInfo = document.getElementById('prodStockPaginationInfo');
+            const pagControls = document.getElementById('prodStockPaginationControls');
+
             if (!tbody) return;
 
-            if (!filtered.length) {
+            if (!total) {
                 tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:3rem 1rem;color:#888;">
-                    <div style="font-size:1.1rem;font-weight:700;color:#555;">No matching store products found</div>
+                    <div style="font-size:1.05rem;font-weight:700;color:#555;">No matching store products found</div>
                     <p style="font-size:0.85rem;color:#999;margin-top:0.3rem;">Try adjusting search terms or department filter.</p>
                 </td></tr>`;
+                if (pagBar) pagBar.style.display = 'none';
                 return;
             }
 
-            tbody.innerHTML = filtered.map(p => {
+            const totalPages = Math.ceil(total / _prodStockPageSize);
+            if (_prodStockCurrentPage > totalPages) _prodStockCurrentPage = totalPages;
+            if (_prodStockCurrentPage < 1) _prodStockCurrentPage = 1;
+
+            const start = (_prodStockCurrentPage - 1) * _prodStockPageSize;
+            const end = Math.min(start + _prodStockPageSize, total);
+            const pageItems = _filteredStoreProducts.slice(start, end);
+
+            tbody.innerHTML = pageItems.map(p => {
                 const thumb = p.image_url
                     ? `<img class="prod-thumb-img" src="${p.image_url}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
                     : '';
@@ -6023,12 +6306,14 @@
                 const st = parseInt(p.stock) || 0;
                 const rp = parseInt(p.reorder_point) || 5;
                 const price = parseFloat(p.price || 0);
-                const stockVal = (price * st).toFixed(2);
+                const stockVal = price * st;
+                const formattedStockVal = stockVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const formattedPrice = price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
                 let statusBadge = '';
                 const isTracked = (p.track_stock !== false && p.track_stock !== 0);
                 if (!isTracked) {
-                    statusBadge = `<span class="stock-pill none" style="background:rgba(255,255,255,0.06);color:#999;border:1px solid rgba(255,255,255,0.12);" title="Stock tracking disabled"><span class="status-dot" style="background:#777;"></span>Untracked</span>`;
+                    statusBadge = `<span class="stock-pill none" title="Stock tracking disabled"><span class="status-dot"></span>Untracked</span>`;
                 } else if (st <= 0) {
                     statusBadge = `<span class="stock-pill out" title="Out of stock! Threshold: ${rp}"><span class="status-dot"></span>Out of Stock</span>`;
                 } else if (st <= rp) {
@@ -6038,30 +6323,82 @@
                 }
 
                 return `<tr>
-                    <td style="width:50px;">
-                        <div class="prod-thumb-cell">
+                    <td style="width:52px;text-align:center;">
+                        <div class="prod-thumb-cell" style="justify-content:center;">
                             ${thumb}${fallback}
                         </div>
                     </td>
                     <td>
-                        <div class="prod-stock-name">${escHtml(p.name)}${p.cup_eligible ? '<span style="margin-left:0.35rem;font-size:0.65rem;background:#fff3cd;color:#856404;padding:0.1rem 0.4rem;border-radius:10px;font-weight:700;vertical-align:middle;">Cup Drink</span>' : ''}</div>
+                        <div class="prod-stock-name">${escHtml(p.name)}${p.cup_eligible ? '<span style="margin-left:0.4rem;font-size:0.65rem;background:#fff3cd;color:#856404;padding:0.12rem 0.45rem;border-radius:10px;font-weight:700;vertical-align:middle;display:inline-block;">Cup Drink</span>' : ''}</div>
                         <div class="prod-stock-sku">SKU: ${escHtml(p.sku || '—')}</div>
                     </td>
                     <td><span class="dept-chip">${escHtml(deptLabel)}</span></td>
                     <td><span class="cat-chip ${!p.category_name ? 'none' : ''}">${escHtml(catLabel)}</span></td>
-                    <td><span class="stock-qty-val">${st}</span><span class="stock-qty-unit">${p.unit || 'pcs'}</span></td>
-                    <td><span class="stock-threshold-val">${rp}</span><span class="stock-qty-unit">${p.unit || 'pcs'}</span></td>
-                    <td style="font-weight:600;">₱${price.toFixed(2)}</td>
-                    <td style="font-weight:700;color:var(--dark-gold);">₱${stockVal}</td>
-                    <td>${statusBadge}</td>
+                    <td class="num-cell"><span class="stock-qty-val">${st}</span><span class="stock-qty-unit">${p.unit || 'pcs'}</span></td>
+                    <td class="num-cell"><span class="stock-threshold-val">${rp}</span><span class="stock-qty-unit">${p.unit || 'pcs'}</span></td>
+                    <td class="num-cell" style="font-weight:600;">₱${formattedPrice}</td>
+                    <td class="num-cell" style="font-weight:700;color:var(--dark-gold);">₱${formattedStockVal}</td>
+                    <td style="text-align:center;">${statusBadge}</td>
                     <td style="text-align:right;">
-                        <button class="btn btn-outline btn-sm" onclick="openAdjustProductStock(${p.product_id})" title="Quick restock or deduct units">
+                        <button class="btn-adjust-stock" onclick="openAdjustProductStock(${p.product_id})" title="Quick restock or deduct units">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             Adjust Stock
                         </button>
                     </td>
                 </tr>`;
             }).join('');
+
+            // Show and render pagination bar
+            if (pagBar) pagBar.style.display = 'flex';
+            if (pagInfo) pagInfo.textContent = `Showing ${start + 1}–${end} of ${total} product${total !== 1 ? 's' : ''}`;
+
+            if (pagControls) {
+                pagControls.innerHTML = '';
+
+                function makeStorePageBtn(label, targetPage, isActive, isDisabled, extraClass) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'store-page-btn' + (isActive ? ' active' : '') + (extraClass ? ' ' + extraClass : '');
+                    btn.textContent = label;
+                    btn.disabled = !!isDisabled;
+                    if (!isDisabled && !isActive) {
+                        btn.addEventListener('click', () => {
+                            _prodStockCurrentPage = targetPage;
+                            renderStoreProductsPage();
+                        });
+                    }
+                    return btn;
+                }
+
+                // Prev button
+                pagControls.appendChild(makeStorePageBtn('‹', _prodStockCurrentPage - 1, false, _prodStockCurrentPage === 1));
+
+                // Smart page range
+                const delta = 1;
+                const range = [];
+                for (let i = 1; i <= totalPages; i++) {
+                    if (i === 1 || i === totalPages || (i >= _prodStockCurrentPage - delta && i <= _prodStockCurrentPage + delta)) {
+                        range.push(i);
+                    }
+                }
+
+                let prev = null;
+                range.forEach(pNum => {
+                    if (prev !== null && pNum - prev > 1) {
+                        const dot = document.createElement('button');
+                        dot.type = 'button';
+                        dot.className = 'store-page-btn ellipsis';
+                        dot.textContent = '…';
+                        dot.disabled = true;
+                        pagControls.appendChild(dot);
+                    }
+                    pagControls.appendChild(makeStorePageBtn(pNum, pNum, pNum === _prodStockCurrentPage, false));
+                    prev = pNum;
+                });
+
+                // Next button
+                pagControls.appendChild(makeStorePageBtn('›', _prodStockCurrentPage + 1, false, _prodStockCurrentPage === totalPages));
+            }
         }
 
         // Toolbar listeners
@@ -6073,6 +6410,11 @@
         document.getElementById('prodStockCatFilter')?.addEventListener('change', filterAndRenderStoreProducts);
         document.getElementById('prodStockStatusFilter')?.addEventListener('change', filterAndRenderStoreProducts);
         document.getElementById('prodStockRefreshBtn')?.addEventListener('click', loadStoreProducts);
+        document.getElementById('prodStockPageSize')?.addEventListener('change', function() {
+            _prodStockPageSize = parseInt(this.value, 10) || 10;
+            _prodStockCurrentPage = 1;
+            renderStoreProductsPage();
+        });
 
         // Quick Product Stock Adjustment Modal
         window.openAdjustProductStock = function(prodId) {
