@@ -390,6 +390,22 @@
             box-shadow: 0 6px 20px rgba(201, 169, 97, 0.22);
         }
 
+        
+        .stat-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: #ffffff;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .empty-icon svg {
+            width: 44px;
+            height: 44px;
+            display: inline-block;
+        }
+
         .stat-icon {
             width: 46px;
             height: 46px;
@@ -2334,7 +2350,7 @@
                         <p>{{ session.get('role')|capitalize }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜] Logout</button></form>
+                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
             </div>
         </header>
 
@@ -2364,15 +2380,15 @@
                         <p class="page-subtitle">Track clock-ins, clock-outs, and shift coverage in real time.</p>
                     </div>
                     <div class="page-actions">
-                        <button class="btn btn-outline btn-sm" id="exportAttendanceBtn">📥 Export CSV</button>
-                        <button class="btn btn-primary" id="openClockModal">📋 Attendance Taking</button>
+                        <button class="btn btn-outline btn-sm" id="exportAttendanceBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Export CSV</button>
+                        <button class="btn btn-primary" id="openClockModal"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>Attendance Taking</button>
                     </div>
                 </div>
 
                 <!-- Summary Cards -->
                 <div class="summary-cards">
                     <div class="stat-card">
-                        <div class="stat-icon gold">👥</div>
+                        <div class="stat-icon gold"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
                         <div>
                             <div class="stat-label">Total Employees</div>
                             <div class="stat-value" id="statTotal">—</div>
@@ -2380,7 +2396,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon green">✅</div>
+                        <div class="stat-icon green"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
                         <div>
                             <div class="stat-label">Present Today</div>
                             <div class="stat-value" id="statPresent">—</div>
@@ -2388,7 +2404,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon blue">🏁</div>
+                        <div class="stat-icon blue"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg></div>
                         <div>
                             <div class="stat-label">Completed</div>
                             <div class="stat-value" id="statCompleted">—</div>
@@ -2415,7 +2431,7 @@
                 <!-- Controls Bar -->
                 <div class="controls-bar">
                     <div class="search-box">
-                        <span class="search-icon">🔍</span>
+                        <span class="search-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
                         <input type="text" id="searchInput" placeholder="Search by employee name or ID…">
                     </div>
                     <div class="filter-group">
@@ -2426,7 +2442,7 @@
                         </select>
                     </div>
                     <div class="divider-v"></div>
-                    <button class="btn btn-outline btn-sm" id="resetFilters">✕ Clear</button>
+                    <button class="btn btn-outline btn-sm" id="resetFilters"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Clear</button>
                 </div>
 
                 <!-- Main Grid -->
@@ -2461,7 +2477,7 @@
                                     <tr>
                                         <td colspan="9">
                                             <div class="empty-state">
-                                                <div class="empty-icon">📋</div>
+                                                <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg></div>
                                                 <p>No attendance records found for the selected filters.</p>
                                             </div>
                                         </td>
@@ -2485,7 +2501,7 @@
                         <!-- Calendar -->
                         <div class="panel-card">
                             <div class="panel-header">
-                                <h3>📅 Calendar</h3>
+                                <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Calendar</h3>
                             </div>
                             <div class="panel-body">
                                 <div class="cal-header">
@@ -2508,11 +2524,11 @@
                         <!-- Shifts -->
                         <div class="panel-card">
                             <div class="panel-header">
-                                <h3>🕐 Today's Shifts</h3>
+                                <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Today's Shifts</h3>
                                 <div style="display:flex;gap:0.4rem;">
-                                    <button class="btn btn-outline btn-sm" id="openShiftManager">⚙️ Manage</button>
+                                    <button class="btn btn-outline btn-sm" id="openShiftManager"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Manage</button>
                                     <button class="btn btn-outline btn-sm" id="openLDSettings"
-                                        title="Late Deduction Settings">🕓 Late Fine</button>
+                                        title="Late Deduction Settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 15 15"></polyline></svg>Late Fine</button>
                                 </div>
                             </div>
                             <div class="panel-body">
@@ -2558,14 +2574,14 @@
         <div class="modal" style="max-width:min(460px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2>Review <span>Overtime Request</span></h2>
-                <button class="modal-close" id="closeOTReviewModal">✕</button>
+                <button class="modal-close" id="closeOTReviewModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body" style="padding:1.5rem;">
                 <div id="otReviewDetails"
                     style="background:#f9f9f9;border-radius:8px;padding:1rem;margin-bottom:1.25rem;font-size:0.93rem;line-height:1.7;">
                 </div>
                 <div style="margin-bottom:1rem;">
-                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">📝 Admin Note (optional)</label>
+                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">Admin Note (optional)</label>
                     <textarea id="otAdminNote" rows="3" maxlength="500" placeholder="Leave a note for the employee…"
                         style="width:100%;box-sizing:border-box;padding:0.6rem 0.75rem;border:1px solid #ddd;border-radius:8px;font-size:0.93rem;resize:vertical;font-family:inherit;"></textarea>
                 </div>
@@ -2577,8 +2593,8 @@
                 <button class="btn btn-outline" id="cancelOTReview">Cancel</button>
                 <div class="modal-footer-right">
                     <button class="btn" id="denyOTBtn"
-                        style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;">❌ Deny</button>
-                    <button class="btn btn-primary" id="approveOTBtn">✅ Approve</button>
+                        style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Deny</button>
+                    <button class="btn btn-primary" id="approveOTBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>Approve</button>
                 </div>
             </div>
         </div>
@@ -2590,7 +2606,7 @@
             <div class="modal-header">
                 <h2>Edit <span>Late Deduction</span></h2>
                 <button class="modal-close"
-                    onclick="document.getElementById('deductionEditModal').classList.remove('open')">✕</button>
+                    onclick="document.getElementById('deductionEditModal').classList.remove('open')" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body" style="padding:1.5rem;">
                 <p style="color:#666;font-size:0.9rem;margin-bottom:1rem;">
@@ -2599,7 +2615,7 @@
                 </p>
                 <input type="hidden" id="deductEditAttId">
                 <div style="margin-bottom:1rem;">
-                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">💸 Deduction Amount (₱)</label>
+                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">Deduction Amount (₱)</label>
                     <input type="number" id="deductEditAmount" min="0" step="0.01"
                         style="width:100%;box-sizing:border-box;padding:0.6rem 0.75rem;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;">
                 </div>
@@ -2615,7 +2631,7 @@
             <div class="modal-footer">
                 <button class="btn btn-outline"
                     onclick="document.getElementById('deductionEditModal').classList.remove('open')">Cancel</button>
-                <button class="btn btn-primary" id="saveDeductionBtn">💾 Save</button>
+                <button class="btn btn-primary" id="saveDeductionBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>Save</button>
             </div>
         </div>
     </div>
@@ -2624,9 +2640,9 @@
     <div class="modal-overlay" id="lateDeductionSettingsModal">
         <div class="modal" style="max-width:min(440px, calc(100vw - 2rem));">
             <div class="modal-header">
-                <h2>⚙️ Late Deduction <span>Settings</span></h2>
+                <h2>Late Deduction <span>Settings</span></h2>
                 <button class="modal-close"
-                    onclick="document.getElementById('lateDeductionSettingsModal').classList.remove('open')">✕</button>
+                    onclick="document.getElementById('lateDeductionSettingsModal').classList.remove('open')" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body" style="padding:1.5rem;">
                 <p style="color:#666;font-size:0.9rem;margin-bottom:1.2rem;">
@@ -2642,7 +2658,7 @@
                         not be penalised.</small>
                 </div>
                 <div style="margin-bottom:0.75rem;">
-                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">💸 Per-Minute Deduction Rate
+                    <label style="font-weight:600;display:block;margin-bottom:0.35rem;">Per-Minute Deduction Rate
                         (₱/min)</label>
                     <input type="number" id="ldPerMinuteRate" min="0" step="0.0001"
                         style="width:100%;box-sizing:border-box;padding:0.6rem 0.75rem;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;"
@@ -2656,7 +2672,7 @@
                 <div
                     style="background:#f5f9ff;border:1px solid #c5d9f1;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;">
                     <label
-                        style="font-weight:600;font-size:0.85rem;color:#1565c0;display:block;margin-bottom:0.4rem;">🔢
+                        style="font-weight:600;font-size:0.85rem;color:#1565c0;display:block;margin-bottom:0.4rem;">
                         Rate Calculator</label>
                     <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                         <span style="font-size:0.88rem;color:#444;">Hourly rate ₱</span>
@@ -2682,7 +2698,7 @@
             <div class="modal-footer">
                 <button class="btn btn-outline"
                     onclick="document.getElementById('lateDeductionSettingsModal').classList.remove('open')">Close</button>
-                <button class="btn btn-primary" id="saveLDSettingsBtn">💾 Save Settings</button>
+                <button class="btn btn-primary" id="saveLDSettingsBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>Save Settings</button>
             </div>
         </div>
     </div>
@@ -2694,7 +2710,7 @@
             <!-- Header -->
             <div class="modal-header">
                 <h2>Attendance <span>Taking</span></h2>
-                <button class="modal-close" id="closeAttendanceModal">✕</button>
+                <button class="modal-close" id="closeAttendanceModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
 
             <!-- Body -->
@@ -2722,7 +2738,7 @@
 
                 <!-- Employee Selector (always visible) -->
                 <div class="employee-selector">
-                    <label>👤 Select Employee</label>
+                    <label>Select Employee</label>
                     <select id="employeeSelect">
                         <option value="">— Choose an employee —</option>
                     </select>
@@ -2733,12 +2749,12 @@
                     <div class="step-section-label">Choose action</div>
                     <div class="shift-grid">
                         <div class="shift-option" onclick="selectAction('clock_in', this)">
-                            <span class="s-icon">🟢</span>
+                            <span class="s-icon" style="color:var(--success);font-size:0.8rem;">●</span>
                             <div class="s-name">Clock In</div>
                             <div class="s-time">Start Work Shift</div>
                         </div>
                         <div class="shift-option" onclick="selectAction('clock_out', this)">
-                            <span class="s-icon">🔴</span>
+                            <span class="s-icon" style="color:var(--danger);font-size:0.8rem;">●</span>
                             <div class="s-name">Clock Out</div>
                             <div class="s-time">End Work Shift</div>
                         </div>
@@ -2771,11 +2787,11 @@
                         </div>
                         <div class="face-actions">
                             <button class="btn btn-primary" id="verifyBtn" onclick="verifyIdentity()">
-                                🔍 Verify Identity
+                                Verify Identity
                             </button>
                         </div>
                         <p class="face-tip">
-                            💡 <strong>Liveness check:</strong> When prompted, slowly nod your head <strong>UP</strong>
+                            <strong>Liveness check:</strong> When prompted, slowly nod your head <strong>UP</strong>
                             then <strong>DOWN</strong> to confirm you are present. The system will then match your face
                             automatically.
                         </p>
@@ -2785,7 +2801,7 @@
                 <!-- Step 4: Confirmation -->
                 <div class="step-panel" id="panelStep4">
                     <div class="confirm-card">
-                        <span class="confirm-success-icon">✅</span>
+                        <span class="confirm-success-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></span>
                         <div class="confirm-avatar" id="confirmInitial">A</div>
                         <div class="confirm-type-badge" id="confirmBadge"></div>
                         <div class="confirm-name" id="confirmEmployeeName">—</div>
@@ -2828,11 +2844,11 @@
         <div class="modal" style="max-width:min(560px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <div>
-                    <h2>⚙️ Shift <span>Manager</span></h2>
+                    <h2>Shift <span>Manager</span></h2>
                     <p style="font-size:0.78rem;color:#aaa;margin-top:3px;">Create custom time slots — employees pick
                         from these when clocking in</p>
                 </div>
-                <button class="modal-close" id="closeShiftManager">✕</button>
+                <button class="modal-close" id="closeShiftManager" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body" style="overflow-y:auto;max-height:62vh;" id="smShiftList">
                 <!-- rows injected by JS -->
@@ -2842,13 +2858,13 @@
                     Shift</button>
             </div>
             <div class="sm-info-note" style="margin:0.75rem 1.4rem 0;">
-                💡 Overnight shifts (end &lt; start) are fully supported. Total hours are auto-calculated.
+                Overnight shifts (end &lt; start) are fully supported. Total hours are auto-calculated.
             </div>
             <div class="modal-footer">
                 <div></div>
                 <div class="modal-footer-right">
                     <button class="btn btn-outline" id="smCancel">Cancel</button>
-                    <button class="btn btn-success" id="smSave">✓ Save Shifts</button>
+                    <button class="btn btn-success" id="smSave"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>Save Shifts</button>
                 </div>
             </div>
         </div>
@@ -3112,7 +3128,7 @@
                         body.innerHTML = `
                     <tr class="empty-row"><td colspan="9">
                         <div class="empty-state">
-                            <div class="empty-icon">📋</div>
+                            <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg></div>
                             <p>No attendance records found for the selected filters.</p>
                         </div>
                     </td></tr>`;
@@ -3135,7 +3151,7 @@
                         })();
                         const fulfill = r.fulfill_working_hours === "YES";
                         const fulfillBadge = fulfill
-                            ? `<span class="badge badge-present">✅ Yes</span>`
+                            ? `<span class="badge badge-present">Yes</span>`
                             : `<span class="badge badge-absent">No</span>`;
                         const initials = (r.full_name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
@@ -3280,11 +3296,11 @@
                     const badge = document.getElementById("confirmBadge");
                     if (badge) {
                         badge.className = `confirm-type-badge ${isClockIn ? 'clock-in' : 'clock-out'}`;
-                        badge.textContent = isClockIn ? "🟢 Clock In" : "🔴 Clock Out";
+                        badge.textContent = isClockIn ? "Clock In" : "Clock Out";
                     }
 
                     showStep(4);
-                    showToast("✅ Face verified & attendance recorded!", "success");
+                    showToast("Face verified & attendance recorded!", "success");
                     loadAttendance();
                     setTimeout(closeAttendance, 3000);
 
@@ -3325,7 +3341,7 @@
                 if (overlayEl) { overlayEl.textContent = ""; overlayEl.style.color = ""; }
                 if (btn) {
                     btn.disabled = false;
-                    btn.textContent = "🔍 Verify Identity";
+                    btn.textContent = "Verify Identity";
                     btn.style.background = "";
                 }
             });
@@ -3474,7 +3490,7 @@
                     errEl.style.display = 'block';
                 } finally {
                     saveBtn.disabled = false;
-                    saveBtn.textContent = '💾 Save';
+                    saveBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>Save';
                 }
             });
         })();
@@ -3540,7 +3556,7 @@
                     });
                     const data = await res.json();
                     if (data.success) {
-                        successEl.textContent = `✅ Saved — grace: ${grace}m, rate: ₱${rate.toFixed(4)}/min`;
+                        successEl.textContent = `Saved — grace: ${grace}m, rate: ₱${rate.toFixed(4)}/min`;
                         successEl.style.display = 'block';
                     } else {
                         errEl.textContent = data.message || 'Failed to save.';
@@ -3551,7 +3567,7 @@
                     errEl.style.display = 'block';
                 } finally {
                     saveBtn.disabled = false;
-                    saveBtn.textContent = '💾 Save Settings';
+                    saveBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>Save Settings';
                 }
             });
         })();
@@ -3568,7 +3584,7 @@
                 "#4caf50", "#c9a961", "#2196f3", "#e91e63", "#ff9800",
                 "#9c27b0", "#00bcd4", "#f44336", "#795548", "#607d8b"
             ];
-            const SHIFT_ICONS = ["🌅", "☀️", "🌙", "⭐", "🔆", "🌟", "💫", "🌠", "🏙️", "🌃"];
+            const SHIFT_ICONS = ["", "", "", "", "", "", "", "", "", ""];
 
             // Convert "HH:MM" to 12-hr display e.g. "8:00 AM"
             function fmt12(t) {
@@ -3686,7 +3702,7 @@
                 </div>
                 <div class="sm-duration-badge" id="smDur_${idx}">—</div>
                 <button onclick="smRemoveRow(${idx})" title="Remove shift"
-                        style="background:none;border:none;color:#f44336;font-size:1.1rem;cursor:pointer;padding:0 0 0 10px;line-height:1;">✕</button>
+                        style="background:none;border:none;color:#f44336;cursor:pointer;padding:0 0 0 10px;display:inline-flex;align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="sm-shift-inputs">
                 <div class="sm-input-group">
@@ -3797,7 +3813,7 @@
                     renderShiftCards();
                     populateFilterDropdown();
                     closeShiftManagerFn();
-                    showToast("✅ Shifts saved successfully!", "success");
+                    showToast("Shifts saved successfully!", "success");
                 } catch (e) {
                     showToast("Network error — shifts not saved.", "error");
                 }
@@ -3861,7 +3877,7 @@
                             const map = { pending: 'background:#fff8e1;color:#f59e0b;', approved: 'background:#e8f5e9;color:#388e3c;', denied: 'background:#ffebee;color:#c62828;', cancelled: 'background:#f5f5f5;color:#888;' };
                             return map[s] || 'background:#f5f5f5;color:#555;';
                         };
-                        const statusLabel = s => ({ pending: '⏳ Pending', approved: '✅ Approved', denied: '❌ Denied', cancelled: 'Cancelled' }[s] || s);
+                        const statusLabel = s => ({ pending: 'Pending', approved: 'Approved', denied: 'Denied', cancelled: 'Cancelled' }[s] || s);
 
                         // Build rows with proper DOM construction to avoid
                         // JSON.stringify double-quotes breaking onclick="..." attributes.
@@ -3914,13 +3930,13 @@
                                 const approveBtn2 = document.createElement('button');
                                 approveBtn2.className = 'btn btn-sm icon-btn-approve';
                                 approveBtn2.style.cssText = 'flex:1;font-size:0.83rem;padding:0.35rem 0.5rem;border-radius:6px;';
-                                approveBtn2.textContent = '✅ Approve';
+                                approveBtn2.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>Approve';
                                 approveBtn2.addEventListener('click', () => quickOTAction(r.request_id, 'approve', r.employee_name));
 
                                 const denyBtn2 = document.createElement('button');
                                 denyBtn2.className = 'btn btn-sm icon-btn-deny';
                                 denyBtn2.style.cssText = 'flex:1;font-size:0.83rem;padding:0.35rem 0.5rem;border-radius:6px;';
-                                denyBtn2.textContent = '❌ Deny';
+                                denyBtn2.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Deny';
                                 denyBtn2.addEventListener('click', () => openOTReview(r.request_id, r.employee_name, r.request_date, r.extended_hours, r.reason || ''));
 
                                 btnRow.appendChild(approveBtn2);
@@ -3943,10 +3959,10 @@
                     currentOTRequestId = requestId;
                     const detailsEl = document.getElementById('otReviewDetails');
                     if (detailsEl) detailsEl.innerHTML = `
-                <strong>👤 Employee:</strong> ${escapeHtml(empName)}<br>
-                <strong>📅 Date:</strong> ${date}<br>
+                <strong>Employee:</strong> ${escapeHtml(empName)}<br>
+                <strong>Date:</strong> ${date}<br>
                 <strong>⏱ Extended Hours:</strong> ${parseFloat(hours).toFixed(1)} hr${hours != 1 ? 's' : ''}<br>
-                <strong>📝 Reason:</strong> ${escapeHtml(reason) || '—'}
+                <strong>Reason:</strong> ${escapeHtml(reason) || '—'}
             `;
                     const noteEl = document.getElementById('otAdminNote');
                     if (noteEl) noteEl.value = '';
@@ -3966,7 +3982,7 @@
                         });
                         const data = await res.json();
                         if (data.success) {
-                            showToast(`Request ${action === 'approve' ? 'approved ✅' : 'denied ❌'}`, action === 'approve' ? 'success' : 'error');
+                            showToast(`Request ${action === 'approve' ? 'approved' : 'denied'}`, action === 'approve' ? 'success' : 'error');
                             loadOTRequests();
                         } else {
                             showToast(data.message || 'Action failed.', 'error');
@@ -3993,7 +4009,7 @@
                         const data = await res.json();
                         if (data.success) {
                             document.getElementById('otReviewModal')?.classList.remove('open');
-                            showToast(`Request ${action === 'approve' ? 'approved ✅' : 'denied ❌'}`, action === 'approve' ? 'success' : 'error');
+                            showToast(`Request ${action === 'approve' ? 'approved' : 'denied'}`, action === 'approve' ? 'success' : 'error');
                             loadOTRequests();
                         } else {
                             if (errEl) { errEl.textContent = data.message || 'Error'; errEl.style.display = 'block'; }
@@ -4082,13 +4098,13 @@
 
                 if (!data.success) {
                     if (data.locked) {
-                        // ── 🔒 Server-side lockout — hard stop, no auto-retry ────
+                        // ── Server-side lockout — hard stop, no auto-retry ────
                         isMismatchLocked = true;
                         showToast(data.message, "error");
                         if (overlayEl) { overlayEl.textContent = data.message; overlayEl.style.color = "#ff4444"; }
                         if (btn) {
                             btn.disabled = true;
-                            btn.textContent = "🔒 Locked";
+                            btn.textContent = "Locked";
                             btn.style.background = "#7f1d1d";
                         }
                         // Parse lockout duration from message if present (e.g. "30s")
@@ -4108,17 +4124,17 @@
                             if (overlayEl) { overlayEl.textContent = ""; overlayEl.style.color = ""; }
                             if (btn) {
                                 btn.disabled = false;
-                                btn.textContent = "🔍 Verify Identity";
+                                btn.textContent = "Verify Identity";
                                 btn.style.background = "";
                             }
                         }, lockMs);
                     } else if (data.mismatch) {
-                        // ── ❌ Confirmed face mismatch — temporary UI lock ────────
+                        // ── Confirmed face mismatch — temporary UI lock ────────
                         isMismatchLocked = true;
-                        showToast("🚫 Face does not match. Attendance denied.", "error");
+                        showToast("Face does not match. Attendance denied.", "error");
                         if (btn) {
                             btn.disabled = true;
-                            btn.textContent = "🚫 Face Mismatch";
+                            btn.textContent = "Face Mismatch";
                             btn.style.background = "#c0392b";
                         }
                         // Auto-unlock after 5 s and reset liveness on backend too
@@ -4135,7 +4151,7 @@
                             if (overlayEl) { overlayEl.textContent = ""; overlayEl.style.color = ""; }
                             if (btn) {
                                 btn.disabled = false;
-                                btn.textContent = "🔍 Verify Identity";
+                                btn.textContent = "Verify Identity";
                                 btn.style.background = "";
                             }
                         }, 5000);
@@ -4144,9 +4160,9 @@
                     return;
                 }
 
-                // ── ✅ Face verified → save attendance ───────────────────────────
+                // ── Face verified → save attendance ───────────────────────────
                 isMismatchLocked = false;
-                showToast("🔓 " + data.message, "success");
+                showToast(data.message, "success");
                 await saveAttendance(imageData, data.verify_token);
 
             } catch (err) {
@@ -4154,7 +4170,7 @@
                 if (overlayEl) overlayEl.textContent = "Connection error – retrying…";
             } finally {
                 isVerifying = false;
-                if (btn) { btn.disabled = false; btn.textContent = "🔍 Verify Identity"; }
+                if (btn) { btn.disabled = false; btn.textContent = "Verify Identity"; }
             }
         }
 
@@ -4238,7 +4254,7 @@
         <div class="modal" style="max-width:min(480px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2>Manual <span>Clock-Out</span></h2>
-                <button class="modal-close" id="closeOverrideModal">✕</button>
+                <button class="modal-close" id="closeOverrideModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body">
                 <p style="font-size:0.9rem;color:#888;margin-bottom:1.25rem;">

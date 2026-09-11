@@ -290,7 +290,23 @@
       border-left: 4px solid var(--gold);
     }
 
-    .stat-icon {
+    
+        .stat-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: #ffffff;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .empty-icon svg {
+            width: 44px;
+            height: 44px;
+            display: inline-block;
+        }
+
+        .stat-icon {
       width: 44px;
       height: 44px;
       border-radius: 10px;
@@ -1891,7 +1907,7 @@
           </div>
         </div>
         <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden"
-            name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜] Logout</button>
+            name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button>
         </form>
       </div>
     </header>
@@ -1930,13 +1946,13 @@
           </div>
           <div class="page-actions">
             <button class="btn btn-outline btn-sm" id="exportPayrollBtn">
-              📥 Export CSV
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Export CSV
             </button>
             <button class="btn btn-outline" id="openSalaryModal">
-              🔍 View Salary
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>View Salary
             </button>
             <button class="btn btn-outline" id="openGenerateModal">
-              💾 Generate Payslips
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>Generate Payslips
             </button>
           </div>
         </div>
@@ -1944,7 +1960,7 @@
         <!-- Summary Cards -->
         <div class="summary-cards">
           <div class="stat-card">
-            <div class="stat-icon gold">👥</div>
+            <div class="stat-icon gold"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
             <div>
               <div class="stat-label">Staff w/ Rate Set</div>
               <div class="stat-value" id="summaryStaff">—</div>
@@ -1952,7 +1968,7 @@
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon blue">📅</div>
+            <div class="stat-icon blue"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
             <div>
               <div class="stat-label">Current Period</div>
               <div class="stat-value" id="summaryPeriod" style="font-size: 0.95rem; margin-top: 4px">
@@ -1970,7 +1986,7 @@
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon purple">💰</div>
+            <div class="stat-icon purple"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><line x1="6" y1="12" x2="6.01" y2="12"></line><line x1="18" y1="12" x2="18.01" y2="12"></line></svg></div>
             <div>
               <div class="stat-label">Period Payroll</div>
               <div class="stat-value" id="summaryPayroll">—</div>
@@ -1983,14 +1999,14 @@
         <div class="charts-section" id="chartsSection" style="display: none">
           <div class="charts-section-header">
             <div>
-              <div class="charts-section-title">📈 Salary Distribution</div>
+              <div class="charts-section-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>Salary Distribution</div>
               <div class="charts-section-sub" id="chartsPeriodLabel">—</div>
             </div>
           </div>
           <div class="charts-grid">
             <!-- Donut: Gross Pay Share -->
             <div class="chart-card">
-              <div class="chart-card-title">💰 Gross Pay Share</div>
+              <div class="chart-card-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="3"></circle></svg>Gross Pay Share</div>
               <div class="chart-canvas-wrap chart-donut-wrap">
                 <canvas id="chartDonut"></canvas>
               </div>
@@ -2007,7 +2023,7 @@
 
             <!-- Rate Comparison -->
             <div class="chart-card">
-              <div class="chart-card-title">⚡ Hourly Rate Comparison</div>
+              <div class="chart-card-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>Hourly Rate Comparison</div>
               <div class="rate-compare-list" id="rateCompareList"></div>
             </div>
           </div>
@@ -2016,12 +2032,12 @@
         <!-- Tabs -->
         <div class="tab-bar">
           <button class="tab-btn active" data-tab="period">
-            📊 Pay Period
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>Pay Period
           </button>
-          <button class="tab-btn" data-tab="daily">📅 Daily Earnings</button>
-          <button class="tab-btn" data-tab="rates">⚙️ Hourly Rates</button>
-          <button class="tab-btn" data-tab="deduction-config">🛡️ Deduction Config</button>
-          <button class="tab-btn" data-tab="history">🗂️ Payslip History</button>
+          <button class="tab-btn" data-tab="daily"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Daily Earnings</button>
+          <button class="tab-btn" data-tab="rates"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Hourly Rates</button>
+          <button class="tab-btn" data-tab="deduction-config"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>Deduction Config</button>
+          <button class="tab-btn" data-tab="history"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>Payslip History</button>
         </div>
 
         <!-- ─── TAB: PAY PERIOD ─── -->
@@ -2194,7 +2210,7 @@
 
               <!-- Formula banner -->
               <div class="dc-formula-banner">
-                <span style="font-size:1.5rem;">🧮</span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>
                 <div class="dc-formula-text">
                   <strong>Formula applied at every clock-in:</strong><br />
                   <code>Late Deduction = Per-Minute Rate × Minutes Late</code><br />
@@ -2207,7 +2223,7 @@
               <!-- Save -->
               <div class="dc-save-row">
                 <button class="btn btn-primary" id="saveDeductionConfigBtn" style="min-width:160px;">
-                  💾 Save Settings
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save Settings
                 </button>
                 <span class="dc-status" id="deductionSaveStatus"></span>
               </div>
@@ -2226,7 +2242,7 @@
                 <div class="card-sub" id="historySubLabel">All generated payslips</div>
               </div>
               <div style="display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;">
-                <input type="text" id="historySearch" placeholder="🔍 Filter by name or period…"
+                <input type="text" id="historySearch" placeholder="Filter by name or period…" 
                   style="padding:0.45rem 0.8rem;border:1.5px solid #ddd;border-radius:8px;font-family:inherit;font-size:0.83rem;width:220px;">
                 <button class="btn btn-outline btn-sm" id="refreshHistoryBtn">↺ Refresh</button>
               </div>
@@ -2269,8 +2285,8 @@
   <div class="modal-overlay" id="generateModal">
     <div class="modal">
       <div class="modal-header">
-        <h2>💾 Generate <span>Payslips</span></h2>
-        <button class="modal-close" id="closeGenerateModal">✕</button>
+        <h2>Generate <span>Payslips</span></h2>
+        <button class="modal-close" id="closeGenerateModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
       <div class="modal-body">
         <p style="font-size: 0.87rem; color: #666; margin-bottom: 1.25rem">
@@ -2300,7 +2316,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" id="genCancel">Cancel</button>
-        <button class="btn btn-gold" id="genConfirm">💾 Generate</button>
+        <button class="btn btn-gold" id="genConfirm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>Generate</button>
       </div>
     </div>
   </div>
@@ -2309,8 +2325,8 @@
   <div class="modal-overlay salary-overlay" id="salaryModal">
     <div class="modal">
       <div class="modal-header">
-        <h2>🔍 View <span>Salary</span></h2>
-        <button class="modal-close" id="closeSalaryModal">✕</button>
+        <h2>View <span>Salary</span></h2>
+        <button class="modal-close" id="closeSalaryModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
       <div class="modal-body">
         <!-- Period Picker -->
@@ -2332,7 +2348,7 @@
 
         <!-- Employee Search -->
         <div class="salary-search-wrap" id="salarySearchWrap">
-          <span class="salary-search-icon">🔍</span>
+          <span class="salary-search-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
           <input type="text" id="salarySearchInput" placeholder="Type an employee name…" autocomplete="off" />
           <div class="salary-dropdown" id="salaryDropdown"></div>
         </div>
@@ -2340,7 +2356,7 @@
         <!-- Results Area -->
         <div id="salaryResults">
           <div class="salary-empty">
-            <div class="empty-icon">👤</div>
+            <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
             <p>
               Search for an employee above to view their 15-day salary
               breakdown.
@@ -2349,7 +2365,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" id="salaryClear">✕ Clear</button>
+        <button class="btn btn-outline" id="salaryClear"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Clear</button>
         <button class="btn btn-primary" id="salaryClose2">Close</button>
       </div>
     </div>
@@ -2562,7 +2578,7 @@
         const tbody = document.getElementById("periodTableBody");
         if (!data.records.length) {
           tbody.innerHTML = `<tr><td colspan="8">
-                <div class="empty-state"><div class="empty-icon">📊</div>
+                <div class="empty-state"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div>
                 <p>No attendance records in this period.</p></div></td></tr>`;
           return;
         }
@@ -2803,7 +2819,7 @@
         const tbody = document.getElementById("dailyTableBody");
         if (!data.records.length) {
           tbody.innerHTML = `<tr><td colspan="8">
-                <div class="empty-state"><div class="empty-icon">📅</div>
+                <div class="empty-state"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
                 <p>No attendance records for ${dt}.</p></div></td></tr>`;
           return;
         }
@@ -2890,7 +2906,7 @@
         const tbody = document.getElementById("ratesTableBody");
         if (!data.employees.length) {
           tbody.innerHTML = `<tr><td colspan="4">
-                <div class="empty-state"><div class="empty-icon">👥</div>
+                <div class="empty-state"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
                 <p>No active employees found.</p></div></td></tr>`;
           return;
         }
@@ -2914,7 +2930,7 @@
                 <td>
                     <button class="save-rate-btn" id="saveBtn_${emp.employee_id}"
                             onclick="saveRate(${emp.employee_id})">
-                        ✓ Save
+                        Save
                     </button>
                 </td>
             </tr>`,
@@ -3005,8 +3021,8 @@
       const grace = parseInt(document.getElementById("graceMinsInput").value);
       const status = document.getElementById("deductionSaveStatus");
 
-      if (isNaN(rate) || rate < 0) { status.style.color = "#c62828"; status.textContent = "⚠ Enter a valid per-minute rate."; return; }
-      if (isNaN(grace) || grace < 0 || grace > 120) { status.style.color = "#c62828"; status.textContent = "⚠ Grace must be 0–120 minutes."; return; }
+      if (isNaN(rate) || rate < 0) { status.style.color = "#c62828"; status.textContent = "Enter a valid per-minute rate."; return; }
+      if (isNaN(grace) || grace < 0 || grace > 120) { status.style.color = "#c62828"; status.textContent = "Grace must be 0–120 minutes."; return; }
 
       status.style.color = "#888"; status.textContent = "Saving…";
       try {
@@ -3018,14 +3034,14 @@
         const data = await res.json();
         if (data.success) {
           status.style.color = "#388e3c";
-          status.textContent = "✅ Settings saved.";
+          status.textContent = "Settings saved.";
           _dcLoaded = false;
         } else {
           status.style.color = "#c62828";
-          status.textContent = "❌ " + (data.message || "Save failed.");
+          status.textContent = "" + (data.message || "Save failed.");
         }
       } catch {
-        status.style.color = "#c62828"; status.textContent = "❌ Network error.";
+        status.style.color = "#c62828"; status.textContent = "Network error.";
       }
       setTimeout(() => { status.textContent = ""; }, 4000);
     });
@@ -3080,7 +3096,7 @@
 
       if (!filtered.length) {
         tbody.innerHTML = `<tr><td colspan="8">
-          <div class="empty-state"><div class="empty-icon">🗂️</div>
+          <div class="empty-state"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
           <p>${q ? "No records match your filter." : "No payslips have been generated yet."}</p></div></td></tr>`;
         return;
       }
@@ -3108,7 +3124,7 @@
         return `
           ${isNewPeriod ? `<tr style="background:#fafafa;border-top:2px solid var(--gold);">
             <td colspan="8" style="padding:0.45rem 1rem;font-size:0.75rem;font-weight:700;color:var(--dark-gold);text-transform:uppercase;letter-spacing:0.5px;">
-              📅 ${periodLabel}
+              ${periodLabel}
             </td></tr>` : ""}
           <tr>
             <td class="td-name">${esc(r.full_name)}<div class="td-sub">ID #${r.employee_id}</div></td>
@@ -3281,7 +3297,7 @@
         }
 
         btn.disabled = false;
-        btn.textContent = "💾 Generate";
+        btn.innerHTML = "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"vertical-align:middle;margin-right:4px;\"><path d=\"M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z\"></path><polyline points=\"17 21 17 13 7 13 7 21\"></polyline><polyline points=\"7 3 7 8 15 8\"></polyline></svg>Generate";
       });
 
     // ══════════════════════════════════════════════════════════════════
@@ -3478,7 +3494,7 @@
           const lateMin = parseInt(d.late_minutes || 0);
           const deductHtml = deductVal > 0
             ? waived
-              ? `<div style="font-size:0.72rem;color:#388e3c;margin-top:2px;">Late ${lateMin}m · Waived ✅</div>`
+              ? `<div style="font-size:0.72rem;color:#388e3c;margin-top:2px;">Late ${lateMin}m · Waived</div>`
               : `<div style="font-size:0.72rem;color:#c62828;margin-top:2px;">Late ${lateMin}m · −${fmt(deductVal)}</div>`
             : '';
           return `
@@ -3513,7 +3529,7 @@
         <div class="salary-period-label">Daily Breakdown · ${periodLabel}</div>
         ${data.days.length
           ? `<div class="salary-days-grid">${dayCards}</div>`
-          : `<div class="salary-empty"><div class="empty-icon">📅</div><p>No attendance records in this period.</p></div>`
+          : `<div class="salary-empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div><p>No attendance records in this period.</p></div>`
         }`;
     }
 
@@ -3523,7 +3539,7 @@
       salaryDropdown.classList.remove("open");
       document.getElementById("salaryResults").innerHTML = `
         <div class="salary-empty">
-            <div class="empty-icon">👤</div>
+            <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
             <p>Search for an employee above to view their 15-day salary breakdown.</p>
         </div>`;
     }

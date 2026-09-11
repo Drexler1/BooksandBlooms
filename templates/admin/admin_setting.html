@@ -99,6 +99,24 @@
         }
         .logout-btn:hover { background: #c82333; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(220,53,69,0.4); }
 
+        
+        .sidebar-icon svg,
+        .card-head-icon svg,
+        .backup-row-icon svg {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .card-head-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+        .btn svg {
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+
         /* ── NAV ── */
         nav {
             background: var(--dark-gray);
@@ -1022,7 +1040,7 @@
                 <p>{{ session.get('role')|capitalize }}</p>
             </div>
         </div>
-        <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">➜] Logout</button></form>
+        <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
     </div>
 </header>
 
@@ -1050,20 +1068,20 @@
         <div class="sidebar-header"><p>Settings Menu</p></div>
         <div class="sidebar-nav">
             <a class="sidebar-item" href="#account">
-                <span class="sidebar-icon">👤</span>
+                <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
                 <div>Account<div class="sidebar-item-desc">Profile, email &amp; password</div></div>
             </a>
             <a class="sidebar-item" href="#notifications">
-                <span class="sidebar-icon">🔔</span>
+                <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
                 <div>Notifications<div class="sidebar-item-desc">Email alerts &amp; SMTP</div></div>
             </a>
             <a class="sidebar-item" href="#backup">
-                <span class="sidebar-icon">💾</span>
+                <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></span>
                 <div>Backup &amp; Export<div class="sidebar-item-desc">Save, export &amp; restore data</div></div>
             </a>
             <div class="sidebar-divider"></div>
             <a class="sidebar-item" href="#danger" style="color:#c0392b;">
-                <span class="sidebar-icon">⚠️</span>
+                <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
                 <div>Danger Zone<div class="sidebar-item-desc" style="color:#e08080;">Irreversible actions</div></div>
             </a>
         </div>
@@ -1080,7 +1098,7 @@
         <!-- ══ ACCOUNT CARD ══ -->
         <div class="setting-card" id="account">
             <div class="card-head">
-                <div class="card-head-icon icon-purple">👤</div>
+                <div class="card-head-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
                 <div class="card-head-text">
                     <h2>Account</h2>
                     <p>Manage your admin profile, email address, and password.</p>
@@ -1089,7 +1107,7 @@
             <div class="card-body">
 
                 <!-- ── UPDATE EMAIL ── -->
-                <p class="section-label">📧 Update Email Address</p>
+                <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>Update Email Address</p>
                 <div class="field-row">
                     <label class="field-label" for="ueEmail">New Gmail Address</label>
                     <input type="email" id="ueEmail" placeholder="e.g. maria@gmail.com"
@@ -1118,7 +1136,7 @@
             <div class="card-body" style="border-top:1px solid #f0f0f0;">
 
                 <!-- ── CHANGE PASSWORD ── -->
-                <p class="section-label">🔒 Change Password</p>
+                <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Change Password</p>
                 <div class="field-row">
                     <label class="field-label" for="cpCurrent">Current Password</label>
                     <div style="position:relative;">
@@ -1164,14 +1182,14 @@
 
             <!-- ── DELETE ACCOUNT ── -->
             <div class="card-body" style="border-top:1px solid #ffcdd2; background:#fff9f9;">
-                <p class="section-label" style="color:#c0392b;">🗑️ Delete Account</p>
+                <p class="section-label" style="color:#c0392b;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>Delete Account</p>
                 <p style="font-size:0.88rem; color:#666; margin-bottom:0;">
                     Permanently remove your admin account. You will be logged out immediately and this action <strong>cannot be undone</strong>.
                     Make sure another admin account exists before proceeding.
                 </p>
             </div>
             <div class="card-footer" style="border-top:1px solid #ffcdd2; background:#fff9f9;">
-                <div style="font-size:0.85rem; color:#c0392b;">⚠️ This is irreversible.</div>
+                <div style="font-size:0.85rem; color:#c0392b; display:inline-flex; align-items:center; gap:5px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>This is irreversible.</div>
                 <button class="btn btn-danger" onclick="openDeleteAccountModal()">Delete Account</button>
             </div>
         </div>
@@ -1179,7 +1197,7 @@
         <!-- ── NOTIFICATIONS & EMAIL ALERTS ── -->
         <div class="setting-card" id="notifications">
             <div class="card-head">
-                <div class="card-head-icon icon-info">🔔</div>
+                <div class="card-head-icon icon-info"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></div>
                 <div class="card-head-text">
                     <h2>Notifications &amp; Email Alerts</h2>
                     <p>Configure SMTP delivery and choose which alerts get sent to your inbox</p>
@@ -1189,7 +1207,7 @@
 
                 <!-- ── SMTP Configuration (Auto) ── -->
                 <div>
-                    <p class="section-label">📮 SMTP Email Configuration</p>
+                    <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>SMTP Email Configuration</p>
                     <div class="smtp-status-bar" id="smtpStatusBar">
                         <span class="smtp-status-dot" id="smtpStatusDot"></span>
                         <span id="smtpStatusText">Loading configuration…</span>
@@ -1248,7 +1266,7 @@
 
                     <div style="display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap;align-items:center;">
                         <button class="btn btn-primary btn-sm" onclick="autoSaveAndTest()" id="testEmailBtn">
-                            📡 Test Connection
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg> Test Connection
                         </button>
                         <div id="testEmailResult" style="display:none;align-items:center;gap:6px;font-size:0.85rem;font-weight:600;"></div>
                     </div>
@@ -1257,7 +1275,7 @@
                     <div style="margin-top:0.9rem;">
                         <button type="button" onclick="toggleAdvanced()" id="advancedToggleBtn"
                             style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:#aaa;padding:0;text-decoration:underline;">
-                            ⚙️ Show advanced SMTP settings
+                            Show advanced SMTP settings
                         </button>
                         <div id="advancedSmtp" style="display:none;margin-top:0.85rem;">
                             <div class="form-row">
@@ -1285,14 +1303,14 @@
 
                 <!-- ── Alert Toggles ── -->
                 <div>
-                    <p class="section-label">🔔 Alert Preferences</p>
+                    <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>Alert Preferences</p>
                     <div class="toggle-list">
 
                         <!-- Low Stock — expanded with threshold config -->
                         <div class="toggle-item" style="flex-direction:column;align-items:stretch;gap:0;">
                             <div style="display:flex;align-items:center;justify-content:space-between;gap:1.25rem;">
                                 <div class="toggle-info">
-                                    <strong>📦 Low Stock Alerts</strong>
+                                    <strong>Low Stock Alerts</strong>
                                     <span>Get notified when a product falls below its reorder point. Includes a full list of affected items.</span>
                                 </div>
                                 <label class="toggle-switch">
@@ -1311,10 +1329,10 @@
                                     </div>
                                     <div style="display:flex;gap:8px;padding-bottom:2px;flex-wrap:wrap;">
                                         <button class="btn btn-outline btn-sm" onclick="previewLowStock()" id="previewBtn">
-                                            🔍 Preview Low-Stock Items
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg> Preview Low-Stock Items
                                         </button>
                                         <button class="btn btn-primary btn-sm" onclick="sendLowStockAlert()" id="sendAlertBtn">
-                                            📧 Send Alert Now
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg> Send Alert Now
                                         </button>
                                     </div>
                                 </div>
@@ -1343,7 +1361,7 @@
 
                         <div class="toggle-item" style="flex-wrap:wrap;">
                             <div class="toggle-info">
-                                <strong>📊 Daily Sales Summary</strong>
+                                <strong>Daily Sales Summary</strong>
                                 <span>Receive an end-of-day summary of total sales, transactions, and top-selling items via email.</span>
                             </div>
                             <label class="toggle-switch">
@@ -1363,7 +1381,7 @@
                                             onclick="sendDailySummaryNow(this)"
                                             style="margin-bottom:2px;"
                                             title="Send today's summary right now without waiting for the scheduled time">
-                                        📤 Send Now
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> Send Now
                                     </button>
                                 </div>
                             </div>
@@ -1383,10 +1401,10 @@
 
             </div>
             <div class="card-footer">
-                <p class="footer-hint">💡 All alert emails are delivered to the <strong>Alert Recipient</strong> address above.</p>
+                <p class="footer-hint">All alert emails are delivered to the <strong>Alert Recipient</strong> address above.</p>
                 <div class="footer-actions">
                     <button class="btn btn-outline" onclick="resetEmailForm()">Reset</button>
-                    <button class="btn btn-primary" id="saveEmailBtn" onclick="saveEmailSettings(this)">💾 Save Settings</button>
+                    <button class="btn btn-primary" id="saveEmailBtn" onclick="saveEmailSettings(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save Settings</button>
                 </div>
             </div>
         </div>
@@ -1395,7 +1413,7 @@
         <!-- ══ BACKUP & DATA EXPORT ══ -->
         <div class="setting-card" id="backup">
             <div class="card-head">
-                <div class="card-head-icon icon-purple">💾</div>
+                <div class="card-head-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></div>
                 <div class="card-head-text">
                     <h2>Backup &amp; Data Export</h2>
                     <p>Download your full database or restore from a previous backup — move to a new device without losing a thing</p>
@@ -1405,11 +1423,11 @@
 
                 <!-- ── EXPORT ── -->
                 <div>
-                    <p class="section-label">📤 Export &amp; Download</p>
+                    <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>Export &amp; Download</p>
                     <div class="backup-grid">
 
                         <div class="backup-row">
-                            <div class="backup-row-icon">🗄️</div>
+                            <div class="backup-row-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></div>
                             <div class="backup-row-info">
                                 <strong>Full Database</strong>
                                 <span>Everything — products, sales, inventory, employees, payroll &amp; settings — as one portable JSON file.</span>
@@ -1420,7 +1438,7 @@
                         </div>
 
                         <div class="backup-row">
-                            <div class="backup-row-icon">🧾</div>
+                            <div class="backup-row-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></div>
                             <div class="backup-row-info">
                                 <strong>Sales &amp; Transactions</strong>
                                 <span>All transaction records and line items only — lightweight and fast to transfer.</span>
@@ -1431,7 +1449,7 @@
                         </div>
 
                         <div class="backup-row">
-                            <div class="backup-row-icon">📦</div>
+                            <div class="backup-row-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
                             <div class="backup-row-info">
                                 <strong>Products &amp; Inventory</strong>
                                 <span>Menu items, categories, and stock levels — ideal when setting up a new POS terminal.</span>
@@ -1460,7 +1478,7 @@
 
                 <!-- ── IMPORT / RESTORE ── -->
                 <div>
-                    <p class="section-label">📥 Restore from Backup</p>
+                    <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Restore from Backup</p>
 
                     <!-- drop zone -->
                     <div class="backup-dropzone" id="backupDropzone"
@@ -1468,7 +1486,7 @@
                          ondragover="event.preventDefault(); this.classList.add('drag-over')"
                          ondragleave="this.classList.remove('drag-over')"
                          ondrop="handleBackupDrop(event)">
-                        <div style="font-size:2rem; line-height:1; margin-bottom:0.5rem;">📂</div>
+                        <div style="margin-bottom:0.5rem;"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
                         <p style="font-weight:700; font-size:0.95rem; color:var(--black); margin-bottom:4px;">Drop a backup file here</p>
                         <p style="font-size:0.81rem; color:#888;">or click to browse — <code style="background:rgba(201,169,97,0.12);color:var(--dark-gold);padding:1px 5px;border-radius:3px;">.json</code> files only</p>
                         <input type="file" id="backupFileInput" accept=".json" style="display:none" onchange="handleBackupFile(this.files[0])">
@@ -1481,23 +1499,23 @@
                                 <strong id="bfpName" style="display:block; font-size:0.95rem; color:var(--black); margin-bottom:3px;"></strong>
                                 <span id="bfpMeta" style="font-size:0.8rem; color:#888;"></span>
                             </div>
-                            <button class="btn btn-outline btn-sm" onclick="clearBackupFile()">✕ Remove</button>
+                            <button class="btn btn-outline btn-sm" onclick="clearBackupFile()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Remove</button>
                         </div>
                         <div id="bfpDetails" style="margin-top:0.75rem; font-size:0.83rem; color:#555; line-height:1.6;"></div>
                         <button class="btn btn-primary" id="btnRestore"
                                 style="margin-top:1rem; width:100%; justify-content:center;"
                                 onclick="openRestoreModal()">
-                            🔄 Restore This Backup
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg> Restore This Backup
                         </button>
                         <p style="font-size:0.77rem; color:#e08080; margin-top:0.5rem;">
-                            ⚠️ Restoring will replace existing rows in the affected tables. This cannot be undone.
+                            Restoring will replace existing rows in the affected tables. This cannot be undone.
                         </p>
                     </div>
                 </div>
 
                 <!-- last-action status line -->
                 <div id="backupStatusBar" class="backup-status-bar">
-                    <span>🕐</span>
+                    <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
                     <span id="backupStatusText">No backup downloaded yet this session.</span>
                 </div>
 
@@ -1513,7 +1531,7 @@
 
         <div class="setting-card" id="danger" style="border-color:#ffcdd2;">
             <div class="card-head" style="border-bottom-color:#ffcdd2; background:#fffafa;">
-                <div class="card-head-icon icon-danger">⚠️</div>
+                <div class="card-head-icon icon-danger"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
                 <div class="card-head-text">
                     <h2 style="color:#c0392b;">Danger Zone</h2>
                     <p>These actions are <strong>permanent and cannot be undone</strong> — please read carefully before proceeding</p>
@@ -1576,7 +1594,7 @@
 
         <!-- Header -->
         <div style="text-align:center; margin-bottom:1rem;">
-            <div style="font-size:2.4rem; line-height:1; margin-bottom:0.6rem;">⚠️</div>
+            <div style="margin-bottom:0.6rem;"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
             <h3 id="dangerModalTitle"
                 style="color:#c0392b; margin:0 0 0.5rem; font-size:1.15rem; font-weight:700;"></h3>
             <p id="dangerModalDesc"
@@ -1617,7 +1635,7 @@
                        font-family:inherit; transition:all .2s; display:flex;
                        align-items:center; gap:6px;"
                 disabled onclick="executeDangerAction()">
-                <span id="dangerConfirmBtnIcon">🗑️</span>
+                <span id="dangerConfirmBtnIcon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></span>
                 <span id="dangerConfirmBtnText">Confirm</span>
             </button>
         </div>
@@ -1635,7 +1653,7 @@
 </style>
 
 <!-- ══ TOAST ══ -->
-<div class="toast" id="toast">✅ Settings saved successfully!</div>
+<div class="toast" id="toast">Settings saved successfully!</div>
 
 <script>
     /* ── DATE/TIME ── */
@@ -1683,7 +1701,7 @@
         const check = item.querySelector('input[type="checkbox"]');
         const box   = item.querySelector('.perm-check');
         check.checked = !check.checked;
-        box.textContent = check.checked ? '✓' : '';
+        box.textContent = check.checked ? '✔' : '';
     }
 
     /* ── PASSWORD STRENGTH ── */
@@ -1692,10 +1710,10 @@
     /* ── SAVE / RESET (generic) ── */
     function saveSettings(btn) {
         const original = btn.innerHTML;
-        btn.innerHTML  = '✓ Saved!';
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Saved!';
         btn.style.opacity = '0.75';
         btn.disabled   = true;
-        showToast('✅ Settings saved successfully!');
+        showToast('Settings saved successfully!', 'success');
         setTimeout(() => {
             btn.innerHTML     = original;
             btn.style.opacity = '';
@@ -1718,35 +1736,35 @@
             desc:        'This will wipe all email configurations and revert late-deduction settings to factory defaults. There is no undo.',
             confirmWord: 'RESET',
             endpoint:    '/api/danger/reset_settings',
-            icon:        '⚙️',
+            icon:        '',
         },
         clear_transactions: {
             title:       'Clear Transaction History',
             desc:        'This will permanently delete every sales record, receipt, and transaction item from the database. Products and inventory are kept. There is no undo.',
             confirmWord: 'DELETE',
             endpoint:    '/api/danger/clear_transactions',
-            icon:        '🗑️',
+            icon:        '',
         },
         clear_products: {
             title:       'Clear All Products',
             desc:        'This will permanently delete every product and its associated inventory items from the database. Categories and transaction history will be preserved. There is no undo.',
             confirmWord: 'DELETE PRODUCTS',
             endpoint:    '/api/danger/clear_products',
-            icon:        '🗑️',
+            icon:        '',
         },
         clear_categories: {
             title:       'Clear All Categories',
             desc:        'This will permanently delete all product categories. Any products referencing a category will have their category field set to NULL. Transaction history is preserved. There is no undo.',
             confirmWord: 'DELETE CATEGORIES',
             endpoint:    '/api/danger/clear_categories',
-            icon:        '🗑️',
+            icon:        '',
         },
         clear_all_data: {
             title:       'Clear All Data',
             desc:        'This will permanently delete ALL transactions, products, categories, and inventory items. All your data will be gone with nothing restored. Download a backup before proceeding. There is no undo.',
             confirmWord: 'CLEAR ALL',
             endpoint:    '/api/danger/clear_all_data',
-            icon:        '💣',
+            icon:        '',
         },
     };
     let _activeDangerKey = null;
@@ -1801,7 +1819,7 @@
             });
             const data = await res.json();
             closeDangerModal();
-            showToast(data.success ? '✅ ' + data.message : '❌ ' + data.message,
+            showToast(data.success ? '' + data.message : '' + data.message,
                       data.success ? 'success' : 'error');
         } catch (err) {
             // Re-enable so user can retry without closing and reopening
@@ -1809,7 +1827,7 @@
             document.getElementById('dangerConfirmBtnText').textContent = 'Confirm';
             btn.disabled         = false;
             btn.style.background = '#dc3545';
-            showToast('❌ Request failed — check your connection.', 'error');
+            showToast('Request failed — check your connection.', 'error');
         }
     }
 
@@ -1926,23 +1944,23 @@
         const btn   = document.getElementById('advancedToggleBtn');
         const open  = panel.style.display === 'none';
         panel.style.display = open ? 'block' : 'none';
-        btn.textContent = open ? '⚙️ Hide advanced SMTP settings' : '⚙️ Show advanced SMTP settings';
+        btn.textContent = open ? 'Hide advanced SMTP settings' : 'Show advanced SMTP settings';
     }
 
     /* ── Provider auto-detection map ── */
     const SMTP_PROVIDERS = {
-        'gmail.com':      { host: 'smtp.gmail.com',      port: 587, tls: true,  label: '✉️ Gmail',       hint: 'Use a 16-char Google App Password' },
-        'googlemail.com': { host: 'smtp.gmail.com',      port: 587, tls: true,  label: '✉️ Gmail',       hint: 'Use a 16-char Google App Password' },
-        'outlook.com':    { host: 'smtp-mail.outlook.com', port: 587, tls: true, label: '📧 Outlook',    hint: 'Use your Outlook password or App Password' },
-        'hotmail.com':    { host: 'smtp-mail.outlook.com', port: 587, tls: true, label: '📧 Hotmail',    hint: 'Use your Microsoft App Password' },
-        'live.com':       { host: 'smtp-mail.outlook.com', port: 587, tls: true, label: '📧 Live',       hint: 'Use your Microsoft App Password' },
-        'yahoo.com':      { host: 'smtp.mail.yahoo.com', port: 587, tls: true,  label: '📨 Yahoo Mail',  hint: 'Use a Yahoo App Password' },
-        'ymail.com':      { host: 'smtp.mail.yahoo.com', port: 587, tls: true,  label: '📨 Yahoo Mail',  hint: 'Use a Yahoo App Password' },
-        'icloud.com':     { host: 'smtp.mail.me.com',    port: 587, tls: true,  label: '🍎 iCloud Mail', hint: 'Use an iCloud App-Specific Password' },
-        'me.com':         { host: 'smtp.mail.me.com',    port: 587, tls: true,  label: '🍎 iCloud Mail', hint: 'Use an iCloud App-Specific Password' },
-        'zoho.com':       { host: 'smtp.zoho.com',       port: 587, tls: true,  label: '🔷 Zoho Mail',   hint: 'Use your Zoho App Password' },
-        'protonmail.com': { host: '127.0.0.1',           port: 1025, tls: false, label: '🔒 ProtonMail', hint: 'Requires Proton Mail Bridge running locally' },
-        'proton.me':      { host: '127.0.0.1',           port: 1025, tls: false, label: '🔒 ProtonMail', hint: 'Requires Proton Mail Bridge running locally' },
+        'gmail.com':      { host: 'smtp.gmail.com',      port: 587, tls: true,  label: 'Gmail',       hint: 'Use a 16-char Google App Password' },
+        'googlemail.com': { host: 'smtp.gmail.com',      port: 587, tls: true,  label: 'Gmail',       hint: 'Use a 16-char Google App Password' },
+        'outlook.com':    { host: 'smtp-mail.outlook.com', port: 587, tls: true, label: 'Outlook',    hint: 'Use your Outlook password or App Password' },
+        'hotmail.com':    { host: 'smtp-mail.outlook.com', port: 587, tls: true, label: 'Hotmail',    hint: 'Use your Microsoft App Password' },
+        'live.com':       { host: 'smtp-mail.outlook.com', port: 587, tls: true, label: 'Live',       hint: 'Use your Microsoft App Password' },
+        'yahoo.com':      { host: 'smtp.mail.yahoo.com', port: 587, tls: true,  label: 'Yahoo Mail',  hint: 'Use a Yahoo App Password' },
+        'ymail.com':      { host: 'smtp.mail.yahoo.com', port: 587, tls: true,  label: 'Yahoo Mail',  hint: 'Use a Yahoo App Password' },
+        'icloud.com':     { host: 'smtp.mail.me.com',    port: 587, tls: true,  label: 'iCloud Mail', hint: 'Use an iCloud App-Specific Password' },
+        'me.com':         { host: 'smtp.mail.me.com',    port: 587, tls: true,  label: 'iCloud Mail', hint: 'Use an iCloud App-Specific Password' },
+        'zoho.com':       { host: 'smtp.zoho.com',       port: 587, tls: true,  label: 'Zoho Mail',   hint: 'Use your Zoho App Password' },
+        'protonmail.com': { host: '127.0.0.1',           port: 1025, tls: false, label: 'ProtonMail', hint: 'Requires Proton Mail Bridge running locally' },
+        'proton.me':      { host: '127.0.0.1',           port: 1025, tls: false, label: 'ProtonMail', hint: 'Requires Proton Mail Bridge running locally' },
     };
 
     /* ── Called on every keystroke in the email field ── */
@@ -1996,7 +2014,7 @@
             }
         } else if (domain) {
             badge.style.display = 'block';
-            pill.textContent    = '⚙️ Custom / Unknown provider';
+            pill.textContent    = 'Custom / Unknown provider';
             details.textContent = 'Set your SMTP details manually using the advanced options below';
             if (passHint) passHint.textContent = 'Enter your SMTP password or App Password';
         } else {
@@ -2016,8 +2034,8 @@
         const recipient = document.getElementById('alertRecipient').value.trim() || email;
 
         if (!email) {
-            showToast('❌ Please enter your email address first.', 'error');
-            btn.innerHTML = '📡 Test Connection'; btn.disabled = false;
+            showToast('Please enter your email address first.', 'error');
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg> Test Connection'; btn.disabled = false;
             return;
         }
 
@@ -2046,20 +2064,20 @@
             const d = await r.json();
             result.style.display = 'flex';
             if (d.success) {
-                result.innerHTML = `<span class="test-result-ok">✅ ${d.message}</span>`;
-                showToast('✅ Connection works! Test email sent.');
+                result.innerHTML = `<span class="test-result-ok">${d.message}</span>`;
+                showToast('Connection works! Test email sent.');
                 setSmtpStatus('ok', `Auto-configured via ${payload.smtp_host}:${payload.smtp_port} — ready to send alerts`);
                 await loadEmailSettings();
             } else {
-                result.innerHTML = `<span class="test-result-err">❌ ${d.message}</span>`;
-                showToast('❌ Test failed: ' + d.message, 'error');
+                result.innerHTML = `<span class="test-result-err">${d.message}</span>`;
+                showToast('Test failed: ' + d.message, 'error');
                 setSmtpStatus('warn', 'Test failed — check your App Password and try again');
             }
         } catch (e) {
             result.style.display = 'flex';
-            result.innerHTML = `<span class="test-result-err">❌ Request error: ${e.message}</span>`;
+            result.innerHTML = `<span class="test-result-err">Request error: ${e.message}</span>`;
         } finally {
-            btn.innerHTML = '📡 Test Connection'; btn.disabled = false;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg> Test Connection'; btn.disabled = false;
         }
     }
 
@@ -2116,14 +2134,14 @@
             });
             const d = await r.json();
             if (!d.success) throw new Error(d.message);
-            showToast('✅ Email settings saved!');
+            showToast('Email settings saved!');
             if (newPass) {
                 document.getElementById('smtpPassword').value = '';
                 document.getElementById('smtpPassword').placeholder = '••••••••  (password saved — enter new one to change)';
             }
             await loadEmailSettings();
         } catch (e) {
-            showToast('❌ ' + e.message, 'error');
+            showToast('' + e.message, 'error');
         } finally {
             btn.innerHTML = original; btn.disabled = false;
         }
@@ -2155,7 +2173,7 @@
             if (!d.items || d.items.length === 0) {
                 preview.style.display = 'block';
                 tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:1.5rem;color:#aaa;">
-                    🎉 All ingredients and supplies are sufficiently stocked</td></tr>`;
+                    All ingredients and supplies are sufficiently stocked</td></tr>`;
                 title.textContent = 'No low-stock ingredients or supplies found';
             } else {
                 const supplies  = d.items.filter(i => i.source === 'ingredient' || i.source === 'packaging');
@@ -2165,7 +2183,7 @@
                 if (supplies.length === 0) {
                     preview.style.display = 'block';
                     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:1.5rem;color:#aaa;">
-                        🎉 All ingredients and supplies are sufficiently stocked</td></tr>`;
+                        All ingredients and supplies are sufficiently stocked</td></tr>`;
                     title.textContent = 'No low-stock ingredients or supplies found';
                     return;
                 }
@@ -2210,14 +2228,14 @@
                 }
 
                 let html = '';
-                if (supplies.length)  html += sectionHeader('📦 Ingredients & Supplies', supplies.length) + buildRows(supplies);
+                if (supplies.length)  html += sectionHeader('Ingredients & Supplies', supplies.length) + buildRows(supplies);
                 tbody.innerHTML = html;
                 preview.style.display = 'block';
             }
         } catch (e) {
-            showToast('❌ Could not load inventory: ' + e.message, 'error');
+            showToast('Could not load inventory: ' + e.message, 'error');
         } finally {
-            btn.innerHTML = '🔍 Preview Low-Stock Items'; btn.disabled = false;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg> Preview Low-Stock Items'; btn.disabled = false;
         }
     }
 
@@ -2229,14 +2247,14 @@
             const r = await fetch('/api/settings/email/send-low-stock-alert', { method: 'POST' });
             const d = await r.json();
             if (d.success) {
-                showToast('✅ ' + d.message);
+                showToast('' + d.message);
             } else {
-                showToast('❌ ' + d.message, 'error');
+                showToast('' + d.message, 'error');
             }
         } catch (e) {
-            showToast('❌ Request failed: ' + e.message, 'error');
+            showToast('Request failed: ' + e.message, 'error');
         } finally {
-            btn.innerHTML = '📧 Send Alert Now'; btn.disabled = false;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg> Send Alert Now'; btn.disabled = false;
         }
     }
 
@@ -2253,9 +2271,9 @@
             const r = await fetch('/api/settings/email/send-daily-summary', { method: 'POST' });
             const d = await r.json();
             if (!d.success) throw new Error(d.message);
-            showToast('✅ Daily Sales Summary sent! Check your inbox.');
+            showToast('Daily Sales Summary sent! Check your inbox.');
         } catch (e) {
-            showToast('❌ ' + e.message, 'error');
+            showToast('' + e.message, 'error');
         } finally {
             btn.innerHTML = original; btn.disabled = false;
         }
@@ -2294,10 +2312,10 @@
         const lbl  = document.getElementById('cpStrengthLabel');
         const levels = [
             { w: '0%',   c: '#ccc',    l: '' },
-            { w: '25%',  c: '#e53935', l: '🔴 Too short' },
-            { w: '50%',  c: '#f57c00', l: '🟠 Weak' },
-            { w: '75%',  c: '#fbc02d', l: '🟡 Fair' },
-            { w: '100%', c: '#2e7d32', l: '🟢 Strong' },
+            { w: '25%',  c: '#e53935', l: 'Too short' },
+            { w: '50%',  c: '#f57c00', l: 'Weak' },
+            { w: '75%',  c: '#fbc02d', l: 'Fair' },
+            { w: '100%', c: '#2e7d32', l: 'Strong' },
         ];
         let score = 0;
         if (val.length >= 8)  score++;
@@ -2313,7 +2331,7 @@
         const conf = document.getElementById('cpConfirm').value;
         const ml   = document.getElementById('cpMatchLabel');
         if (conf.length > 0) {
-            ml.textContent = val === conf ? '✅ Passwords match' : '❌ Passwords do not match';
+            ml.textContent = val === conf ? 'Passwords match' : 'Passwords do not match';
             ml.style.color = val === conf ? '#2e7d32' : '#c0392b';
         }
     }
@@ -2323,7 +2341,7 @@
         const conf = document.getElementById('cpConfirm').value;
         const ml   = document.getElementById('cpMatchLabel');
         if (conf.length > 0) {
-            ml.textContent = pw === conf ? '✅ Passwords match' : '❌ Passwords do not match';
+            ml.textContent = pw === conf ? 'Passwords match' : 'Passwords do not match';
             ml.style.color = pw === conf ? '#2e7d32' : '#c0392b';
         } else {
             ml.textContent = '';
@@ -2336,8 +2354,8 @@
         const btn   = document.getElementById('ueSaveBtn');
         const hint  = document.getElementById('ueEmailHint');
 
-        if (!email || !pw) { showToast('❌ Please fill in both the email and your password.', 'error'); return; }
-        if (!/^[^@\s]+@gmail\.com$/i.test(email)) { showToast('❌ Only Gmail addresses are accepted.', 'error'); return; }
+        if (!email || !pw) { showToast('Please fill in both the email and your password.', 'error'); return; }
+        if (!/^[^@\s]+@gmail\.com$/i.test(email)) { showToast('Only Gmail addresses are accepted.', 'error'); return; }
 
         btn.textContent = '⏳ Saving…'; btn.disabled = true;
         try {
@@ -2348,15 +2366,15 @@
             });
             const d = await r.json();
             if (d.success) {
-                showToast('✅ ' + d.message);
+                showToast('' + d.message);
                 hint.textContent = 'Current: ' + d.new_email;
                 hint.style.color = '#2e7d32';
                 document.getElementById('uePw').value = '';
             } else {
-                showToast('❌ ' + d.message, 'error');
+                showToast('' + d.message, 'error');
             }
         } catch (e) {
-            showToast('❌ Request failed: ' + e.message, 'error');
+            showToast('Request failed: ' + e.message, 'error');
         } finally {
             btn.textContent = 'Update Email'; btn.disabled = false;
         }
@@ -2368,9 +2386,9 @@
         const confirm = document.getElementById('cpConfirm').value;
         const btn     = document.getElementById('cpSaveBtn');
 
-        if (!cur.trim() || !nw.trim() || !confirm.trim()) { showToast('❌ Please fill in all password fields.', 'error'); return; }
-        if (nw !== confirm)           { showToast('❌ New passwords do not match.', 'error');          return; }
-        if (nw.length < 8)            { showToast('❌ New password must be at least 8 characters.', 'error'); return; }
+        if (!cur.trim() || !nw.trim() || !confirm.trim()) { showToast('Please fill in all password fields.', 'error'); return; }
+        if (nw !== confirm)           { showToast('New passwords do not match.', 'error');          return; }
+        if (nw.length < 8)            { showToast('New password must be at least 8 characters.', 'error'); return; }
 
         btn.textContent = '⏳ Saving…'; btn.disabled = true;
         try {
@@ -2381,7 +2399,7 @@
             });
             const d = await r.json();
             if (d.success) {
-                showToast('✅ ' + d.message);
+                showToast('' + d.message);
                 document.getElementById('cpCurrent').value = '';
                 document.getElementById('cpNew').value     = '';
                 document.getElementById('cpConfirm').value = '';
@@ -2389,10 +2407,10 @@
                 document.getElementById('cpStrengthLabel').textContent = '';
                 document.getElementById('cpMatchLabel').textContent    = '';
             } else {
-                showToast('❌ ' + d.message, 'error');
+                showToast('' + d.message, 'error');
             }
         } catch (e) {
-            showToast('❌ Request failed: ' + e.message, 'error');
+            showToast('Request failed: ' + e.message, 'error');
         } finally {
             btn.textContent = 'Update Password'; btn.disabled = false;
         }
@@ -2410,7 +2428,7 @@
                 border-top:5px solid #dc3545; font-family:inherit;
                 animation:dangerSlideIn .22s cubic-bezier(.34,1.56,.64,1);">
         <div style="text-align:center; margin-bottom:1rem;">
-            <div style="font-size:2.4rem; line-height:1; margin-bottom:0.6rem;">🗑️</div>
+            <div style="margin-bottom:0.6rem;"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></div>
             <h3 style="color:#c0392b; margin:0 0 0.5rem; font-size:1.15rem; font-weight:700;">Delete Admin Account</h3>
             <p style="color:#666; font-size:0.875rem; margin:0; line-height:1.55;">
                 This will <strong>permanently delete your account</strong> and log you out immediately.
@@ -2438,7 +2456,7 @@
                     onclick="executeDeleteAccount()"
                     style="padding:0.55rem 1.4rem; border-radius:8px; border:none;
                            background:#ccc; color:#fff; font-size:0.9rem; font-weight:600; cursor:pointer;">
-                🗑️ Delete Account
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete Account
             </button>
         </div>
     </div>
@@ -2478,15 +2496,15 @@
             const d = await r.json();
             if (d.success) {
                 closeDeleteAccountModal();
-                showToast('✅ ' + d.message);
+                showToast('' + d.message);
                 setTimeout(() => { window.location.href = '/login'; }, 1800);
             } else {
-                btn.textContent = '🗑️ Delete Account'; btn.disabled = false; btn.style.background = '#dc3545';
-                showToast('❌ ' + d.message, 'error');
+                btn.textContent = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete Account'; btn.disabled = false; btn.style.background = '#dc3545';
+                showToast('' + d.message, 'error');
             }
         } catch (e) {
-            btn.textContent = '🗑️ Delete Account'; btn.disabled = false; btn.style.background = '#dc3545';
-            showToast('❌ Request failed: ' + e.message, 'error');
+            btn.textContent = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete Account'; btn.disabled = false; btn.style.background = '#dc3545';
+            showToast('Request failed: ' + e.message, 'error');
         }
     }
 
@@ -2506,7 +2524,7 @@
                 border-top:5px solid var(--gold); font-family:inherit;
                 animation:dangerSlideIn .22s cubic-bezier(.34,1.56,.64,1);">
         <div style="text-align:center; margin-bottom:1rem;">
-            <div style="font-size:2.4rem; line-height:1; margin-bottom:0.6rem;">🔄</div>
+            <div style="margin-bottom:0.6rem;"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg></div>
             <h3 style="color:var(--black); margin:0 0 0.5rem; font-size:1.15rem; font-weight:700;">Confirm Restore</h3>
             <p id="restoreModalDesc" style="color:#666; font-size:0.875rem; margin:0; line-height:1.55;"></p>
         </div>
@@ -2535,7 +2553,7 @@
                            background:#ccc; color:#fff; font-size:0.88rem; font-weight:700;
                            font-family:inherit; transition:all .2s; display:flex;
                            align-items:center; gap:6px; cursor:not-allowed;">
-                <span id="restoreConfirmIcon">🔄</span>
+                <span id="restoreConfirmIcon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg></span>
                 <span id="restoreConfirmText">Restore</span>
             </button>
         </div>
@@ -2639,10 +2657,10 @@ async function triggerExport(type) {
 
         finishExportProgress();
         setBackupStatus(`Last export: ${type} backup — ${new Date().toLocaleString()}`);
-        showToast(`✅ Backup downloaded: ${name}`);
+        showToast(`Backup downloaded: ${name}`, "success");
     } catch (err) {
         document.getElementById('exportProgressWrap').style.display = 'none';
-        showToast('❌ Export failed: ' + err.message, 'error');
+        showToast('Export failed: ' + err.message, 'error');
     } finally {
         btn.innerHTML = origHtml; btn.disabled = false;
     }
@@ -2660,17 +2678,17 @@ let _pendingBackup = null; // holds parsed JSON once validated
 
 function handleBackupFile(file) {
     if (!file || !file.name.endsWith('.json')) {
-        showToast('❌ Please choose a .json backup file.', 'error'); return;
+        showToast('Please choose a .json backup file.', 'error'); return;
     }
     const reader = new FileReader();
     reader.onload = e => {
         let data;
         try { data = JSON.parse(e.target.result); }
-        catch { showToast('❌ File could not be parsed — it may be corrupted.', 'error'); return; }
+        catch { showToast('File could not be parsed — it may be corrupted.', 'error'); return; }
 
         // Basic shape check — must have our signature fields
         if (!data.backup_meta || !data.tables) {
-            showToast('❌ This does not appear to be a Books & Blooms backup file.', 'error'); return;
+            showToast('This does not appear to be a Books & Blooms backup file.', 'error'); return;
         }
 
         _pendingBackup = data;
@@ -2716,7 +2734,7 @@ function openRestoreModal() {
     inp.value = '';
     const btn = document.getElementById('restoreConfirmBtn');
     btn.disabled = true; btn.style.background = '#ccc'; btn.style.cursor = 'not-allowed';
-    document.getElementById('restoreConfirmIcon').textContent = '🔄';
+    document.getElementById('restoreConfirmIcon').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>';
     document.getElementById('restoreConfirmText').textContent = 'Restore';
 
     document.getElementById('restoreModalOverlay').style.display = 'flex';
@@ -2753,20 +2771,20 @@ async function executeRestore() {
         const d = await res.json();
         closeRestoreModal();
         if (d.success) {
-            showToast('✅ ' + d.message);
+            showToast('' + d.message);
             setBackupStatus(`Last restore: ${_pendingBackup.backup_meta.type} — ${new Date().toLocaleString()}`);
             clearBackupFile();
         } else {
-            showToast('❌ ' + d.message, 'error');
+            showToast('' + d.message, 'error');
             // re-enable so admin can retry
-            document.getElementById('restoreConfirmIcon').textContent = '🔄';
+            document.getElementById('restoreConfirmIcon').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>';
             document.getElementById('restoreConfirmText').textContent = 'Restore';
             btn.disabled = false;
             btn.style.background = 'var(--dark-gold)';
         }
     } catch (err) {
         closeRestoreModal();
-        showToast('❌ Restore failed: ' + err.message, 'error');
+        showToast('Restore failed: ' + err.message, 'error');
     }
 }
 

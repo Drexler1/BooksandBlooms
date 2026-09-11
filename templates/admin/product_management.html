@@ -2336,7 +2336,7 @@
                         <p>{{ session.get('role')|capitalize }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn">Logout</button></form>
+                <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
             </div>
         </header>
 
@@ -2653,7 +2653,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2 id="modalTitle">Add <span>Product</span></h2>
-                <button class="modal-close" id="closeProductModal">✕</button>
+                <button class="modal-close" id="closeProductModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editProductId">
@@ -2671,7 +2671,7 @@
                         </div>
                         <input type="hidden" id="existingImageUrl">
                         <button type="button" class="btn btn-outline btn-sm" id="clearImageBtn"
-                            style="margin-top:0.5rem;display:none;">✕ Remove Image</button>
+                            style="margin-top:0.5rem;display:none;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Remove Image</button>
                     </div>
 
                     <!-- Name -->
@@ -2799,7 +2799,7 @@
         <div class="modal" style="max-width:min(420px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2 id="mainCatModalTitle">Add <span>Main Category</span></h2>
-                <button class="modal-close" id="closeMainCatModal">✕</button>
+                <button class="modal-close" id="closeMainCatModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editMainCatId">
@@ -2827,7 +2827,7 @@
         <div class="modal delete-modal">
             <div class="modal-header">
                 <h2>Delete <span>Main Category</span></h2>
-                <button class="modal-close" id="closeDeleteMainCatModal">✕</button>
+                <button class="modal-close" id="closeDeleteMainCatModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body delete-body">
                 <div class="delete-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></div>
@@ -2852,7 +2852,7 @@
         <div class="modal" style="max-width:min(450px, calc(100vw - 2rem));">
             <div class="modal-header">
                 <h2 id="catModalTitle">Add <span>Subcategory</span></h2>
-                <button class="modal-close" id="closeCatModal">✕</button>
+                <button class="modal-close" id="closeCatModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editCatId">
@@ -2884,7 +2884,7 @@
         <div class="modal delete-modal">
             <div class="modal-header">
                 <h2>Confirm <span>Delete</span></h2>
-                <button class="modal-close" id="closeDeleteModal">✕</button>
+                <button class="modal-close" id="closeDeleteModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="delete-body">
                 <div class="delete-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></div>
@@ -2907,7 +2907,7 @@
         <div class="modal delete-modal">
             <div class="modal-header">
                 <h2>Delete <span>Category</span></h2>
-                <button class="modal-close" id="closeDeleteCatModal">✕</button>
+                <button class="modal-close" id="closeDeleteCatModal" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <div class="modal-body delete-body">
                 <div class="delete-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></div>
