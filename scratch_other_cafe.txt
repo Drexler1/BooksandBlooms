@@ -1,0 +1,47 @@
+Other cafe matches (without Books): 46
+.\app.py:2838: "please contact the café administrator.",
+.\app.py:10799: "category": "Café",
+.\templates\choose_method.html:515: <p>No email address is registered for this account. Please contact the café administrator.</p>
+.\templates\forgot_password.html:607: <p class="field-hint">Use the full name on file with the café.</p>
+.\templates\index.html:690: <p>Manage your café with ease. Sign in to access your dashboard, process orders, and keep things running smoothly.</p>
+.\templates\admin\admin_sales.html:2101: <div class="logo-subtitle">CAFÉ</div>
+.\templates\admin\admin_setting.html:1026: <div class="logo-subtitle">CAFÉ</div>
+.\templates\admin\employee_management.html:1344: <div class="logo-subtitle">CAFÉ</div>
+.\templates\admin\inventory.html:3952: <div class="logo-subtitle">CAFÉ</div>
+.\templates\admin\inventory.html:4069: <button class="inv-tab" data-tab="cafe-supplies">
+.\templates\admin\inventory.html:4169: <!-- ════ TAB 2: CAFÉ PACKAGING & LOGS ════ -->
+.\templates\admin\inventory.html:4170: <div class="inv-tab-panel" id="tab-cafe-supplies">
+.\templates\admin\inventory.html:5309: tab: isCup ? 'cafe-supplies' : 'ingredients',
+.\templates\admin\inventory.html:6469: const lowCupCount = allInv.filter(i => i.tab === 'cafe-supplies' && getStatus(i) === 'low').length;
+.\templates\admin\inventory.html:6476: else if (lowCupCount > 0) targetTab = 'cafe-supplies';
+.\templates\admin\inventory.html:6479: else if (lowCupCount > 0) targetTab = 'cafe-supplies';
+.\templates\admin\inventory.html:6480: } else if (activeTab === 'cafe-supplies' && lowCupCount === 0) {
+.\templates\admin\inventory.html:6510: const outCupCount = allInv.filter(i => i.tab === 'cafe-supplies' && getStatus(i) === 'out').length;
+.\templates\admin\inventory.html:6517: else if (outCupCount > 0) targetTab = 'cafe-supplies';
+.\templates\admin\inventory.html:6520: else if (outCupCount > 0) targetTab = 'cafe-supplies';
+.\templates\admin\inventory.html:6521: } else if (activeTab === 'cafe-supplies' && outCupCount === 0) {
+.\templates\admin\payroll.html:1892: <div class="logo-subtitle">CAFÉ</div>
+.\templates\admin\product_management.html:2322: <div class="logo-subtitle">CAFÉ</div>
+.\templates\admin\staff_attendance.html:2336: <div class="logo-subtitle">CAFÉ</div>
+.\templates\developer\dashboard.html:1406: of authorized café staff and active system accounts</p>
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:557: 'cafebabefacedbaddecaf888'
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:567: 'cafebabefacedbaddecaf888'
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:577: 'cafebabefacedbad'
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:615: 'cafebabefacedbaddecaf888'
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:625: 'cafebabefacedbaddecaf888'
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:635: 'cafebabefacedbad'
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:672: 'cafebabefacedbaddecaf888'
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:682: 'cafebabefacedbaddecaf888'
+.\venv\Lib\site-packages\Crypto\SelfTest\Cipher\test_GCM.py:692: 'cafebabefacedbad'
+.\venv\Lib\site-packages\Crypto\SelfTest\IO\test_PKCS8.py:182: 9d6125d1b52f7b2cca1f6bd5f584334bf90bce1a7d938274cafe27b68e629698
+.\venv\Lib\site-packages\Crypto\SelfTest\Protocol\test_ecdh.py:186: b"9e977ae45f33bf67f285d064d83e6632bcafe3a7d33fe571233bab4794ace759")
+.\venv\Lib\site-packages\Crypto\SelfTest\Signature\test_dss.py:786: "074BD1D979D5F32BF958DDC61E4FB4872ADCAFEB2256497CDAC30397",
+.\venv\Lib\site-packages\Crypto\SelfTest\Signature\test_eddsa.py:327: "0987fd08527c1a8e80d5823e65cafe2a3d00",
+.\venv\Lib\site-packages\Crypto\Util\RFC1751.py:228: "BUSY", "BYTE", "CADY", "CAFE", "CAGE", "CAIN", "CAKE", "CALF",
+.\venv\Lib\site-packages\numpy\core\tests\test_arrayprint.py:581: assert_equal(str(np.array('café', '<U4')), 'café')
+.\venv\Lib\site-packages\numpy\core\tests\test_arrayprint.py:583: assert_equal(repr(np.array('café', '<U4')),
+.\venv\Lib\site-packages\numpy\core\tests\test_arrayprint.py:584: "array('café', dtype='<U4')")
+.\venv\Lib\site-packages\pandas\tests\strings\test_case_justify.py:417: ["  pre  ", np.nan, "\xac\u20ac\U00008000 abadcafe"], dtype=any_string_dtype
+.\venv\Lib\site-packages\pandas\tests\strings\test_case_justify.py:420: ["  pre", np.nan, "\xac\u20ac\U00008000 ab\nadcafe"], dtype=any_string_dtype
+.\venv\Lib\site-packages\wheel\macosx_libfile.py:60: FAT_MAGIC = 0xCAFEBABE
+.\venv\Lib\site-packages\wheel\macosx_libfile.py:62: FAT_MAGIC_64 = 0xCAFEBABF

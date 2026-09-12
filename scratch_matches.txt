@@ -1,0 +1,65 @@
+Total matches: 64
+.\app.py:86: from_name: str = "Books & Blooms Café",
+.\app.py:2491: subject = "Books & Blooms Café — Password Reset"
+.\app.py:2497: color:#1c1814;margin:0 0 8px">Books &amp; Blooms Café</p>
+.\app.py:2546: f"[Books & Blooms Cafe] Hi {full_name}, your OTP is: {otp_code}. "
+.\app.py:4503: <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+.\app.py:4538: This notification was sent automatically by the Books &amp; Blooms Café POS system.
+.\app.py:4612: <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+.\app.py:4647: This notification was sent automatically by the Books &amp; Blooms Café POS system.
+.\app.py:4988: <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+.\app.py:4999: Sent from the Admin Settings page of Books &amp; Blooms Café POS.
+.\app.py:5006: subject="📧 Books & Blooms Café — Test Email",
+.\app.py:5184: <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+.\app.py:5208: This alert was sent from Books &amp; Blooms Café POS · Admin Settings
+.\app.py:5365: <h2 style="color:#c9a961;margin:0;font-size:1.3rem;">📚 Books &amp; Blooms Café</h2>
+.\app.py:5442: This summary was sent automatically by the Books &amp; Blooms Café POS system
+.\app.py:9225: # Books & Blooms Café — New Inventory API Routes
+.\templates\choose_account.html:6: <title>Choose Account | Books & Blooms Café</title>
+.\templates\choose_account.html:403: Books &amp; Blooms Café
+.\templates\choose_account.html:416: <p>© 2025 Books &amp; Blooms Café. All rights reserved.</p>
+.\templates\choose_method.html:6: <title>Choose Recovery Method | Books & Blooms Café</title>
+.\templates\choose_method.html:435: Books &amp; Blooms Café
+.\templates\choose_method.html:448: <p>© 2025 Books &amp; Blooms Café. All rights reserved.</p>
+.\templates\forgot_password.html:6: <title>Forgot Password | Books & Blooms Café</title>
+.\templates\forgot_password.html:538: Books &amp; Blooms Café
+.\templates\forgot_password.html:551: <p>© 2025 Books &amp; Blooms Café. All rights reserved.</p>
+.\templates\index.html:6: <title>Books & Blooms Café — Sign In</title>
+.\templates\index.html:683: Books &amp; Blooms Café
+.\templates\index.html:695: <p>© 2025 Books &amp; Blooms Café. All rights reserved.</p>
+.\templates\reset_password.html:6: <title>Reset Password | Books & Blooms Café</title>
+.\templates\reset_password.html:446: Books &amp; Blooms Café
+.\templates\reset_password.html:459: <p>© 2025 Books &amp; Blooms Café. All rights reserved.</p>
+.\templates\verify_otp.html:6: <title>Verify OTP | Books & Blooms Café</title>
+.\templates\verify_otp.html:454: Books &amp; Blooms Café
+.\templates\verify_otp.html:467: <p>© 2025 Books &amp; Blooms Café. All rights reserved.</p>
+.\templates\admin\admin_sales.html:7: <title>Books & Blooms Café — Sales</title>
+.\templates\admin\admin_sales.html:2842: <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:700;">Books & Blooms Café</div>
+.\templates\admin\admin_sales.html:2877: <div style="text-align:center;font-size:0.75rem;color:#aaa;">Thank you for visiting Books & Blooms Café!<br><span style="font-size:0.68rem;letter-spacing:0.4px;">This serves as your official receipt.</span></div>`;
+.\templates\admin\admin_sales.html:2913: <div class="rp-store">Books & Blooms Café</div>
+.\templates\admin\admin_sales.html:2934: <div class="rp-footer">Thank you for visiting!<br>Books & Blooms Café</div>`;
+.\templates\admin\admin_sales.html:2969: <div class="rp-store">Books & Blooms Café</div>
+.\templates\admin\admin_sales.html:3005: <div class="rp-footer">— End of Shift Report —<br>Books & Blooms Café</div>`;
+.\templates\admin\admin_sales.html:3022: <div class="rp-store">Books & Blooms Café</div>
+.\templates\admin\admin_sales.html:3082: html += `<hr class="rp-divider"><div class="rp-footer">— End of Report —<br>Books & Blooms Café</div>`;
+.\templates\admin\admin_sales.html:3373: <div class="rp-store">Books & Blooms Café</div>
+.\templates\admin\admin_sales.html:3395: <div class="rp-footer">Books & Blooms Café<br>Cash Flow Report</div>`;
+.\templates\admin\admin_setting.html:7: <title>Books & Blooms Café — Admin Settings</title>
+.\templates\admin\create_admin.html:6: <title>Books &amp; Blooms Café — Admin Setup</title>
+.\templates\admin\dashboard.html:6: <title>Books & Blooms Café - Admin Dashboard</title>
+.\templates\admin\employee_management.html:7: <title>Books & Blooms Café - Employee Management</title>
+.\templates\admin\inventory.html:7: <title>Books & Blooms Café — Inventory Management</title>
+.\templates\admin\payroll.html:7: <title>Books & Blooms Café — Payroll</title>
+.\templates\admin\product_management.html:7: <title>Books & Blooms Café — Product Management</title>
+.\templates\admin\staff_attendance.html:7: <title>Books & Blooms Café — Staff Attendance</title>
+.\templates\cashier\cashier_attendance.html:7: <title>Books & Blooms Café — My Attendance</title>
+.\templates\cashier\cashier_dashboard.html:7: <title>Books &amp; Blooms Café — POS</title>
+.\templates\cashier\cashier_dashboard.html:2841: <h3>Books &amp; Blooms Café</h3>
+.\templates\cashier\cashier_dashboard.html:2866: <p style="margin-top:0.3rem;">Thank you for visiting Books &amp; Blooms Café!</p>
+.\templates\cashier\cashier_inventory.html:7: <title>Books & Blooms Café — Cashier Inventory</title>
+.\templates\cashier\transaction.html:7: <title>Books & Blooms Café — Transactions</title>
+.\templates\cashier\transaction.html:1438: <div style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:700">Books &amp; Blooms Café</div>
+.\templates\cashier\transaction.html:1462: <div style="margin-top:0.25rem">Thank you for visiting Books &amp; Blooms Café!</div>
+.\templates\errors\403.html:6: <title>Access Denied — Books &amp; Blooms Café</title>
+.\templates\errors\404.html:6: <title>Page Not Found — Books &amp; Blooms Café</title>
+.\templates\errors\500.html:6: <title>Server Error — Books &amp; Blooms Café</title>
