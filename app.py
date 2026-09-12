@@ -13008,13 +13008,14 @@ def api_cashier_me():
 def api_cashier_inv_items():
     """
     Cashier-safe read-only item list.
-    Returns id, name, type, stock, unit, reorder_point, note, status, updated_at.
+    Returns id, name, type, category, stock, unit, reorder_point, note, status, updated_at.
     Cost and price fields are intentionally excluded.
     """
     if not _is_cashier():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     try:
         cur = mysql.connection.cursor(DictCursor)
+        # Fetch inv_items (supplies/packaging/ingredients)
         cur.execute("""
             SELECT id, name, type, stock, unit, reorder_point, note,
                    DATE_FORMAT(updated_at, '%%b %%d, %%Y %%h:%%i %%p') AS updated_at
@@ -13022,12 +13023,51 @@ def api_cashier_inv_items():
             WHERE  is_active = 1
             ORDER  BY type, name
             """)
-        rows = cur.fetchall()
+        inv_rows = cur.fetchall()
+
+        # Also fetch active store products to provide complete stock tracking
+        cur.execute("""
+            SELECT p.product_id, p.name, c.name AS category_name, p.stock, p.unit, p.reorder_point,
+                   p.sku, p.description,
+                   DATE_FORMAT(p.updated_at, '%%b %%d, %%Y %%h:%%i %%p') AS updated_at
+            FROM   products p
+            LEFT JOIN categories c ON p.category_id = c.category_id
+            WHERE  p.is_active = 1
+            ORDER  BY c.name, p.name
+            """)
+        prod_rows = cur.fetchall()
         cur.close()
+
         items = []
-        for r in rows:
-            stock = float(r["stock"])
-            reorder = float(r["reorder_point"])
+        for r in inv_rows:
+            stock = float(r["stock"]) if r["stock"] is not None else 0.0
+            reorder = float(r["reorder_point"]) if r["reorder_point"] is not None else 0.0
+            if stock <= 0:
+                status = "out"
+            elif stock <= reorder:
+                status = "low"
+            else:
+                status = "ok"
+            cat_name = "Packaging" if r["type"] == "packaging" else ("Ingredient" if r["type"] == "ingredient" else (r["type"].capitalize() if r["type"] else "Supplies"))
+            items.append(
+                {
+                    "id": r["id"],
+                    "name": r["name"],
+                    "type": r["type"],
+                    "category": cat_name,
+                    "stock": stock,
+                    "unit": r["unit"] or "",
+                    "reorder_point": reorder,
+                    "note": r["note"] or "",
+                    "status": status,
+                    "item_source": "supply",
+                    "updated_at": r["updated_at"],
+                }
+            )
+
+        for p in prod_rows:
+            stock = float(p["stock"]) if p["stock"] is not None else 0.0
+            reorder = float(p["reorder_point"]) if p["reorder_point"] is not None else 0.0
             if stock <= 0:
                 status = "out"
             elif stock <= reorder:
@@ -13036,17 +13076,21 @@ def api_cashier_inv_items():
                 status = "ok"
             items.append(
                 {
-                    "id": r["id"],
-                    "name": r["name"],
-                    "type": r["type"],
+                    "id": p["product_id"],
+                    "name": p["name"],
+                    "type": "product",
+                    "category": p["category_name"] or "Product",
                     "stock": stock,
-                    "unit": r["unit"],
+                    "unit": p["unit"] or "pcs",
                     "reorder_point": reorder,
-                    "note": r["note"] or "",
+                    "note": p["sku"] or p["description"] or "",
                     "status": status,
-                    "updated_at": r["updated_at"],
+                    "item_source": "product",
+                    "updated_at": p["updated_at"],
                 }
             )
+
+        items.sort(key=lambda x: (x["category"].lower(), x["name"].lower()))
         return jsonify({"success": True, "items": items, "total": len(items)})
     except Exception as exc:
         app.logger.error(f"[cashier_inv] api_cashier_inv_items: {exc}")
