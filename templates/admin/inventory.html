@@ -1731,17 +1731,43 @@
 
         /* ── Stock Alert Button ── */
         .btn-alert {
+            background: white;
+            color: var(--black);
+            border-color: #ddd;
+        }
+
+        .btn-alert:hover {
+            background: #f5f5f5;
+            color: var(--black);
+            border-color: #bbb;
+        }
+
+        .btn-alert.btn-alert-low {
             background: #fff3e0;
             color: #e65100;
             border-color: #ffcc80;
         }
 
-        .btn-alert:hover {
-            background: #ff9800;
-            color: white;
-            border-color: #ff9800;
+        .btn-alert.btn-alert-low:hover {
+            background: #ffe0b2;
+            color: #e65100;
+            border-color: #ffb74d;
             transform: translateY(-2px);
             box-shadow: 0 6px 18px rgba(255, 152, 0, 0.35);
+        }
+
+        .btn-alert.btn-alert-critical {
+            background: #fce4ec;
+            color: #c62828;
+            border-color: #ef9a9a;
+        }
+
+        .btn-alert.btn-alert-critical:hover {
+            background: #f8bbd0;
+            color: #b71c1c;
+            border-color: #e57373;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(220, 53, 69, 0.35);
         }
 
         .btn-alert .alert-badge {
@@ -1760,18 +1786,6 @@
 
         .btn-alert .alert-badge.visible {
             display: flex;
-        }
-
-        .btn-alert.btn-alert-low {
-            background: #fff3e0;
-            color: #e65100;
-            border-color: #ffcc80;
-        }
-
-        .btn-alert.btn-alert-critical {
-            background: #fce4ec;
-            color: #c62828;
-            border-color: #ef9a9a;
         }
 
         /* ── Stock Alert Modal ── */
@@ -4016,7 +4030,7 @@
                         <div>
                             <div class="stat-label">Total Inventory Items</div>
                             <div class="stat-value" id="statTotal">—</div>
-                            <div class="stat-sub">ingredients + packaging</div>
+                            <div class="stat-sub">products & supplies</div>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -4024,7 +4038,7 @@
                         <div>
                             <div class="stat-label">Stocked</div>
                             <div class="stat-value" id="statOk">—</div>
-                            <div class="stat-sub">above reorder point</div>
+                            <div class="stat-sub">healthy stock levels</div>
                         </div>
                     </div>
                     <div class="stat-card clickable" id="lowStockCard" onclick="filterToLow()">
@@ -4032,7 +4046,7 @@
                         <div>
                             <div class="stat-label">Low Stock</div>
                             <div class="stat-value" id="statLow">—</div>
-                            <div class="stat-sub" id="lowStockSub">click to filter</div>
+                            <div class="stat-sub" id="lowStockSub">needs restocking</div>
                         </div>
                     </div>
                     <div class="stat-card clickable" id="outStockCard" onclick="filterToOut()">
@@ -4040,7 +4054,7 @@
                         <div>
                             <div class="stat-label">Out of Stock</div>
                             <div class="stat-value" id="statOut">—</div>
-                            <div class="stat-sub" id="outStockSub">click to filter</div>
+                            <div class="stat-sub" id="outStockSub">immediate attention</div>
                         </div>
                     </div>
                 </div>
@@ -4096,8 +4110,9 @@
                             <select class="filter-select" id="prodStockStatusFilter">
                                 <option value="">All Stock Statuses</option>
                                 <option value="ok">In Stock</option>
-                                <option value="low">Low Stock Warning</option>
+                                <option value="low">Low Stock</option>
                                 <option value="out">Out of Stock</option>
+                                <option value="untracked">Untracked</option>
                             </select>
                             <button class="btn btn-outline btn-sm" id="prodStockRefreshBtn" style="padding:0.6rem 0.95rem;">Refresh</button>
                             <span class="result-count" id="prodStockCount" style="align-self:center;font-size:0.82rem;color:#888;font-weight:600;">Loading…</span>
@@ -5253,12 +5268,69 @@
         }
 
         /* ════════════════════════════════════════════
-           STOCK STATUS
+           STOCK HELPERS & STATUS
         ════════════════════════════════════════════ */
+        function fmtNum(n) {
+            if (n === null || n === undefined || isNaN(n)) return '0';
+            const num = parseFloat(n);
+            return Number.isInteger(num) ? num.toString() : num.toFixed(2);
+        }
+
         function getStatus(item) {
-            if (item.stock <= 0) return 'out';
-            if (item.stock <= (item.reorder_point || 10)) return 'low';
+            if (!item) return 'ok';
+            if (item.track_stock === false || item.track_stock === 0 || item.track_stock === '0') {
+                return 'untracked';
+            }
+            const s = parseFloat(item.stock) || 0;
+            const rp = (item.reorder_point !== undefined && item.reorder_point !== null && item.reorder_point !== '')
+                ? parseFloat(item.reorder_point)
+                : (item.item_source === 'product' || item.product_id ? 5 : 10);
+            if (s <= 0) return 'out';
+            if (s <= rp) return 'low';
             return 'ok';
+        }
+
+        function getAllInventoryItems() {
+            const list = [];
+            // 1. Ingredients & Supplies / Cups from inv_items
+            if (Array.isArray(allItems)) {
+                allItems.forEach(i => {
+                    const isCup = typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit);
+                    list.push({
+                        id: i.id,
+                        name: i.name,
+                        type: i.type || (isCup ? 'packaging' : 'ingredient'),
+                        category: isCup ? 'Cup Packaging' : (i.type === 'packaging' ? 'Packaging' : 'Ingredient'),
+                        stock: parseFloat(i.stock) || 0,
+                        unit: i.unit || 'pcs',
+                        reorder_point: (i.reorder_point !== undefined && i.reorder_point !== null && i.reorder_point !== '') ? parseFloat(i.reorder_point) : 10,
+                        track_stock: true,
+                        item_source: isCup ? 'cup' : 'supply',
+                        tab: isCup ? 'cafe-supplies' : 'ingredients',
+                        rawItem: i
+                    });
+                });
+            }
+            // 2. Active store products
+            if (Array.isArray(allStoreProducts)) {
+                allStoreProducts.forEach(p => {
+                    const isTracked = (p.track_stock !== false && p.track_stock !== 0 && p.track_stock !== '0');
+                    list.push({
+                        id: p.product_id,
+                        name: p.name,
+                        type: 'product',
+                        category: p.main_category_name || p.category_name || 'Store Product',
+                        stock: parseFloat(p.stock) || 0,
+                        unit: p.unit || 'pcs',
+                        reorder_point: (p.reorder_point !== undefined && p.reorder_point !== null && p.reorder_point !== '') ? parseFloat(p.reorder_point) : 5,
+                        track_stock: isTracked,
+                        item_source: 'product',
+                        tab: 'store-products',
+                        rawItem: p
+                    });
+                });
+            }
+            return list;
         }
 
         /* ════════════════════════════════════════════
@@ -5284,13 +5356,21 @@
         }
 
         function renderStats() {
-            const ok = allItems.filter(i => getStatus(i) === 'ok').length;
-            const low = allItems.filter(i => getStatus(i) === 'low').length;
-            const out = allItems.filter(i => getStatus(i) === 'out').length;
-            document.getElementById('statTotal').textContent = allItems.length;
-            document.getElementById('statOk').textContent = ok;
-            document.getElementById('statLow').textContent = low;
-            document.getElementById('statOut').textContent = out;
+            const allInv = getAllInventoryItems().filter(i => i.track_stock);
+            const ok = allInv.filter(i => getStatus(i) === 'ok').length;
+            const low = allInv.filter(i => getStatus(i) === 'low').length;
+            const out = allInv.filter(i => getStatus(i) === 'out').length;
+
+            const elTotal = document.getElementById('statTotal');
+            const elOk = document.getElementById('statOk');
+            const elLow = document.getElementById('statLow');
+            const elOut = document.getElementById('statOut');
+
+            if (elTotal) elTotal.textContent = allInv.length;
+            if (elOk) elOk.textContent = ok;
+            if (elLow) elLow.textContent = low;
+            if (elOut) elOut.textContent = out;
+
             updateAlertBadge();
         }
 
@@ -5427,12 +5507,7 @@
             }).join('');
         }
 
-        function filterToLow() {
-            stockFilter = stockFilter === 'low' ? '' : 'low';
-            const sel = document.getElementById('ingStockFilter');
-            sel.value = stockFilter;
-            renderIngredients();
-        }
+        // filterToLow is defined globally below with unified tab intelligence
 
         /* ════════════════════════════════════════════
            DEDUCTION LOG (cups auto-deducted by sales)
@@ -6019,20 +6094,37 @@
         /* ════════════════════════════════════════════
            STOCK ALERT NOTIFICATION
         ════════════════════════════════════════════ */
+        /* ════════════════════════════════════════════
+           STOCK ALERT NOTIFICATION & MODAL
+        ════════════════════════════════════════════ */
         function updateAlertBadge() {
-            const lowCount = allItems.filter(i => getStatus(i) === 'low').length;
-            const outCount = allItems.filter(i => getStatus(i) === 'out').length;
+            const allInv = getAllInventoryItems().filter(i => i.track_stock);
+            const lowCount = allInv.filter(i => getStatus(i) === 'low').length;
+            const outCount = allInv.filter(i => getStatus(i) === 'out').length;
             const total = lowCount + outCount;
             const badge = document.getElementById('alertBadge');
             const btn = document.getElementById('stockAlertBtn');
-            badge.textContent = total;
-            badge.classList.toggle('visible', total > 0);
-            // Make the button pulse red if there are out-of-stock items
-            btn.classList.remove('btn-alert-critical', 'btn-alert-low');
-            if (outCount > 0) {
-                btn.classList.add('btn-alert-critical');
-            } else if (lowCount > 0) {
-                btn.classList.add('btn-alert-low');
+            if (badge) {
+                badge.textContent = total;
+                badge.classList.toggle('visible', total > 0);
+            }
+            if (btn) {
+                btn.classList.remove('btn-alert-critical', 'btn-alert-low');
+                if (outCount > 0) {
+                    btn.classList.add('btn-alert-critical');
+                    btn.style.background = '#fce4ec';
+                    btn.style.color = '#c62828';
+                    btn.style.borderColor = '#ef9a9a';
+                } else if (lowCount > 0) {
+                    btn.classList.add('btn-alert-low');
+                    btn.style.background = '#fff3e0';
+                    btn.style.color = '#e65100';
+                    btn.style.borderColor = '#ffcc80';
+                } else {
+                    btn.style.background = '';
+                    btn.style.color = '';
+                    btn.style.borderColor = '';
+                }
             }
         }
 
@@ -6040,22 +6132,26 @@
             openModal('stockAlertModal');
             const body = document.getElementById('alertModalBody');
             const sendBtn = document.getElementById('sendAlertBtn');
-            sendBtn.style.display = 'none';
-            body.innerHTML = `<div class="alert-no-issues"><div class="alert-no-issues-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><p>Checking stock levels…</p></div>`;
+            if (sendBtn) sendBtn.style.display = 'none';
+            if (body) {
+                body.innerHTML = `<div class="alert-no-issues"><div class="alert-no-issues-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><p>Checking stock levels…</p></div>`;
+            }
 
-            // Re-use already-loaded data
-            const lowItems = allItems.filter(i => getStatus(i) === 'low');
-            const outItems = allItems.filter(i => getStatus(i) === 'out');
+            const allInv = getAllInventoryItems().filter(i => i.track_stock);
+            const outItems = allInv.filter(i => getStatus(i) === 'out');
+            const lowItems = allInv.filter(i => getStatus(i) === 'low');
             const alertItems = [...outItems, ...lowItems];
 
             if (!alertItems.length) {
-                body.innerHTML = `
-                <div class="alert-no-issues">
-                    <div class="alert-no-issues-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <p style="font-weight:700;color:#388e3c;font-size:0.95rem;">All stock levels are healthy!</p>
-                    <p style="margin-top:0.4rem;">No ingredients or supplies are below their reorder point.</p>
-                </div>`;
-                sendBtn.style.display = 'none';
+                if (body) {
+                    body.innerHTML = `
+                    <div class="alert-no-issues">
+                        <div class="alert-no-issues-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+                        <p style="font-weight:700;color:#388e3c;font-size:0.95rem;">All stock levels are healthy!</p>
+                        <p style="margin-top:0.4rem;color:#888;">No products, ingredients, or supplies are below their reorder point.</p>
+                    </div>`;
+                }
+                if (sendBtn) sendBtn.style.display = 'none';
             } else {
                 const outCount = outItems.length;
                 const lowCount = lowItems.length;
@@ -6073,35 +6169,56 @@
 
                 const itemRows = alertItems.map(item => {
                     const st = getStatus(item);
+                    const sourceBadge = `<span style="display:inline-block;padding:2px 7px;border-radius:12px;font-size:0.68rem;font-weight:600;background:#eee;color:#555;margin-left:6px;">${escHtml(item.category)}</span>`;
                     return `
-                <div class="alert-item-row">
-                    <span class="alert-item-dot ${st}"></span>
-                    <span class="alert-item-name">${item.name}</span>
-                    <span class="alert-item-stock">${item.stock} ${item.unit} / reorder ≤${item.reorder_point || 10}</span>
-                    <span class="alert-item-badge ${st}">${st === 'out' ? 'Out of Stock' : 'Low Stock'}</span>
-                </div>`;
+                    <div class="alert-item-row" style="cursor:pointer;" onclick="jumpToAlertItem('${item.tab}', '${st}', ${item.id})" title="Click to view in ${item.tab}">
+                        <span class="alert-item-dot ${st}"></span>
+                        <div style="flex:1;min-width:0;">
+                            <span class="alert-item-name">${escHtml(item.name)}</span>
+                            ${sourceBadge}
+                        </div>
+                        <span class="alert-item-stock">${fmtNum(item.stock)} ${escHtml(item.unit)} / reorder ≤${fmtNum(item.reorder_point)}</span>
+                        <span class="alert-item-badge ${st}">${st === 'out' ? 'Out of Stock' : 'Low Stock'}</span>
+                    </div>`;
                 }).join('');
 
-                body.innerHTML = `
-                <div class="alert-summary-banner ${isCritical ? 'critical' : ''}">
-                    <div class="alert-summary-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
-                    <div>
-                        <div class="alert-summary-title">${isCritical ? 'Critical stock alert!' : 'Low stock warning'}</div>
-                        <div class="alert-summary-sub">${alertItems.length} item${alertItems.length !== 1 ? 's' : ''} need${alertItems.length === 1 ? 's' : ''} attention — reviewed as of now</div>
+                if (body) {
+                    body.innerHTML = `
+                    <div class="alert-summary-banner ${isCritical ? 'critical' : ''}">
+                        <div class="alert-summary-icon">${isCritical
+                            ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>'
+                            : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>'}</div>
+                        <div>
+                            <div class="alert-summary-title">${isCritical ? 'Critical stock alert!' : 'Low stock warning'}</div>
+                            <div class="alert-summary-sub">${alertItems.length} item${alertItems.length !== 1 ? 's' : ''} need attention — reviewed as of now</div>
+                        </div>
                     </div>
-                </div>
-                <div class="alert-counts">
-                    ${outCount ? `<span class="alert-count-chip out">${outCount} Out of Stock</span>` : ''}
-                    ${lowCount ? `<span class="alert-count-chip low">${lowCount} Low Stock</span>` : ''}
-                </div>
-                <div class="alert-items-list">${itemRows}</div>
-                <div class="alert-recipient-box">
-                    Alert will be sent to: <strong>${recipientEmail}</strong>
-                    &nbsp;·&nbsp; <a href="{{ url_for('admin_settings') }}" style="color:var(--dark-gold);font-size:0.8rem;">Change in Settings</a>
-                </div>`;
-                sendBtn.style.display = 'inline-flex';
+                    <div class="alert-counts">
+                        ${outCount ? `<span class="alert-count-chip out"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon></svg>${outCount} Out of Stock</span>` : ''}
+                        ${lowCount ? `<span class="alert-count-chip low"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>${lowCount} Low Stock</span>` : ''}
+                    </div>
+                    <div class="alert-items-list">${itemRows}</div>
+                    <div class="alert-recipient-box">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>Alert will be sent to: <strong>${recipientEmail}</strong>
+                        &nbsp;·&nbsp; <a href="{{ url_for('admin_settings') }}" style="color:var(--dark-gold);font-size:0.8rem;">Change in Settings</a>
+                    </div>`;
+                }
+                if (sendBtn) sendBtn.style.display = 'inline-flex';
             }
         }
+
+        window.jumpToAlertItem = function(tabName, statusFilter, itemId) {
+            closeModal('stockAlertModal');
+            const tabBtn = document.querySelector(`.inv-tab[data-tab="${tabName}"]`);
+            if (tabBtn) tabBtn.click();
+            if (tabName === 'store-products') {
+                const sel = document.getElementById('prodStockStatusFilter');
+                if (sel) { sel.value = statusFilter; filterAndRenderStoreProducts(); }
+            } else if (tabName === 'ingredients') {
+                const sel = document.getElementById('ingStockFilter');
+                if (sel) { sel.value = statusFilter; stockFilter = statusFilter; renderIngredients(); }
+            }
+        };
 
         document.getElementById('stockAlertBtn').addEventListener('click', () => { openAlertModal(); setInvActive('stockAlertBtn'); });
         document.getElementById('closeAlertModal').addEventListener('click', () => { closeModal('stockAlertModal'); setInvActive(null); });
@@ -6113,7 +6230,7 @@
         document.getElementById('sendAlertBtn').addEventListener('click', async () => {
             const btn = document.getElementById('sendAlertBtn');
             btn.disabled = true;
-            btn.innerHTML = 'Sending…';
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin-icon" style="vertical-align:-1px;margin-right:4px;"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path></svg>Sending…';
 
             try {
                 const res = await fetch('/api/settings/email/send-low-stock-alert', { method: 'POST' });
@@ -6136,14 +6253,19 @@
             await startNetworkMonitor(); // must run first — validates _isOnline before any fetch
             await loadAll();
             await loadDeductionLog(); // show log immediately on page load
+            await loadStoreProducts(); // load store products
         })();
 
-        // Refresh cup stock counts + deduction log every 15 s so the page
+        // Refresh stock counts + deduction log every 15 s so the page
         // reflects sales that completed since the admin opened the tab.
         setInterval(async () => {
             await checkConnectivity(); // keep _isOnline accurate before fetching
             allItems = await fetchItems();
-            renderStats();
+            if (_isOnline && typeof loadStoreProducts === 'function') {
+                await loadStoreProducts();
+            } else {
+                renderStats();
+            }
             renderCups();
             await loadDeductionLog();
         }, 15000);
@@ -6341,77 +6463,82 @@
 
         // Click low stock stat card to filter
         window.filterToLow = function() {
-            const storeLowCount = allStoreProducts.filter(p => {
-                const isTracked = (p.track_stock !== false && p.track_stock !== 0);
-                if (!isTracked) return false;
-                const st = parseInt(p.stock) || 0;
-                const rp = parseInt(p.reorder_point) || 5;
-                return st > 0 && st <= rp;
-            }).length;
-
-            const invLowItems = (typeof allItems !== 'undefined' && Array.isArray(allItems)) ? allItems.filter(i => getStatus(i) === 'low') : [];
-            const cupLowCount = invLowItems.filter(i => (typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit))).length;
-            const ingLowCount = invLowItems.filter(i => !(typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit))).length;
+            const allInv = getAllInventoryItems().filter(i => i.track_stock);
+            const lowStoreCount = allInv.filter(i => i.tab === 'store-products' && getStatus(i) === 'low').length;
+            const lowIngCount = allInv.filter(i => i.tab === 'ingredients' && getStatus(i) === 'low').length;
+            const lowCupCount = allInv.filter(i => i.tab === 'cafe-supplies' && getStatus(i) === 'low').length;
 
             const activeTab = document.querySelector('.inv-tab.active')?.dataset?.tab || 'store-products';
 
-            if (activeTab === 'ingredients' || (storeLowCount === 0 && cupLowCount === 0 && ingLowCount > 0)) {
-                const tabBtn = document.querySelector('.inv-tab[data-tab="ingredients"]');
-                if (tabBtn) tabBtn.click();
-                const sel = document.getElementById('ingStockFilter');
-                if (sel) {
-                    sel.value = 'low';
-                    stockFilter = 'low';
-                    renderIngredients();
-                }
-            } else if (activeTab === 'cafe-supplies' || (storeLowCount === 0 && cupLowCount > 0)) {
-                const tabBtn = document.querySelector('.inv-tab[data-tab="cafe-supplies"]');
-                if (tabBtn) tabBtn.click();
-            } else {
-                const tabBtn = document.querySelector('.inv-tab[data-tab="store-products"]');
-                if (tabBtn) tabBtn.click();
+            let targetTab = activeTab;
+            if (activeTab === 'store-products' && lowStoreCount === 0) {
+                if (lowIngCount > 0) targetTab = 'ingredients';
+                else if (lowCupCount > 0) targetTab = 'cafe-supplies';
+            } else if (activeTab === 'ingredients' && lowIngCount === 0) {
+                if (lowStoreCount > 0) targetTab = 'store-products';
+                else if (lowCupCount > 0) targetTab = 'cafe-supplies';
+            } else if (activeTab === 'cafe-supplies' && lowCupCount === 0) {
+                if (lowStoreCount > 0) targetTab = 'store-products';
+                else if (lowIngCount > 0) targetTab = 'ingredients';
+            }
+
+            const tabBtn = document.querySelector(`.inv-tab[data-tab="${targetTab}"]`);
+            if (tabBtn) tabBtn.click();
+
+            if (targetTab === 'store-products') {
                 const filterEl = document.getElementById('prodStockStatusFilter');
                 if (filterEl) {
-                    filterEl.value = 'low';
+                    filterEl.value = filterEl.value === 'low' ? '' : 'low';
                     filterAndRenderStoreProducts();
+                }
+            } else if (targetTab === 'ingredients') {
+                const sel = document.getElementById('ingStockFilter');
+                if (sel) {
+                    const newVal = sel.value === 'low' ? '' : 'low';
+                    sel.value = newVal;
+                    stockFilter = newVal;
+                    renderIngredients();
                 }
             }
         };
 
         // Click out of stock stat card to filter
         window.filterToOut = function() {
-            const storeOutCount = allStoreProducts.filter(p => {
-                const isTracked = (p.track_stock !== false && p.track_stock !== 0);
-                if (!isTracked) return false;
-                const st = parseInt(p.stock) || 0;
-                return st <= 0;
-            }).length;
-
-            const invOutItems = (typeof allItems !== 'undefined' && Array.isArray(allItems)) ? allItems.filter(i => getStatus(i) === 'out') : [];
-            const cupOutCount = invOutItems.filter(i => (typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit))).length;
-            const ingOutCount = invOutItems.filter(i => !(typeof CUP_SIZES !== 'undefined' && CUP_SIZES.includes(i.unit))).length;
+            const allInv = getAllInventoryItems().filter(i => i.track_stock);
+            const outStoreCount = allInv.filter(i => i.tab === 'store-products' && getStatus(i) === 'out').length;
+            const outIngCount = allInv.filter(i => i.tab === 'ingredients' && getStatus(i) === 'out').length;
+            const outCupCount = allInv.filter(i => i.tab === 'cafe-supplies' && getStatus(i) === 'out').length;
 
             const activeTab = document.querySelector('.inv-tab.active')?.dataset?.tab || 'store-products';
 
-            if (activeTab === 'ingredients' || (storeOutCount === 0 && cupOutCount === 0 && ingOutCount > 0)) {
-                const tabBtn = document.querySelector('.inv-tab[data-tab="ingredients"]');
-                if (tabBtn) tabBtn.click();
-                const sel = document.getElementById('ingStockFilter');
-                if (sel) {
-                    sel.value = 'out';
-                    stockFilter = 'out';
-                    renderIngredients();
-                }
-            } else if (activeTab === 'cafe-supplies' || (storeOutCount === 0 && cupOutCount > 0)) {
-                const tabBtn = document.querySelector('.inv-tab[data-tab="cafe-supplies"]');
-                if (tabBtn) tabBtn.click();
-            } else {
-                const tabBtn = document.querySelector('.inv-tab[data-tab="store-products"]');
-                if (tabBtn) tabBtn.click();
+            let targetTab = activeTab;
+            if (activeTab === 'store-products' && outStoreCount === 0) {
+                if (outIngCount > 0) targetTab = 'ingredients';
+                else if (outCupCount > 0) targetTab = 'cafe-supplies';
+            } else if (activeTab === 'ingredients' && outIngCount === 0) {
+                if (outStoreCount > 0) targetTab = 'store-products';
+                else if (outCupCount > 0) targetTab = 'cafe-supplies';
+            } else if (activeTab === 'cafe-supplies' && outCupCount === 0) {
+                if (outStoreCount > 0) targetTab = 'store-products';
+                else if (outIngCount > 0) targetTab = 'ingredients';
+            }
+
+            const tabBtn = document.querySelector(`.inv-tab[data-tab="${targetTab}"]`);
+            if (tabBtn) tabBtn.click();
+
+            if (targetTab === 'store-products') {
                 const filterEl = document.getElementById('prodStockStatusFilter');
                 if (filterEl) {
-                    filterEl.value = 'out';
+                    filterEl.value = filterEl.value === 'out' ? '' : 'out';
                     filterAndRenderStoreProducts();
+                }
+            } else if (targetTab === 'ingredients') {
+                const sel = document.getElementById('ingStockFilter');
+                if (sel) {
+                    const newVal = sel.value === 'out' ? '' : 'out';
+                    sel.value = newVal;
+                    stockFilter = newVal;
+                    renderIngredients();
                 }
             }
         };
@@ -6430,6 +6557,8 @@
                 if (pData.success) {
                     allStoreProducts = pData.items || pData.products || [];
                     _updateUnifiedStats();
+                    renderStats();
+                    updateAlertBadge();
                 }
                 if (mcData.success) {
                     allStoreMainCats = mcData.main_categories || [];
@@ -6485,7 +6614,7 @@
             }
         }
 
-                let _prodStockCurrentPage = 1;
+        let _prodStockCurrentPage = 1;
         let _prodStockPageSize = 10;
         let _filteredStoreProducts = [];
 
@@ -6497,7 +6626,10 @@
 
             _filteredStoreProducts = allStoreProducts.filter(p => {
                 const isTracked = (p.track_stock !== false && p.track_stock !== 0 && p.track_stock !== '0');
-                if (!isTracked) return false;
+                const st = parseFloat(p.stock) || 0;
+                const rp = (p.reorder_point !== undefined && p.reorder_point !== null && p.reorder_point !== '') 
+                    ? parseFloat(p.reorder_point) 
+                    : 5;
 
                 if (q) {
                     const matchQ = (p.name || '').toLowerCase().includes(q) ||
@@ -6509,14 +6641,17 @@
                 if (deptId && String(p.main_category_id) !== String(deptId)) return false;
                 if (catId && String(p.category_id) !== String(catId)) return false;
                 if (status) {
-                    const st = parseInt(p.stock) || 0;
-                    const rp = parseInt(p.reorder_point) || 5;
-                    if (status === 'out') {
-                        if (st > 0) return false;
-                    } else if (status === 'low') {
-                        if (st <= 0 || st > rp) return false;
-                    } else if (status === 'ok') {
-                        if (st <= rp) return false;
+                    if (status === 'untracked') {
+                        if (isTracked) return false;
+                    } else {
+                        if (!isTracked) return false;
+                        if (status === 'out') {
+                            if (st > 0) return false;
+                        } else if (status === 'low') {
+                            if (st <= 0 || st > rp) return false;
+                        } else if (status === 'ok') {
+                            if (st <= rp) return false;
+                        }
                     }
                 }
                 return true;

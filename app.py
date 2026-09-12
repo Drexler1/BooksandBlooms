@@ -8735,8 +8735,8 @@ def api_inventory_stats():
             SELECT
                 COUNT(*)                                        AS total_products,
                 SUM(stock)                                      AS total_units,
-                SUM(CASE WHEN stock <= 0 THEN 1 ELSE 0 END)     AS out_of_stock,
-                SUM(CASE WHEN stock > 0 AND stock <= reorder_point THEN 1 ELSE 0 END) AS low_stock,
+                SUM(CASE WHEN track_stock = 1 AND stock <= 0 THEN 1 ELSE 0 END)     AS out_of_stock,
+                SUM(CASE WHEN track_stock = 1 AND stock > 0 AND stock <= reorder_point THEN 1 ELSE 0 END) AS low_stock,
                 SUM(stock * cost)                               AS inventory_cost,
                 SUM(stock * price)                              AS inventory_value
             FROM products
@@ -8909,7 +8909,7 @@ def api_inventory_items():
         if stock_status == "untracked":
             where.append("p.track_stock = 0")
         elif stock_status == "out":
-            where.append("p.track_stock = 1 AND p.stock = 0")
+            where.append("p.track_stock = 1 AND p.stock <= 0")
         elif stock_status == "low":
             where.append("p.track_stock = 1 AND p.stock > 0 AND p.stock <= p.reorder_point")
         elif stock_status == "ok":
