@@ -4098,7 +4098,6 @@
                                 <option value="ok">In Stock</option>
                                 <option value="low">Low Stock Warning</option>
                                 <option value="out">Out of Stock</option>
-                                <option value="untracked">Untracked</option>
                             </select>
                             <button class="btn btn-outline btn-sm" id="prodStockRefreshBtn" style="padding:0.6rem 0.95rem;">Refresh</button>
                             <span class="result-count" id="prodStockCount" style="align-self:center;font-size:0.82rem;color:#888;font-weight:600;">Loading…</span>
@@ -6430,7 +6429,6 @@
 
                 if (pData.success) {
                     allStoreProducts = pData.items || pData.products || [];
-                    document.getElementById('prodStockBadge').textContent = allStoreProducts.length;
                     _updateUnifiedStats();
                 }
                 if (mcData.success) {
@@ -6449,7 +6447,10 @@
 
         function _updateUnifiedStats() {
             const badge = document.getElementById('prodStockBadge');
-            if (badge) badge.textContent = allStoreProducts.length;
+            if (badge) {
+                const trackedCount = allStoreProducts.filter(p => p.track_stock !== false && p.track_stock !== 0 && p.track_stock !== '0').length;
+                badge.textContent = trackedCount;
+            }
         }
 
         function _populateDeptFilter() {
@@ -6495,6 +6496,9 @@
             const status = document.getElementById('prodStockStatusFilter')?.value || '';
 
             _filteredStoreProducts = allStoreProducts.filter(p => {
+                const isTracked = (p.track_stock !== false && p.track_stock !== 0 && p.track_stock !== '0');
+                if (!isTracked) return false;
+
                 if (q) {
                     const matchQ = (p.name || '').toLowerCase().includes(q) ||
                                    (p.sku || '').toLowerCase().includes(q) ||
@@ -6505,17 +6509,14 @@
                 if (deptId && String(p.main_category_id) !== String(deptId)) return false;
                 if (catId && String(p.category_id) !== String(catId)) return false;
                 if (status) {
-                    const isTracked = (p.track_stock !== false && p.track_stock !== 0);
                     const st = parseInt(p.stock) || 0;
                     const rp = parseInt(p.reorder_point) || 5;
-                    if (status === 'untracked') {
-                        if (isTracked) return false;
-                    } else if (status === 'out') {
-                        if (!isTracked || st > 0) return false;
+                    if (status === 'out') {
+                        if (st > 0) return false;
                     } else if (status === 'low') {
-                        if (!isTracked || st <= 0 || st > rp) return false;
+                        if (st <= 0 || st > rp) return false;
                     } else if (status === 'ok') {
-                        if (!isTracked || st <= rp) return false;
+                        if (st <= rp) return false;
                     }
                 }
                 return true;

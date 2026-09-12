@@ -429,6 +429,98 @@
         .stock-num.out { color: var(--danger); }
         .stock-unit { font-size: 0.75rem; font-weight: 500; color: #888; margin-left: 3px; }
 
+        /* ── Pagination ── */
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.85rem 1.25rem;
+            border-top: 1px solid #f0f0f0;
+            background: #fafafa;
+            border-radius: 0 0 10px 10px;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+        }
+
+        .pagination-info {
+            font-size: 0.82rem;
+            color: #777;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .page-size-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.82rem;
+            color: #777;
+            font-weight: 600;
+        }
+
+        .page-size-select {
+            padding: 0.3rem 0.65rem;
+            border: 1px solid #d5d5d5;
+            border-radius: 6px;
+            background: #fff;
+            color: var(--black);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .page-size-select:focus {
+            border-color: var(--gold);
+        }
+
+        .page-btn {
+            min-width: 32px;
+            height: 32px;
+            border: 1.5px solid #e0e0e0;
+            background: #fff;
+            border-radius: 6px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 0.4rem;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .page-btn.active {
+            background: var(--black);
+            color: var(--gold);
+            border-color: var(--black);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .page-btn.ellipsis {
+            border: none;
+            background: transparent;
+            cursor: default;
+            color: #999;
+        }
+
         /* ── Action buttons in table ── */
         .action-btns { display: flex; gap: 0.4rem; }
 
@@ -872,6 +964,31 @@
             .table-footer { flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.75rem 1rem; }
             .table-footer > div { display: flex; gap: 0.5rem; }
             .table-footer .btn { flex: 1; justify-content: center; }
+
+            .pagination-bar {
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 0.65rem !important;
+                padding: 0.75rem 1rem !important;
+                text-align: center !important;
+            }
+            .pagination-info {
+                width: 100% !important;
+                text-align: center !important;
+                font-size: 0.8rem !important;
+            }
+            .pagination-controls {
+                width: 100% !important;
+                justify-content: center !important;
+                flex-wrap: wrap !important;
+                gap: 0.35rem !important;
+            }
+            .page-size-wrap {
+                width: 100% !important;
+                justify-content: center !important;
+                margin-top: 0.2rem !important;
+                font-size: 0.8rem !important;
+            }
         }
 
 
@@ -1360,6 +1477,21 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Pagination Bar -->
+                    <div class="pagination-bar" id="stockPaginationBar" style="display:none;">
+                        <div class="pagination-info" id="stockPaginationInfo"></div>
+                        <div class="pagination-controls" id="stockPaginationControls"></div>
+                        <div class="page-size-wrap">
+                            <span>Rows:</span>
+                            <select id="stockPageSizeSelect" class="page-size-select" onchange="changePageSize(this.value)">
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Activity Log -->
@@ -1637,22 +1769,14 @@
            RENDER TABLE
         ═══════════════════════════════════════ */
         /* ═══════════════════════════════════════
-           RENDER TABLE (Streamlined 4 Columns)
+           PAGINATION STATE & RENDERING
         ═══════════════════════════════════════ */
+        let _currentPage   = 1;
+        let _pageSize      = 10;
+        let _filteredItems = [];
+
         function renderTable(items) {
             const tbody = document.getElementById('supplyTableBody');
-            if (!items.length) {
-                tbody.innerHTML = `
-                    <tr><td colspan="4">
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
-                            <h4>No items found</h4>
-                            <p>Try adjusting your search or filters.</p>
-                        </div>
-                    </td></tr>`;
-                return;
-            }
-
             tbody.innerHTML = items.map(item => {
                 const statusMeta = {
                     ok:  { label: 'In Stock',     cls: 'ok' },
@@ -1682,6 +1806,98 @@
             }).join('');
         }
 
+        function renderPagedTable() {
+            const tbody       = document.getElementById('supplyTableBody');
+            const pagBar      = document.getElementById('stockPaginationBar');
+            const pagInfo     = document.getElementById('stockPaginationInfo');
+            const pagControls = document.getElementById('stockPaginationControls');
+
+            const total = _filteredItems.length;
+
+            if (!total) {
+                tbody.innerHTML = `
+                    <tr><td colspan="4">
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+                            <h4>No items found</h4>
+                            <p>Try adjusting your search or filters.</p>
+                        </div>
+                    </td></tr>`;
+                if (pagBar) pagBar.style.display = 'none';
+                return;
+            }
+
+            const totalPages = Math.ceil(total / _pageSize);
+            if (_currentPage > totalPages) _currentPage = totalPages;
+            if (_currentPage < 1)          _currentPage = 1;
+
+            const start = (_currentPage - 1) * _pageSize;
+            const end   = Math.min(start + _pageSize, total);
+            const pageItems = _filteredItems.slice(start, end);
+
+            renderTable(pageItems);
+
+            if (pagBar) pagBar.style.display = 'flex';
+            if (pagInfo) {
+                pagInfo.textContent = `Showing ${start + 1}–${end} of ${total} item${total !== 1 ? 's' : ''}`;
+            }
+
+            if (pagControls) {
+                pagControls.innerHTML = '';
+
+                function makeBtn(label, pageNum, isActive, isDisabled, extraClass) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'page-btn' + (isActive ? ' active' : '') + (extraClass ? ' ' + extraClass : '');
+                    btn.textContent = label;
+                    btn.disabled = isDisabled;
+                    if (!isDisabled && !isActive) {
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            _currentPage = pageNum;
+                            renderPagedTable();
+                        });
+                    }
+                    return btn;
+                }
+
+                // Prev button
+                pagControls.appendChild(makeBtn('‹', _currentPage - 1, false, _currentPage === 1));
+
+                // Smart page range
+                const delta = 1;
+                const range = [];
+                for (let i = 1; i <= totalPages; i++) {
+                    if (i === 1 || i === totalPages || (i >= _currentPage - delta && i <= _currentPage + delta)) {
+                        range.push(i);
+                    }
+                }
+
+                let prev = null;
+                range.forEach(pNum => {
+                    if (prev !== null && pNum - prev > 1) {
+                        const dot = document.createElement('button');
+                        dot.type = 'button';
+                        dot.className = 'page-btn ellipsis';
+                        dot.textContent = '…';
+                        dot.disabled = true;
+                        pagControls.appendChild(dot);
+                    }
+                    pagControls.appendChild(makeBtn(pNum, pNum, pNum === _currentPage, pNum === _currentPage));
+                    prev = pNum;
+                });
+
+                // Next button
+                pagControls.appendChild(makeBtn('›', _currentPage + 1, false, _currentPage === totalPages));
+            }
+        }
+
+        function changePageSize(newSize) {
+            _pageSize = parseInt(newSize) || 10;
+            _currentPage = 1;
+            renderPagedTable();
+        }
+
         /* ═══════════════════════════════════════
            POPULATE CATEGORY FILTER
         ═══════════════════════════════════════ */
@@ -1705,14 +1921,15 @@
             const cat    = document.getElementById('filterCategory')?.value || '';
             const status = document.getElementById('filterStatus')?.value || '';
 
-            const filtered = allItems.filter(item => {
+            _filteredItems = allItems.filter(item => {
                 const itemCat = item.category || (item.type ? item.type.charAt(0).toUpperCase() + item.type.slice(1) : 'General');
                 const matchQ = !q || item.name.toLowerCase().includes(q) || (item.note || '').toLowerCase().includes(q) || itemCat.toLowerCase().includes(q);
                 const matchC = !cat    || itemCat === cat;
                 const matchS = !status || item.status === status;
                 return matchQ && matchC && matchS;
             });
-            renderTable(filtered);
+            _currentPage = 1;
+            renderPagedTable();
         }
 
         /* ═══════════════════════════════════════

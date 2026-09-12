@@ -13032,7 +13032,7 @@ def api_cashier_inv_items():
                    DATE_FORMAT(p.updated_at, '%%b %%d, %%Y %%h:%%i %%p') AS updated_at
             FROM   products p
             LEFT JOIN categories c ON p.category_id = c.category_id
-            WHERE  p.is_active = 1
+            WHERE  p.is_active = 1 AND p.track_stock = 1
             ORDER  BY c.name, p.name
             """)
         prod_rows = cur.fetchall()
