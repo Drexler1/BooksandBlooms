@@ -2356,16 +2356,15 @@
         <!-- NAV -->
         <nav id="mainNav">
             <ul>
-                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
-                <li><a href="{{ url_for('inventory') }}">Inventory</a></li>
-                <li><a href="{{ url_for('staff_attendance') }}" class="active">Staff Attendance</a></li>
-                <li><a href="{{ url_for('product_management') }}">Product Management</a></li>
-                {% if session.get('role') == 'admin' %}
-                <li><a href="{{ url_for('admin_settings') }}">Settings</a></li>
-                {% endif %}
-                <li><a href="{{ url_for('employee_management') }}">Employee Management</a></li>
-                <li><a href="{{ url_for('payroll') }}">Payroll</a></li>
+                {% if can_access('dashboard') %}<li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>{% endif %}
+                {% if can_access('sales') %}<li><a href="{{ url_for('admin_sales') }}">Sales</a></li>{% endif %}
+                {% if can_access('inventory') %}<li><a href="{{ url_for('inventory') }}">Inventory</a></li>{% endif %}
+                {% if can_access('staff_attendance') %}<li><a href="{{ url_for('staff_attendance') }}" class="active">Staff Attendance</a></li>{% endif %}
+                {% if can_access('product_management') %}<li><a href="{{ url_for('product_management') }}">Product Management</a></li>{% endif %}
+                {% if can_access('settings') %}<li><a href="{{ url_for('admin_settings') }}">Settings</a></li>{% endif %}
+                {% if can_access('employee_management') %}<li><a href="{{ url_for('employee_management') }}">Employee Management</a></li>{% endif %}
+                {% if can_access('payroll') %}<li><a href="{{ url_for('payroll') }}">Payroll</a></li>{% endif %}
+                {% if can_access('pos') %}<li><a href="{{ url_for('cashier_dashboard') }}" style="color:var(--gold);">POS Terminal</a></li>{% endif %}
             </ul>
         </nav>
 

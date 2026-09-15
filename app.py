@@ -1420,6 +1420,155 @@ def _is_cashier():
     return "employee_id" in session and session.get("role") == "cashier"
 
 
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                  ROLE-BASED ACCESS CONTROL (RBAC) CORE                       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+DEFAULT_RBAC_PERMISSIONS = {
+    "admin": {
+        "pos": True,
+        "dashboard": True,
+        "sales": True,
+        "inventory": True,
+        "staff_attendance": True,
+        "product_management": True,
+        "employee_management": True,
+        "payroll": True,
+        "settings": True,
+    },
+    "manager": {
+        "pos": False,
+        "dashboard": True,
+        "sales": True,
+        "inventory": True,
+        "staff_attendance": True,
+        "product_management": True,
+        "employee_management": False,
+        "payroll": False,
+        "settings": False,
+    },
+    "cashier": {
+        "pos": True,
+        "dashboard": False,
+        "sales": False,
+        "inventory": False,
+        "staff_attendance": False,
+        "product_management": False,
+        "employee_management": False,
+        "payroll": False,
+        "settings": False,
+    },
+}
+
+
+def _ensure_rbac_schema():
+    """Ensure app_settings table exists and seeds default RBAC permissions."""
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS `app_settings` (
+                `setting_key`   VARCHAR(100) NOT NULL PRIMARY KEY,
+                `setting_value` VARCHAR(500) NOT NULL DEFAULT '',
+                `updated_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                             ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        conn.commit()
+
+        for role, perms in DEFAULT_RBAC_PERMISSIONS.items():
+            cur.execute("""
+                INSERT IGNORE INTO app_settings (setting_key, setting_value)
+                VALUES (%s, %s)
+            """, (f"rbac_{role}", json.dumps(perms)))
+        conn.commit()
+        cur.close()
+        app.logger.info("[rbac] schema and default permissions ensured")
+    except Exception as exc:
+        app.logger.error(f"[rbac] _ensure_rbac_schema: {exc}")
+
+
+def _get_rbac_permissions() -> dict:
+    """Return the current RBAC configuration for all roles."""
+    import copy
+    result = copy.deepcopy(DEFAULT_RBAC_PERMISSIONS)
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT setting_key, setting_value FROM app_settings "
+            "WHERE setting_key IN ('rbac_admin', 'rbac_manager', 'rbac_cashier')"
+        )
+        rows = cur.fetchall()
+        cur.close()
+        for r in rows:
+            key = r["setting_key"]
+            role = key.replace("rbac_", "")
+            if role in result and r.get("setting_value"):
+                try:
+                    loaded = json.loads(r["setting_value"])
+                    if isinstance(loaded, dict):
+                        result[role].update(loaded)
+                except Exception:
+                    pass
+    except Exception as exc:
+        app.logger.error(f"[rbac] _get_rbac_permissions error: {exc}")
+    return result
+
+
+def _save_rbac_permissions(perms: dict) -> bool:
+    """Save RBAC configuration into app_settings table."""
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        for role in ("admin", "manager", "cashier"):
+            if role in perms and isinstance(perms[role], dict):
+                val = json.dumps(perms[role])
+                cur.execute("""
+                    INSERT INTO app_settings (setting_key, setting_value)
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+                """, (f"rbac_{role}", val))
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as exc:
+        app.logger.error(f"[rbac] _save_rbac_permissions error: {exc}")
+        return False
+
+
+def has_permission(role: str, module_name: str) -> bool:
+    """
+    Check if a given role is authorized to access a module.
+    Failsafe: Admins retain unconditional access to administrative modules to prevent accidental lockout.
+    """
+    if not role:
+        return False
+
+    if role == "admin":
+        if module_name == "pos":
+            perms = _get_rbac_permissions()
+            return bool(perms.get("admin", {}).get("pos", True))
+        return True
+
+    if role == "cashier":
+        return module_name == "pos"
+
+    perms = _get_rbac_permissions()
+    role_perms = perms.get(role, {})
+    return bool(role_perms.get(module_name, False))
+
+
+@app.context_processor
+def inject_rbac():
+    role = session.get("role") or ""
+    def can_access(module_name):
+        return has_permission(role, module_name)
+    return dict(can_access=can_access, user_role=role)
+
+
+
+
+
 def decode_base64_image(image_data: str):
     """
     Decode a base64 data-URI string to an OpenCV BGR image.
@@ -3336,8 +3485,12 @@ def _get_dashboard_data() -> dict:
 
 @app.route("/dashboard")
 def dashboard():
-    if session.get("role") not in ["admin", "manager"]:
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+    if not has_permission(role, "dashboard"):
+        flash("Access Denied: Your account does not have permission to view the Dashboard.")
+        return redirect(url_for("cashier_dashboard") if role == "cashier" else url_for("login"))
 
     # ── Resolve full_name (always set in session at login) ────────────────────
     full_name = session.get("full_name") or session.get("role", "User").capitalize()
@@ -3396,8 +3549,12 @@ def dashboard():
 
 @app.route("/employee_management")
 def employee_management():
-    if session.get("role") not in ["admin", "manager"]:
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+    if not has_permission(role, "employee_management"):
+        flash("Access Denied: Your account does not have permission to access Employee Management.")
+        return redirect(url_for("cashier_dashboard") if role == "cashier" else url_for("dashboard"))
 
     full_name = session.get("full_name") or session.get("role", "User").capitalize()
 
@@ -3967,8 +4124,12 @@ def invalidate_face_cache(employee_id):
 
 @app.route("/staff_attendance")
 def staff_attendance():
-    if session.get("role") not in ["admin", "manager"]:
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+    if not has_permission(role, "staff_attendance"):
+        flash("Access Denied: Your account does not have permission to access Staff Attendance.")
+        return redirect(url_for("cashier_dashboard") if role == "cashier" else url_for("dashboard"))
 
     full_name = session.get("full_name") or session.get("role", "User").capitalize()
     return render_template("admin/staff_attendance.html", full_name=full_name)
@@ -4426,9 +4587,12 @@ def api_attendance():
 
 @app.route("/admin_settings")
 def admin_settings():
-    # Settings are restricted to admins only; managers are not permitted.
-    if not is_super_admin():
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+    if not has_permission(role, "settings") or not is_super_admin():
+        flash("Access Denied: Settings are restricted to Administrators.")
+        return redirect(url_for("cashier_dashboard") if role == "cashier" else url_for("dashboard"))
 
     cur = mysql.connection.cursor(DictCursor)
     try:
@@ -5738,8 +5902,22 @@ def api_danger_clear_all_data():
 
 @app.route("/cashier_dashboard")
 def cashier_dashboard():
-    if not _is_cashier():
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+
+    if not _is_cashier():
+        if has_permission(role, "pos"):
+            employee = {
+                "full_name": session.get("full_name", "Admin"),
+                "username": session.get("username", "admin"),
+                "role": role,
+                "employee_id": session.get("employee_id") or session.get("admin_id") or 0,
+            }
+            return render_template("cashier/cashier_dashboard.html", employee=employee)
+        flash("Access Denied: You do not have permission to access the POS Terminal.")
+        return redirect(url_for("dashboard") if role in ("admin", "manager") else url_for("login"))
+
     emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
     if not emp_id:
         return redirect(url_for("login"))
@@ -5757,8 +5935,22 @@ def cashier_dashboard():
 
 @app.route("/cashier_transactions")
 def cashier_transactions():
-    if not _is_cashier():
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+
+    if not _is_cashier():
+        if has_permission(role, "pos"):
+            employee = {
+                "full_name": session.get("full_name", "Admin"),
+                "username": session.get("username", "admin"),
+                "role": role,
+                "employee_id": session.get("employee_id") or session.get("admin_id") or 0,
+            }
+            return render_template("cashier/transaction.html", employee=employee)
+        flash("Access Denied: You do not have permission to access POS Transactions.")
+        return redirect(url_for("dashboard") if role in ("admin", "manager") else url_for("login"))
+
     emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
     if not emp_id:
         return redirect(url_for("login"))
@@ -5777,8 +5969,23 @@ def cashier_transactions():
 @app.route("/cashier_attendance")
 def cashier_attendance():
     """Cashier-only attendance page — clock-in/out and own history only."""
-    if not _is_cashier():
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+
+    if not _is_cashier():
+        if has_permission(role, "pos"):
+            employee = {
+                "full_name": session.get("full_name", "Admin"),
+                "username": session.get("username", "admin"),
+                "role": role,
+                "employee_id": session.get("employee_id") or session.get("admin_id") or 0,
+                "hourly_rate": 0,
+            }
+            return render_template("cashier/cashier_attendance.html", employee=employee)
+        flash("Access Denied: You do not have permission to access POS Attendance.")
+        return redirect(url_for("dashboard") if role in ("admin", "manager") else url_for("login"))
+
     emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
     if not emp_id:
         return redirect(url_for("login"))
@@ -5799,8 +6006,12 @@ def cashier_attendance():
 @app.route("/admin_sales")
 def admin_sales():
     """Admin sales overview — transaction history + per-cashier shift reports."""
-    if not is_admin():
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+    if not has_permission(role, "sales"):
+        flash("Access Denied: Your account does not have permission to access Sales Overview.")
+        return redirect(url_for("cashier_dashboard") if role == "cashier" else url_for("dashboard"))
 
     full_name = session.get("full_name") or session.get("role", "Admin").capitalize()
     return render_template("admin/admin_sales.html", full_name=full_name)
@@ -5809,8 +6020,12 @@ def admin_sales():
 @app.route("/product_management")
 def product_management():
     """Render the admin product management page."""
-    if not is_admin():
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+    if not has_permission(role, "product_management"):
+        flash("Access Denied: Your account does not have permission to access Product Management.")
+        return redirect(url_for("cashier_dashboard") if role == "cashier" else url_for("dashboard"))
     full_name = session.get("full_name") or "Admin"
     return render_template("admin/product_management.html", full_name=full_name)
 
@@ -6717,7 +6932,14 @@ def run_auto_migration():
     except Exception as exc:
         app.logger.error(f"[migration] Step 21 (password_reset_tokens table) failed: {exc}")
 
+    # ── STEP 22: role-based access control (RBAC) schema & defaults ──────────
+    try:
+        _ensure_rbac_schema()
+    except Exception as exc:
+        app.logger.error(f"[migration] Step 22 (rbac schema) failed: {exc}")
+
     app.logger.info("[migration] run_auto_migration complete.")
+
 
 
 def _ensure_vat_columns():
@@ -6994,8 +7216,12 @@ def _compute_period_bounds(ref_date=None):
 @app.route("/payroll")
 def payroll():
     """Render the payroll dashboard page."""
-    if not is_admin():
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+    if not has_permission(role, "payroll"):
+        flash("Access Denied: Your account does not have permission to access Payroll.")
+        return redirect(url_for("cashier_dashboard") if role == "cashier" else url_for("dashboard"))
     full_name = session.get("full_name") or session.get("role", "Admin").capitalize()
     return render_template("admin/payroll.html", full_name=full_name)
 
@@ -7005,7 +7231,8 @@ def api_payroll_employees():
     """
     Return all active employees with their hourly_rate for the payroll UI.
     """
-    if not is_admin():
+    role = session.get("role")
+    if not has_permission(role, "payroll"):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
@@ -8689,9 +8916,13 @@ def _get_low_stock_items(limit=20):
 
 @app.route("/inventory")
 def inventory():
-    """Render the inventory management page (admin only)."""
-    if not is_admin():
+    """Render the inventory management page."""
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+    if not has_permission(role, "inventory"):
+        flash("Access Denied: Your account does not have permission to access Inventory.")
+        return redirect(url_for("cashier_dashboard") if role == "cashier" else url_for("dashboard"))
     # full_name is already decrypted when stored in session at login — do NOT decrypt again
     full_name = session.get("full_name") or "Admin"
     return render_template("admin/inventory.html", full_name=full_name)
@@ -12508,6 +12739,78 @@ def api_set_late_deduction_settings():
     return jsonify({"success": True, "message": "Late deduction settings updated"})
 
 
+# ── RBAC Permissions API (admin only) ─────────────────────────────────────────
+
+
+@app.route("/api/settings/permissions", methods=["GET"])
+def api_get_rbac_permissions():
+    """Admin-only: return current RBAC permissions configuration."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    perms = _get_rbac_permissions()
+    return jsonify({"success": True, "permissions": perms})
+
+
+@app.route("/api/settings/permissions", methods=["POST"])
+@csrf.exempt
+def api_save_rbac_permissions():
+    """Admin-only: update RBAC permissions configuration."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    new_perms = data.get("permissions")
+    if not isinstance(new_perms, dict):
+        return jsonify({"success": False, "message": "Invalid permissions format"}), 400
+
+    current = _get_rbac_permissions()
+
+    # Manager permissions
+    if "manager" in new_perms and isinstance(new_perms["manager"], dict):
+        for k in current["manager"]:
+            if k in new_perms["manager"]:
+                current["manager"][k] = bool(new_perms["manager"][k])
+
+    # Admin POS access toggle
+    if "admin" in new_perms and isinstance(new_perms["admin"], dict):
+        if "pos" in new_perms["admin"]:
+            current["admin"]["pos"] = bool(new_perms["admin"]["pos"])
+
+    # Cashier remains strictly locked to POS
+    current["cashier"]["pos"] = True
+    for k in current["cashier"]:
+        if k != "pos":
+            current["cashier"][k] = False
+
+    success = _save_rbac_permissions(current)
+    if success:
+        return jsonify({
+            "success": True,
+            "message": "Role permissions saved successfully",
+            "permissions": current
+        })
+    return jsonify({"success": False, "message": "Failed to save permissions to database"}), 500
+
+
+@app.route("/api/settings/permissions/reset", methods=["POST"])
+@csrf.exempt
+def api_reset_rbac_permissions():
+    """Admin-only: reset RBAC permissions to factory defaults."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    import copy
+    defaults = copy.deepcopy(DEFAULT_RBAC_PERMISSIONS)
+    success = _save_rbac_permissions(defaults)
+    if success:
+        return jsonify({
+            "success": True,
+            "message": "Permissions reset to factory defaults",
+            "permissions": defaults
+        })
+    return jsonify({"success": False, "message": "Failed to reset permissions"}), 500
+
+
 @app.route("/api/attendance/edit_deduction", methods=["POST"])
 @csrf.exempt
 def api_edit_attendance_deduction():
@@ -12943,8 +13246,22 @@ def api_overtime_review(request_id):
 @app.route("/cashier/inventory")
 def cashier_inventory():
     """Render the cashier Supply Monitor page."""
-    if not _is_cashier():
+    role = session.get("role")
+    if not role:
         return redirect(url_for("login"))
+
+    if not _is_cashier():
+        if has_permission(role, "pos"):
+            employee = {
+                "full_name": session.get("full_name", "Admin"),
+                "username": session.get("username", "admin"),
+                "role": role,
+                "employee_id": session.get("employee_id") or session.get("admin_id") or 0,
+            }
+            return render_template("cashier/cashier_inventory.html", employee=employee)
+        flash("Access Denied: You do not have permission to access Supply Monitor.")
+        return redirect(url_for("dashboard") if role in ("admin", "manager") else url_for("login"))
+
     employee = None
     try:
         emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")

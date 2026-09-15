@@ -484,6 +484,116 @@
         .perm-text { font-size: 0.88rem; font-weight: 600; color: #555; }
         .perm-item.checked .perm-text { color: var(--dark-gold); }
 
+        /* ── RBAC ROLE & PERMISSION STYLES ── */
+        .rbac-summary-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px; margin-bottom: 1.5rem;
+        }
+        .rbac-summary-card {
+            padding: 1.1rem; border-radius: 10px; background: #fafafa;
+            border: 1.5px solid #e8e8e8; transition: all 0.2s ease;
+        }
+        .rbac-summary-card.highlight {
+            border-color: var(--gold); background: rgba(201,169,97,0.05);
+            box-shadow: 0 3px 10px rgba(201,169,97,0.08);
+        }
+        .rbac-summary-card h4 {
+            font-size: 0.95rem; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;
+        }
+        .rbac-summary-card p {
+            font-size: 0.81rem; color: #666; line-height: 1.45; margin-bottom: 10px;
+        }
+        .rbac-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .rbac-badge-gold { background: rgba(201,169,97,0.18); color: var(--dark-gold); border: 1px solid rgba(201,169,97,0.3); }
+        .rbac-badge-blue { background: rgba(33,150,243,0.12); color: #1976d2; border: 1px solid rgba(33,150,243,0.25); }
+        .rbac-badge-gray { background: #e8e8e8; color: #666; border: 1px solid #dcdcdc; }
+        .rbac-badge-locked { background: rgba(220,53,69,0.12); color: #c0392b; border: 1px solid rgba(220,53,69,0.25); }
+
+        .rbac-role-tabs {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.35rem;
+            border-bottom: 1.5px solid #eee; padding-bottom: 12px;
+        }
+        .rbac-role-btn {
+            display: flex; align-items: center; gap: 8px;
+            padding: 0.6rem 1.1rem; border-radius: 20px;
+            background: var(--light-gray); border: 1.5px solid #e0e0e0;
+            font-size: 0.86rem; font-weight: 600; color: #555;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .rbac-role-btn:hover {
+            border-color: var(--gold); color: var(--black);
+        }
+        .rbac-role-btn.active {
+            background: var(--black); color: var(--gold); border-color: var(--black);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
+        .rbac-perm-list {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;
+        }
+        .rbac-perm-card {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 12px; padding: 1rem 1.15rem; border-radius: 9px;
+            background: var(--light-gray); border: 1.5px solid #e5e5e5;
+            transition: border-color .18s, background .18s, box-shadow .18s;
+        }
+        .rbac-perm-card:hover {
+            border-color: rgba(201,169,97,0.5); background: rgba(201,169,97,0.03);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+        .rbac-perm-info { flex: 1; min-width: 0; }
+        .rbac-perm-category {
+            font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--dark-gold); margin-bottom: 2px;
+        }
+        .rbac-perm-title {
+            font-size: 0.88rem; font-weight: 700; color: var(--black); margin-bottom: 3px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .rbac-perm-desc {
+            font-size: 0.78rem; color: #666; line-height: 1.35;
+        }
+        .rbac-toggle-switch {
+            position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; margin-top: 2px;
+        }
+        .rbac-toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .rbac-slider {
+            position: absolute; cursor: pointer; inset: 0; background-color: #ccc;
+            transition: .25s; border-radius: 24px;
+        }
+        .rbac-slider:before {
+            position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background-color: white; transition: .25s; border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
+        .rbac-toggle-switch input:checked + .rbac-slider {
+            background-color: var(--gold);
+        }
+        .rbac-toggle-switch input:checked + .rbac-slider:before {
+            transform: translateX(20px);
+        }
+        .rbac-toggle-switch input:disabled + .rbac-slider {
+            opacity: 0.55; cursor: not-allowed;
+        }
+        .rbac-matrix-table {
+            width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.5rem;
+            background: white; border-radius: 8px; overflow: hidden; border: 1px solid #e8e8e8;
+        }
+        .rbac-matrix-table th, .rbac-matrix-table td {
+            padding: 10px 14px; text-align: left; border-bottom: 1px solid #e8e8e8;
+        }
+        .rbac-matrix-table th {
+            background: #f7f7f7; font-weight: 700; color: var(--black);
+        }
+        .rbac-matrix-table td:not(:first-child), .rbac-matrix-table th:not(:first-child) {
+            text-align: center; width: 130px;
+        }
+        .rbac-matrix-table tr:last-child td { border-bottom: none; }
+        .rbac-matrix-table tr:hover td { background: rgba(201,169,97,0.03); }
+
         /* ══ BACKUP & EXPORT ══ */
         .backup-grid {
             display: flex;
@@ -1046,16 +1156,15 @@
 <!-- ══ NAV ══ -->
 <nav id="mainNav">
     <ul>
-        <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-        <li><a href="{{ url_for('admin_sales') }}">Sales</a></li>
-        <li><a href="{{ url_for('inventory') }}">Inventory</a></li>
-        <li><a href="{{ url_for('staff_attendance') }}">Staff Attendance</a></li>
-        <li><a href="{{ url_for('product_management') }}">Product Management</a></li>
-        {% if session.get('role') == 'admin' %}
-        <li><a href="{{ url_for('admin_settings') }}" class="active">Settings</a></li>
-        {% endif %}
-        <li><a href="{{ url_for('employee_management') }}">Employee Management</a></li>
-        <li><a href="{{ url_for('payroll') }}">Payroll</a></li>
+        {% if can_access('dashboard') %}<li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>{% endif %}
+        {% if can_access('sales') %}<li><a href="{{ url_for('admin_sales') }}">Sales</a></li>{% endif %}
+        {% if can_access('inventory') %}<li><a href="{{ url_for('inventory') }}">Inventory</a></li>{% endif %}
+        {% if can_access('staff_attendance') %}<li><a href="{{ url_for('staff_attendance') }}">Staff Attendance</a></li>{% endif %}
+        {% if can_access('product_management') %}<li><a href="{{ url_for('product_management') }}">Product Management</a></li>{% endif %}
+        {% if can_access('settings') %}<li><a href="{{ url_for('admin_settings') }}" class="active">Settings</a></li>{% endif %}
+        {% if can_access('employee_management') %}<li><a href="{{ url_for('employee_management') }}">Employee Management</a></li>{% endif %}
+        {% if can_access('payroll') %}<li><a href="{{ url_for('payroll') }}">Payroll</a></li>{% endif %}
+        {% if can_access('pos') %}<li><a href="{{ url_for('cashier_dashboard') }}" style="color:var(--gold);">POS Terminal</a></li>{% endif %}
     </ul>
 </nav>
 
@@ -1077,6 +1186,10 @@
             <a class="sidebar-item" href="#backup">
                 <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></span>
                 <div>Backup &amp; Export<div class="sidebar-item-desc">Save, export &amp; restore data</div></div>
+            </a>
+            <a class="sidebar-item" href="#permissions">
+                <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span>
+                <div>Permissions<div class="sidebar-item-desc">Role-based access control (RBAC)</div></div>
             </a>
             <div class="sidebar-divider"></div>
             <a class="sidebar-item" href="#danger" style="color:#c0392b;">
@@ -1527,6 +1640,206 @@
             </div>
         </div>
         <!-- /BACKUP & DATA EXPORT -->
+
+        <!-- ══ PERMISSIONS (RBAC) CARD ══ -->
+        <div class="setting-card" id="permissions">
+            <div class="card-head">
+                <div class="card-head-icon icon-gold">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                </div>
+                <div class="card-head-text">
+                    <h2>Role-Based Access Control (RBAC)</h2>
+                    <p>Manage and restrict system permissions for each role across administrative modules and point-of-sale operations.</p>
+                </div>
+            </div>
+            <div class="card-body">
+
+                <!-- ── ROLE OVERVIEW CARDS ── -->
+                <div class="rbac-summary-grid">
+                    <div class="rbac-summary-card highlight" id="rbacCardAdmin">
+                        <h4>
+                            <span style="font-weight:700;">👑 Administrator</span>
+                            <span class="rbac-badge rbac-badge-gold">Full Access</span>
+                        </h4>
+                        <p>Complete authority over all system modules, security settings, backups, and point-of-sale register.</p>
+                        <div style="font-size:0.8rem; font-weight:700; color:var(--dark-gold);" id="adminPermSummary">
+                            ✓ 9 of 9 Permissions Active
+                        </div>
+                    </div>
+
+                    <div class="rbac-summary-card" id="rbacCardManager">
+                        <h4>
+                            <span style="font-weight:700;">🛡️ Store Manager</span>
+                            <span class="rbac-badge rbac-badge-blue">Operational</span>
+                        </h4>
+                        <p>Delegated operational access for day-to-day store operations with configurable administrative permissions.</p>
+                        <div style="font-size:0.8rem; font-weight:700; color:#1976d2;" id="managerPermSummary">
+                            Loading permissions…
+                        </div>
+                    </div>
+
+                    <div class="rbac-summary-card" id="rbacCardCashier">
+                        <h4>
+                            <span style="font-weight:700;">💻 Cashier</span>
+                            <span class="rbac-badge rbac-badge-gray">Restricted</span>
+                        </h4>
+                        <p>Strictly isolated to designated Point-of-Sale terminal and personal attendance clock-in records.</p>
+                        <div style="font-size:0.8rem; font-weight:700; color:#666;" id="cashierPermSummary">
+                            🔒 1 of 9 Allowed (POS Only)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── ROLE TABS ── -->
+                <div class="rbac-role-tabs">
+                    <button type="button" class="rbac-role-btn active" id="tabBtnManager" onclick="switchRbacTab('manager')">
+                        <span>🛡️ Manager Permissions</span>
+                        <span class="rbac-badge rbac-badge-blue" id="tabBadgeManager">Configurable</span>
+                    </button>
+                    <button type="button" class="rbac-role-btn" id="tabBtnAdmin" onclick="switchRbacTab('admin')">
+                        <span>👑 Administrator</span>
+                        <span class="rbac-badge rbac-badge-gold">Full Access</span>
+                    </button>
+                    <button type="button" class="rbac-role-btn" id="tabBtnCashier" onclick="switchRbacTab('cashier')">
+                        <span>💻 Cashier Restrictions</span>
+                        <span class="rbac-badge rbac-badge-gray">Isolated</span>
+                    </button>
+                    <button type="button" class="rbac-role-btn" id="tabBtnMatrix" onclick="switchRbacTab('matrix')">
+                        <span>📊 Full Access Matrix</span>
+                    </button>
+                </div>
+
+                <!-- ── TAB CONTENT: MANAGER ── -->
+                <div id="rbacTabManagerContent">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <p class="section-label" style="margin-bottom:2px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Store Manager Module Permissions</p>
+                            <span style="font-size:0.82rem; color:#666;">Toggle which sections Managers are allowed to view and manage in the system.</span>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" class="btn btn-outline btn-sm" onclick="setAllManagerPerms(true)">Allow All</button>
+                            <button type="button" class="btn btn-outline btn-sm" onclick="setAllManagerPerms(false)">Revoke All</button>
+                        </div>
+                    </div>
+
+                    <div class="rbac-perm-list" id="managerPermList">
+                        <!-- Rendered dynamically via JavaScript -->
+                    </div>
+                </div>
+
+                <!-- ── TAB CONTENT: ADMIN ── -->
+                <div id="rbacTabAdminContent" style="display:none;">
+                    <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>Administrator Privileges</p>
+                    <div style="background:rgba(201,169,97,0.08); border:1.5px solid var(--gold); border-radius:8px; padding:1rem; margin-bottom:1.2rem;">
+                        <strong style="color:var(--dark-gold); font-size:0.92rem; display:block; margin-bottom:4px;">👑 Full Administrative Oversight</strong>
+                        <span style="font-size:0.82rem; color:#555; line-height:1.45;">Administrators maintain unrestricted access to all backend administrative modules (Dashboard, Sales, Inventory, Attendance, Products, Employees, Payroll, and Settings) as a core system safeguard against accidental lockouts.</span>
+                    </div>
+
+                    <div class="rbac-perm-list">
+                        <div class="rbac-perm-card" style="border-color:var(--gold);">
+                            <div class="rbac-perm-info">
+                                <div class="rbac-perm-category">POS Operations</div>
+                                <div class="rbac-perm-title">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                    POS Terminal Operations
+                                </div>
+                                <div class="rbac-perm-desc">Allow Administrators to open the Point of Sale terminal and process cashier transactions directly under the Admin account.</div>
+                            </div>
+                            <label class="rbac-toggle-switch">
+                                <input type="checkbox" id="adminPermPos" onchange="onAdminPosToggle(this)">
+                                <span class="rbac-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="rbac-perm-card" style="opacity:0.9;">
+                            <div class="rbac-perm-info">
+                                <div class="rbac-perm-category">System Control</div>
+                                <div class="rbac-perm-title">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                    All Administrative Modules
+                                </div>
+                                <div class="rbac-perm-desc">Dashboard, Sales History, Inventory Control, Attendance, Products, Staff Management, Payroll, Settings.</div>
+                            </div>
+                            <span class="rbac-badge rbac-badge-gold">Always Active</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TAB CONTENT: CASHIER ── -->
+                <div id="rbacTabCashierContent" style="display:none;">
+                    <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Cashier Access Boundaries</p>
+                    <div style="background:#f9f9f9; border:1.5px solid #e0e0e0; border-radius:8px; padding:1rem; margin-bottom:1.2rem;">
+                        <strong style="color:#444; font-size:0.92rem; display:block; margin-bottom:4px;">🔒 Strict POS Isolation Policy</strong>
+                        <span style="font-size:0.82rem; color:#666; line-height:1.45;">Cashiers are strictly restricted to their designated point-of-sale accounts. Any attempts by cashiers to access administrative interfaces or backend configuration URLs are automatically blocked and redirected to the POS dashboard.</span>
+                    </div>
+
+                    <div class="rbac-perm-list">
+                        <div class="rbac-perm-card" style="border-color:#4caf50; background:rgba(76,175,80,0.04);">
+                            <div class="rbac-perm-info">
+                                <div class="rbac-perm-category">POS Operations</div>
+                                <div class="rbac-perm-title" style="color:#2e7d32;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Point of Sale (POS) Terminal
+                                </div>
+                                <div class="rbac-perm-desc">Full access to order register, cart checkout, receipt generation, cash/GCash processing, and supply level monitor.</div>
+                            </div>
+                            <span class="rbac-badge" style="background:#e8f5e9; color:#2e7d32;">Permitted</span>
+                        </div>
+
+                        <div class="rbac-perm-card" style="border-color:#ffcdd2; background:rgba(244,67,54,0.04);">
+                            <div class="rbac-perm-info">
+                                <div class="rbac-perm-category">Security Restriction</div>
+                                <div class="rbac-perm-title" style="color:#c62828;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                    Administrative Modules &amp; Reports
+                                </div>
+                                <div class="rbac-perm-desc">Dashboard, Sales Analytics, Inventory Restock, Staff Management, Payroll, and System Settings.</div>
+                            </div>
+                            <span class="rbac-badge rbac-badge-locked">Strictly Restricted</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TAB CONTENT: MATRIX ── -->
+                <div id="rbacTabMatrixContent" style="display:none;">
+                    <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"></path></svg>System Access Control Matrix</p>
+                    <div style="overflow-x:auto;">
+                        <table class="rbac-matrix-table">
+                            <thead>
+                                <tr>
+                                    <th>Feature / Module</th>
+                                    <th>👑 Administrator</th>
+                                    <th>🛡️ Store Manager</th>
+                                    <th>💻 Cashier</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rbacMatrixBody">
+                                <!-- Rendered dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div><!-- /card-body -->
+
+            <div class="card-footer">
+                <div style="display:flex; align-items:center; gap:8px; font-size:0.83rem; color:#666;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <span id="rbacSaveStatus">Changes take effect immediately upon saving.</span>
+                </div>
+                <div class="footer-actions" style="display:flex; gap:10px;">
+                    <button type="button" class="btn btn-outline" id="rbacResetBtn" onclick="resetRbacPermissions()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+                        Reset Defaults
+                    </button>
+                    <button type="button" class="btn btn-primary" id="rbacSaveBtn" onclick="saveRbacPermissions()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        Save Permissions
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- /PERMISSIONS (RBAC) CARD -->
 
         <div class="setting-card" id="danger" style="border-color:#ffcdd2;">
             <div class="card-head" style="border-bottom-color:#ffcdd2; background:#fffafa;">
@@ -2797,6 +3110,306 @@ document.addEventListener('keydown', function(e) {
         closeRestoreModal();
     }
 });
+
+/* ════════════════════════════════════════════════════════════
+   ROLE-BASED ACCESS CONTROL (RBAC) CLIENT LOGIC
+════════════════════════════════════════════════════════════ */
+const RBAC_MODULES = [
+    {
+        key: 'pos',
+        title: 'Point of Sale (POS)',
+        category: 'POS Operations',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
+        desc: 'Access POS cash register, process orders, handle checkout and print receipts.'
+    },
+    {
+        key: 'dashboard',
+        title: 'Dashboard Overview',
+        category: 'Operations & Analytics',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
+        desc: 'View live sales summaries, inventory alerts, and key performance metrics.'
+    },
+    {
+        key: 'sales',
+        title: 'Sales & Transactions',
+        category: 'Operations & Analytics',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>',
+        desc: 'Access transaction history, shift cashflow, and sales export reports.'
+    },
+    {
+        key: 'inventory',
+        title: 'Inventory & Supplies',
+        category: 'Operations & Analytics',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>',
+        desc: 'Track ingredient stocks, cup sizes, restock logs, and raw materials.'
+    },
+    {
+        key: 'product_management',
+        title: 'Product Catalog',
+        category: 'Operations & Analytics',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>',
+        desc: 'Add, edit, and organize café menu items, categories, and item images.'
+    },
+    {
+        key: 'staff_attendance',
+        title: 'Staff Attendance',
+        category: 'Workforce & Finance',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
+        desc: 'Review biometric clock-in records, shift logs, and overtime requests.'
+    },
+    {
+        key: 'employee_management',
+        title: 'Employee Management',
+        category: 'Workforce & Finance',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+        desc: 'Manage staff accounts, credentials, hiring, and employee trash bin.'
+    },
+    {
+        key: 'payroll',
+        title: 'Payroll Dashboard',
+        category: 'Workforce & Finance',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="12" x2="18" y2="12"></line><line x1="12" y1="8" x2="12" y2="16"></line></svg>',
+        desc: 'Calculate 15-day compensation, edit hourly pay rates, and export payroll.'
+    },
+    {
+        key: 'settings',
+        title: 'System Settings',
+        category: 'System & Security',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>',
+        desc: 'Configure email alerts, credentials, backup & restore, and factory reset.'
+    }
+];
+
+let _rbacData = {
+    admin: { pos: true, dashboard: true, sales: true, inventory: true, staff_attendance: true, product_management: true, employee_management: true, payroll: true, settings: true },
+    manager: { pos: false, dashboard: true, sales: true, inventory: true, staff_attendance: true, product_management: true, employee_management: false, payroll: false, settings: false },
+    cashier: { pos: true, dashboard: false, sales: false, inventory: false, staff_attendance: false, product_management: false, employee_management: false, payroll: false, settings: false }
+};
+
+async function loadRbacPermissions() {
+    try {
+        const res = await fetch('/api/settings/permissions');
+        if (!res.ok) throw new Error('Failed to load permissions');
+        const d = await res.json();
+        if (d.success && d.permissions) {
+            _rbacData = d.permissions;
+        }
+    } catch (err) {
+        console.warn('[RBAC] Could not load from server, using local defaults:', err);
+    }
+    renderManagerPermCards();
+    renderRbacMatrix();
+    updateRbacSummaries();
+}
+
+function renderManagerPermCards() {
+    const container = document.getElementById('managerPermList');
+    if (!container) return;
+    const mgr = _rbacData.manager || {};
+
+    container.innerHTML = RBAC_MODULES.map(m => {
+        const checked = !!mgr[m.key];
+        return `
+            <div class="rbac-perm-card" id="mgrCard_${m.key}">
+                <div class="rbac-perm-info">
+                    <div class="rbac-perm-category">${m.category}</div>
+                    <div class="rbac-perm-title">${m.icon} ${m.title}</div>
+                    <div class="rbac-perm-desc">${m.desc}</div>
+                </div>
+                <label class="rbac-toggle-switch">
+                    <input type="checkbox" id="mgrToggle_${m.key}" ${checked ? 'checked' : ''} onchange="onManagerToggle('${m.key}', this.checked)">
+                    <span class="rbac-slider"></span>
+                </label>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderRbacMatrix() {
+    const tbody = document.getElementById('rbacMatrixBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = RBAC_MODULES.map(m => {
+        const adminHas = _rbacData.admin?.[m.key] !== false;
+        const mgrHas   = !!_rbacData.manager?.[m.key];
+        const cashHas  = m.key === 'pos';
+
+        return `
+            <tr>
+                <td>
+                    <strong style="color:var(--black); display:block;">${m.title}</strong>
+                    <span style="font-size:0.75rem; color:#888;">${m.category}</span>
+                </td>
+                <td>
+                    ${m.key === 'pos' ?
+                        `<label class="rbac-toggle-switch" style="width:36px;height:20px;">
+                            <input type="checkbox" ${_rbacData.admin?.pos ? 'checked' : ''} onchange="onAdminPosToggle(this)">
+                            <span class="rbac-slider"></span>
+                        </label>` :
+                        `<span style="color:#2e7d32; font-weight:700; font-size:1.1rem;">✔</span>`
+                    }
+                </td>
+                <td>
+                    <label class="rbac-toggle-switch" style="width:36px;height:20px;">
+                        <input type="checkbox" ${mgrHas ? 'checked' : ''} onchange="onManagerToggle('${m.key}', this.checked)">
+                        <span class="rbac-slider"></span>
+                    </label>
+                </td>
+                <td>
+                    ${cashHas ?
+                        `<span class="rbac-badge" style="background:#e8f5e9; color:#2e7d32;">Allowed</span>` :
+                        `<span style="color:#c62828; font-weight:700;" title="Strictly Restricted">🔒</span>`
+                    }
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateRbacSummaries() {
+    const adminPos = _rbacData.admin?.pos !== false;
+    const adminCount = adminPos ? 9 : 8;
+    const adminSumEl = document.getElementById('adminPermSummary');
+    if (adminSumEl) {
+        adminSumEl.textContent = `✓ ${adminCount} of 9 Permissions Active`;
+    }
+
+    const adminPosBox = document.getElementById('adminPermPos');
+    if (adminPosBox) {
+        adminPosBox.checked = adminPos;
+    }
+
+    const mgr = _rbacData.manager || {};
+    const mgrCount = Object.keys(mgr).filter(k => mgr[k]).length;
+    const mgrSumEl = document.getElementById('managerPermSummary');
+    if (mgrSumEl) {
+        mgrSumEl.textContent = `${mgrCount} of 9 Permissions Granted`;
+    }
+    const badgeEl = document.getElementById('tabBadgeManager');
+    if (badgeEl) {
+        badgeEl.textContent = `${mgrCount}/9 Active`;
+    }
+}
+
+function switchRbacTab(tabKey) {
+    const tabs = ['manager', 'admin', 'cashier', 'matrix'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`tabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        const content = document.getElementById(`rbacTab${t.charAt(0).toUpperCase() + t.slice(1)}Content`);
+        if (btn) btn.classList.toggle('active', t === tabKey);
+        if (content) content.style.display = (t === tabKey) ? 'block' : 'none';
+    });
+}
+
+function onManagerToggle(key, isChecked) {
+    if (!_rbacData.manager) _rbacData.manager = {};
+    _rbacData.manager[key] = isChecked;
+    updateRbacSummaries();
+    renderRbacMatrix();
+    markRbacUnsaved();
+}
+
+function onAdminPosToggle(el) {
+    if (!_rbacData.admin) _rbacData.admin = {};
+    _rbacData.admin.pos = el.checked;
+    updateRbacSummaries();
+    renderRbacMatrix();
+    markRbacUnsaved();
+}
+
+function setAllManagerPerms(grantAll) {
+    if (!_rbacData.manager) _rbacData.manager = {};
+    RBAC_MODULES.forEach(m => {
+        _rbacData.manager[m.key] = grantAll;
+    });
+    renderManagerPermCards();
+    renderRbacMatrix();
+    updateRbacSummaries();
+    markRbacUnsaved();
+}
+
+function markRbacUnsaved() {
+    const statusEl = document.getElementById('rbacSaveStatus');
+    if (statusEl) {
+        statusEl.innerHTML = '<span style="color:#d97706; font-weight:600;">● Unsaved changes</span> — click Save Permissions to apply.';
+    }
+}
+
+async function saveRbacPermissions() {
+    const btn = document.getElementById('rbacSaveBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg> Saving…';
+
+    try {
+        const res = await fetch('/api/settings/permissions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF()
+            },
+            body: JSON.stringify({ permissions: _rbacData })
+        });
+        const d = await res.json();
+        if (d.success) {
+            _rbacData = d.permissions;
+            showToast('Role permissions updated successfully!');
+            const statusEl = document.getElementById('rbacSaveStatus');
+            if (statusEl) {
+                statusEl.textContent = `Saved at ${new Date().toLocaleTimeString()} — active for all users.`;
+            }
+            updateRbacSummaries();
+            renderManagerPermCards();
+            renderRbacMatrix();
+        } else {
+            showToast(d.message || 'Failed to save permissions', 'error');
+        }
+    } catch (err) {
+        showToast('Network error saving permissions: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+async function resetRbacPermissions() {
+    if (!confirm('Are you sure you want to reset all role permissions to factory defaults?')) {
+        return;
+    }
+    const btn = document.getElementById('rbacResetBtn');
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/settings/permissions/reset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF()
+            }
+        });
+        const d = await res.json();
+        if (d.success) {
+            _rbacData = d.permissions;
+            showToast('Permissions reset to factory defaults!');
+            const statusEl = document.getElementById('rbacSaveStatus');
+            if (statusEl) {
+                statusEl.textContent = 'Factory defaults restored.';
+            }
+            updateRbacSummaries();
+            renderManagerPermCards();
+            renderRbacMatrix();
+        } else {
+            showToast(d.message || 'Failed to reset', 'error');
+        }
+    } catch (err) {
+        showToast('Error resetting permissions: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// Auto-load on script execution
+loadRbacPermissions();
 </script>
 
 <script>
