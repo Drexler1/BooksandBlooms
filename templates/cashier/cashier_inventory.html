@@ -1359,6 +1359,12 @@
                         <p>{{ employee.role|capitalize if employee else 'Cashier' }}</p>
                     </div>
                 </div>
+                {% if can_access('dashboard') or session.get('role') in ('admin', 'manager') %}
+                <a href="{{ url_for('dashboard') }}" style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; background:var(--gold); color:var(--black); border-radius:6px; font-weight:700; font-size:0.8rem; text-decoration:none; margin-right:8px;" title="Return to Admin Panel">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    Admin Panel
+                </a>
+                {% endif %}
                 <form method="POST" action="{{ url_for('cashier_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
             </div>
         </header>
@@ -1369,8 +1375,13 @@
             <ul>
                 <li><a href="{{ url_for('cashier_dashboard') }}">POS</a></li>
                 <li><a href="{{ url_for('cashier_transactions') }}">My Transactions</a></li>
+                {% if session.get('role') != 'admin' %}
                 <li><a href="{{ url_for('cashier_attendance') }}">Attendance</a></li>
                 <li><a href="{{ url_for('cashier_inventory') }}" class="active">Supply Monitor</a></li>
+                {% endif %}
+                {% if can_access('dashboard') or session.get('role') in ('admin', 'manager') %}
+                <li><a href="{{ url_for('dashboard') }}" style="color:var(--gold);">← Admin Panel</a></li>
+                {% endif %}
             </ul>
         </nav>
 

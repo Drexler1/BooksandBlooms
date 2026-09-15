@@ -5974,6 +5974,9 @@ def cashier_attendance():
         return redirect(url_for("login"))
 
     if not _is_cashier():
+        if role == "admin":
+            flash("Admin attendance is managed in the Staff Attendance panel.")
+            return redirect(url_for("staff_attendance"))
         if has_permission(role, "pos"):
             employee = {
                 "full_name": session.get("full_name", "Admin"),
@@ -13251,6 +13254,9 @@ def cashier_inventory():
         return redirect(url_for("login"))
 
     if not _is_cashier():
+        if role == "admin":
+            flash("Admin inventory is managed in the Admin Inventory panel.")
+            return redirect(url_for("inventory"))
         if has_permission(role, "pos"):
             employee = {
                 "full_name": session.get("full_name", "Admin"),

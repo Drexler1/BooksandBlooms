@@ -2036,8 +2036,10 @@
             <ul>
                 <li><a href="{{ url_for('cashier_dashboard') }}" class="active">POS</a></li>
                 <li><a href="{{ url_for('cashier_transactions') }}">My Transactions</a></li>
+                {% if session.get('role') != 'admin' %}
                 <li><a href="{{ url_for('cashier_attendance') }}">Attendance</a></li>
                 <li><a href="{{ url_for('cashier_inventory') }}">Supply Monitor</a></li>
+                {% endif %}
                 {% if can_access('dashboard') or session.get('role') in ('admin', 'manager') %}
                 <li><a href="{{ url_for('dashboard') }}" style="color:var(--gold);">← Admin Panel</a></li>
                 {% endif %}
