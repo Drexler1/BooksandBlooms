@@ -240,6 +240,12 @@
             animation: fadeInPane 0.28s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
+        /* Guard against any child overflowing the card on mobile */
+        .setting-card {
+            min-width: 0;
+            overflow: hidden;
+        }
+
         @keyframes fadeInPane {
             from {
                 opacity: 0;
@@ -562,22 +568,26 @@
             gap: 12px; padding: 1rem 1.15rem; border-radius: 9px;
             background: var(--light-gray); border: 1.5px solid #e5e5e5;
             transition: border-color .18s, background .18s, box-shadow .18s;
+            min-width: 0; /* prevent flex overflow */
         }
         .rbac-perm-card:hover {
             border-color: rgba(201,169,97,0.5); background: rgba(201,169,97,0.03);
             box-shadow: 0 2px 8px rgba(0,0,0,0.03);
         }
-        .rbac-perm-info { flex: 1; min-width: 0; }
+        .rbac-perm-info { flex: 1; min-width: 0; overflow: hidden; }
         .rbac-perm-category {
             font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.5px; color: var(--dark-gold); margin-bottom: 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .rbac-perm-title {
             font-size: 0.88rem; font-weight: 700; color: var(--black); margin-bottom: 3px;
             display: flex; align-items: center; gap: 6px;
+            flex-wrap: wrap; word-break: break-word;
         }
         .rbac-perm-desc {
             font-size: 0.78rem; color: #666; line-height: 1.35;
+            word-break: break-word;
         }
         .rbac-toggle-switch {
             position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; margin-top: 2px;
@@ -1091,45 +1101,99 @@
                 font-size: 1.65rem;
             }
 
+            /* ── RBAC Mobile Fixes ── */
+
+            /* Summary cards — always single column on mobile */
             .rbac-summary-grid {
                 grid-template-columns: 1fr;
-                gap: 0.75rem;
+                gap: 0.65rem;
             }
 
-            .rbac-role-tabs {
-                display: flex;
-                overflow-x: auto;
-                flex-wrap: nowrap;
-                -webkit-overflow-scrolling: touch;
-                padding-bottom: 6px;
+            .rbac-summary-card {
+                padding: 0.85rem 1rem;
+            }
+
+            .rbac-summary-card h4 {
+                flex-wrap: wrap;
                 gap: 6px;
-                scrollbar-width: none;
+                font-size: 0.88rem;
             }
 
-            .rbac-role-tabs::-webkit-scrollbar {
-                display: none;
+            /* Role tabs — wrap to 2 rows, no horizontal scroll */
+            .rbac-role-tabs {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                flex-wrap: unset;
+                overflow-x: unset;
+                gap: 7px;
+                padding-bottom: 0;
             }
 
             .rbac-role-btn {
-                flex: 0 0 auto;
-                white-space: nowrap;
-                padding: 7px 12px;
-                font-size: 0.8rem;
+                width: 100%;
+                border-radius: 10px;
+                padding: 8px 10px;
+                font-size: 0.78rem;
+                justify-content: center;
+                text-align: center;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+                white-space: normal;
+                min-width: 0;
             }
 
-            .rbac-perm-cards-grid {
-                grid-template-columns: 1fr;
-                gap: 0.75rem;
+            /* Hide badge inside role btn on very small — shown as text only */
+            .rbac-role-btn .rbac-badge {
+                display: none;
             }
 
+            /* Perm cards — stack badge below text */
             .rbac-perm-card {
-                padding: 0.9rem;
+                flex-direction: column;
+                padding: 0.85rem;
+                gap: 8px;
             }
 
+            .rbac-perm-card .rbac-badge,
+            .rbac-perm-card .rbac-toggle-switch {
+                align-self: flex-start;
+                margin-top: 2px;
+            }
+
+            /* Perm list — true single column */
+            .rbac-perm-list {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            /* RBAC matrix — horizontally scrollable */
+            .rbac-matrix-wrap {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .rbac-matrix-table {
+                min-width: 480px;
+            }
+            .rbac-matrix-table td:not(:first-child),
+            .rbac-matrix-table th:not(:first-child) {
+                width: 90px;
+            }
             .rbac-matrix-table th,
             .rbac-matrix-table td {
                 padding: 8px 10px;
                 font-size: 0.82rem;
+            }
+
+            /* Card head text for long titles */
+            .card-head-text h2 {
+                font-size: 1rem;
+                word-break: break-word;
+                line-height: 1.3;
+            }
+            .card-head-text p {
+                font-size: 0.8rem;
+                word-break: break-word;
             }
 
             /* Avatar area */
@@ -1301,20 +1365,20 @@
                 font-size: 1.5rem;
             }
 
-            /* Permissions grid — true single column on very small screens */
-            .perm-grid {
-                grid-template-columns: 1fr;
-            }
-
             /* Card body tighter padding */
             .card-body {
-                padding: 1rem;
-                gap: 0.9rem;
+                padding: 0.9rem;
+                gap: 0.85rem;
             }
 
-            /* Card head tighter */
+            /* Card head tighter — hide icon to give title full width */
             .card-head {
                 padding: 0.85rem 1rem;
+                gap: 0.6rem;
+            }
+
+            .card-head-icon {
+                display: none;
             }
 
             /* Card footer tighter */
@@ -1322,10 +1386,46 @@
                 padding: 0.75rem 1rem;
             }
 
-            /* RBAC role btn — smaller on very small */
+            /* Permissions grid — true single column */
+            .perm-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* RBAC: role tabs — single column on very small */
+            .rbac-role-tabs {
+                grid-template-columns: 1fr;
+            }
+
+            /* RBAC role btn */
             .rbac-role-btn {
-                padding: 5px 10px;
-                font-size: 0.78rem;
+                padding: 8px 12px;
+                font-size: 0.8rem;
+                flex-direction: row;
+                justify-content: flex-start;
+                text-align: left;
+            }
+
+            /* RBAC: manager header stacks */
+            .rbac-manager-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .rbac-manager-header > div:last-child {
+                width: 100%;
+                display: flex;
+                gap: 8px;
+            }
+
+            .rbac-manager-header > div:last-child .btn {
+                flex: 1;
+                justify-content: center;
+            }
+
+            /* Section label smaller */
+            .section-label {
+                font-size: 0.72rem;
             }
 
             /* Toggle info text */
@@ -1939,7 +2039,7 @@
 
                 <!-- ── TAB CONTENT: MANAGER ── -->
                 <div id="rbacTabManagerContent">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
+                    <div class="rbac-manager-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
                         <div>
                             <p class="section-label" style="margin-bottom:2px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Store Manager Module Permissions</p>
                             <span style="font-size:0.82rem; color:#666;">Toggle which sections Managers are allowed to view and manage in the system.</span>
