@@ -477,6 +477,14 @@
         /* ── PERMISSIONS GRID ── */
         .perm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 
+        /* ── RBAC MATRIX SCROLL WRAPPER ── */
+        .rbac-matrix-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 8px;
+        }
+
         .perm-item {
             display: flex; align-items: center; gap: 10px;
             padding: 0.75rem 1rem; border-radius: 8px;
@@ -1157,6 +1165,101 @@
                 gap: 0.75rem;
             }
 
+            /* Permissions grid — single column on mobile */
+            .perm-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            /* RBAC permission list — single column */
+            .rbac-perm-list {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            /* RBAC matrix — horizontally scrollable */
+            .rbac-matrix-wrap {
+                overflow-x: auto;
+            }
+            .rbac-matrix-table {
+                min-width: 480px;
+            }
+            .rbac-matrix-table td:not(:first-child),
+            .rbac-matrix-table th:not(:first-child) {
+                width: 90px;
+            }
+
+            /* Section labels — allow wrap */
+            .section-label {
+                white-space: normal;
+                word-break: break-word;
+            }
+
+            /* Card head — prevent overflow */
+            .card-head-text h2 {
+                font-size: 1.15rem;
+                word-break: break-word;
+            }
+            .card-head-text p {
+                font-size: 0.82rem;
+            }
+
+            /* SMTP status bar — wrap on small screens */
+            .smtp-status-bar {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            /* Backup dropzone — tighter padding */
+            .backup-dropzone {
+                padding: 1.25rem 1rem;
+            }
+
+            /* Backup preview header */
+            .backup-preview-header {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            /* Swatch row — allow wrap */
+            .swatch-row {
+                gap: 8px;
+            }
+            .swatch {
+                width: 36px;
+                height: 36px;
+            }
+
+            /* RBAC summary cards */
+            .rbac-summary-card {
+                padding: 0.9rem;
+            }
+
+            /* Make all action buttons in panes full-width */
+            .card-footer .btn {
+                flex: 1;
+                justify-content: center;
+            }
+
+            /* Consistent field-row spacing */
+            .field-row {
+                margin-bottom: 0.75rem;
+            }
+
+            /* Alert sub-panel */
+            .alert-sub-panel {
+                padding: 0.85rem 0.9rem;
+            }
+
+            /* Low-stock table — scroll */
+            .low-stock-table-wrap {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .low-stock-table {
+                min-width: 320px;
+            }
+
             /* Toast */
             .toast {
                 bottom: 1rem;
@@ -1196,6 +1299,46 @@
 
             .page-title {
                 font-size: 1.5rem;
+            }
+
+            /* Permissions grid — true single column on very small screens */
+            .perm-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Card body tighter padding */
+            .card-body {
+                padding: 1rem;
+                gap: 0.9rem;
+            }
+
+            /* Card head tighter */
+            .card-head {
+                padding: 0.85rem 1rem;
+            }
+
+            /* Card footer tighter */
+            .card-footer {
+                padding: 0.75rem 1rem;
+            }
+
+            /* RBAC role btn — smaller on very small */
+            .rbac-role-btn {
+                padding: 5px 10px;
+                font-size: 0.78rem;
+            }
+
+            /* Toggle info text */
+            .toggle-info strong {
+                font-size: 0.88rem;
+            }
+            .toggle-info span {
+                font-size: 0.78rem;
+            }
+
+            /* Backup row icon hidden on very small */
+            .backup-row-icon {
+                display: none;
             }
 
             .btn-row {
@@ -1888,7 +2031,7 @@
                 <!-- ── TAB CONTENT: MATRIX ── -->
                 <div id="rbacTabMatrixContent" style="display:none;">
                     <p class="section-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"></path></svg>System Access Control Matrix</p>
-                    <div style="overflow-x:auto;">
+                    <div class="rbac-matrix-wrap">
                         <table class="rbac-matrix-table">
                             <thead>
                                 <tr>
