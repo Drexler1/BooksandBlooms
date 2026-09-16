@@ -2147,12 +2147,12 @@ def verify_face():
     # ── Fetch registered face path from DB ──────────────────────────────────
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
-        "SELECT face_image_path FROM employees WHERE employee_id=%s", (employee_id,)
+        "SELECT face_image_path, face_model_path FROM employees WHERE employee_id=%s", (employee_id,)
     )
     emp = cur.fetchone()
     cur.close()
 
-    if not emp or not emp.get("face_image_path"):
+    if not emp or (not emp.get("face_image_path") and not emp.get("face_model_path")):
         return jsonify(
             {"success": False, "message": "No Face ID registered for this employee"}
         )
