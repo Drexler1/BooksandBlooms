@@ -6224,6 +6224,8 @@ def api_products_upload_image():
                 )
                 mysql.connection.commit()
                 cur3.close()
+                _invalidate_pos_cache()
+                threading.Thread(target=_sse_notify_product_change, daemon=True).start()
             except Exception as db_exc:
                 app.logger.warning(f"[products] image DB update failed: {db_exc}")
 

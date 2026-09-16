@@ -3254,7 +3254,7 @@
         /* ── Render a single row / card (extracted for reuse) ── */
         function _buildRow(p) {
             const thumb = p.image_url
-                ? `<img class="prod-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+                ? `<img class="prod-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';(this.nextElementSibling||this.nextSibling).style.display='flex'">`
                 : '';
             const fallback = `<div class="prod-thumb-placeholder" ${p.image_url ? 'style="display:none"' : ''}><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`;
             const deptChip = `<span class="dept-chip">${p.main_category_name || 'General'}</span>`;
@@ -3305,7 +3305,7 @@
 
         function _buildMobileCard(p) {
             const thumbHtml = p.image_url
-                ? `<img class="prod-mobile-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div class="prod-mobile-placeholder" style="display:none;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`
+                ? `<img class="prod-mobile-thumb" src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none';(this.nextElementSibling||this.nextSibling).style.display='flex'"><div class="prod-mobile-placeholder" style="display:none;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`
                 : `<div class="prod-mobile-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>`;
             const deptLabel = p.main_category_name || 'General';
             const catLabel = p.category_name || 'Uncategorized';
@@ -3463,6 +3463,14 @@
             clearImageBtn.style.display = 'none';
             document.getElementById('existingImageUrl').value = '';
         });
+        imgPreview.onerror = () => {
+            imgPreview.src = '';
+            imgPreview.classList.remove('show');
+            uploadIcon.style.display = '';
+            uploadText.style.display = '';
+            clearImageBtn.style.display = 'none';
+            document.getElementById('existingImageUrl').value = '';
+        };
 
         /* Live Stock Indicator inside Product Modal */
         function _updateModalStockIndicator() {
