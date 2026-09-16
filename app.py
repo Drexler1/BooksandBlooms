@@ -701,6 +701,31 @@ def _widen_face_model_path():
             app.logger.info(
                 f"[migration] face_model_path already {col['DATA_TYPE']} — no change needed"
             )
+
+        # ── Ensure face_image_path is MEDIUMTEXT for persistent Base64 storage ──
+        cur.execute("""
+            SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME   = 'employees'
+              AND COLUMN_NAME  = 'face_image_path'
+        """)
+        col_img = cur.fetchone()
+        if col_img is None:
+            cur.execute(
+                "ALTER TABLE `employees` ADD COLUMN `face_image_path` MEDIUMTEXT DEFAULT NULL"
+            )
+            conn.commit()
+            app.logger.info("[migration] face_image_path added as MEDIUMTEXT")
+        elif col_img["DATA_TYPE"].lower() in ("varchar", "char", "tinytext"):
+            cur.execute(
+                "ALTER TABLE `employees` MODIFY COLUMN `face_image_path` MEDIUMTEXT DEFAULT NULL"
+            )
+            conn.commit()
+            app.logger.info(
+                f"[migration] face_image_path widened from "
+                f"{col_img['DATA_TYPE']}({col_img.get('CHARACTER_MAXIMUM_LENGTH')}) → MEDIUMTEXT"
+            )
         cur.close()
     except Exception as exc:
         app.logger.error(f"[migration] _widen_face_model_path failed: {exc}")
@@ -729,7 +754,7 @@ def _ensure_trash_table():
                 `password`          VARCHAR(255) NOT NULL DEFAULT '',
                 `password_hash`     VARCHAR(255) DEFAULT NULL,
                 `role`              ENUM('admin','manager','cashier') NOT NULL DEFAULT 'cashier',
-                `face_image_path`   VARCHAR(255) DEFAULT NULL,
+                `face_image_path`   MEDIUMTEXT   DEFAULT NULL,
                 `face_model_path`   MEDIUMTEXT   DEFAULT NULL,
                 `last_login`        DATETIME     DEFAULT NULL,
                 `created_at`        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -740,6 +765,11 @@ def _ensure_trash_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         """)
         conn.commit()
+        try:
+            cur.execute("ALTER TABLE `employees_trash` MODIFY COLUMN `face_image_path` MEDIUMTEXT DEFAULT NULL")
+            conn.commit()
+        except Exception:
+            pass
         app.logger.info("[migration] employees_trash table ensured")
 
         # ── Migrate existing inactive employees into trash ───────────────────
@@ -826,9 +856,9 @@ def _purge_expired_trash():
         for row in expired:
             emp_id = row["employee_id"]
 
-            # Delete face image from disk
+            # Delete face image from disk (if stored as local file, not Base64)
             face_path = row.get("face_image_path")
-            if face_path:
+            if face_path and not face_path.startswith("data:image/"):
                 full_path = os.path.join("static", face_path)
                 try:
                     if os.path.exists(full_path):
@@ -1585,6 +1615,23 @@ def decode_base64_image(image_data: str):
     return img, gray
 
 
+def encode_face_crop_to_base64(crop_160):
+    """
+    Encode a 160x160 BGR face crop into a compact Base64 JPEG data URL:
+    'data:image/jpeg;base64,...' so it can be stored directly in Aiven MySQL
+    and survive Railway container redeployments.
+    """
+    try:
+        cv2, _ = _get_cv2_np()
+        success, enc = cv2.imencode(".jpg", crop_160, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if success:
+            b64 = base64.b64encode(enc).decode("utf-8")
+            return f"data:image/jpeg;base64,{b64}"
+    except Exception as exc:
+        app.logger.warning(f"[face_id] encode_face_crop_to_base64 failed: {exc}")
+    return ""
+
+
 def detect_face_strict(img, gray, registration_mode=False):
     """
     Run Haar cascade detection and enforce positional / size constraints.
@@ -1774,13 +1821,22 @@ def load_embedding_from_db(employee_id, cur):
     face_image_path = row.get("face_image_path") or ""
     if not face_image_path:
         return None
-    reg_path = os.path.join("static", face_image_path)
-    if not os.path.exists(reg_path):
-        return None
     try:
-        cv2, _ = _get_cv2_np()
+        cv2, _np = _get_cv2_np()
         DeepFace = _get_deepface()
-        reg_img = cv2.imread(reg_path)
+        reg_img = None
+        if face_image_path.startswith("data:image/"):
+            try:
+                raw_b64 = face_image_path.split(",", 1)[-1]
+                b_data = base64.b64decode(raw_b64)
+                reg_img = cv2.imdecode(_np.frombuffer(b_data, _np.uint8), cv2.IMREAD_COLOR)
+            except Exception as b64_err:
+                app.logger.warning(f"[load_embedding] decode base64 face error: {b64_err}")
+        else:
+            reg_path = os.path.join("static", face_image_path)
+            if os.path.exists(reg_path):
+                reg_img = cv2.imread(reg_path)
+
         if reg_img is None:
             return None
         reg_img = cv2.resize(reg_img, (160, 160))
@@ -1987,12 +2043,17 @@ def commit_face_registration():
     if sess["best_face"] is None:
         return jsonify({"success": False, "message": "No valid face crop available"})
 
-    # ── Save sharpest face image ─────────────────────────────────────────────
-    filename = f"{employee_id}.jpg"
-    image_path = os.path.join(UPLOAD_FOLDER, filename)
+    # ── Save sharpest face image (Base64 data URL for Aiven DB + local cache) ──
+    face_b64 = encode_face_crop_to_base64(sess["best_face"])
+    face_path = face_b64 if face_b64 else f"face_images/{employee_id}.jpg"
+    try:
+        filename = f"{employee_id}.jpg"
+        image_path = os.path.join(UPLOAD_FOLDER, filename)
+        _cv2_local, _ = _get_cv2_np()
+        _cv2_local.imwrite(image_path, sess["best_face"], [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
+    except Exception as fs_err:
+        app.logger.debug(f"[face_id] Local disk face save skipped: {fs_err}")
     _cv2_local, _np_local = _get_cv2_np()
-    _cv2_local.imwrite(image_path, sess["best_face"], [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
-    face_path = f"face_images/{filename}"
 
     # ── Average embeddings for best accuracy ────────────────────────────────
     avg_emb = _np_local.mean(sess["embeddings"], axis=0).tolist()
@@ -3788,11 +3849,15 @@ def add_employee():
                 }
             )
 
-        # ── Save sharpest face image ─────────────────────────────────────────
-        filename = f"{employee_id}.jpg"
-        image_path = os.path.join(UPLOAD_FOLDER, filename)
-        _cv2_local.imwrite(image_path, best_face, [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
-        face_path = f"face_images/{filename}"
+        # ── Save sharpest face image (Base64 data URL for Aiven DB + local cache) ──
+        face_b64 = encode_face_crop_to_base64(best_face)
+        face_path = face_b64 if face_b64 else f"face_images/{employee_id}.jpg"
+        try:
+            filename = f"{employee_id}.jpg"
+            image_path = os.path.join(UPLOAD_FOLDER, filename)
+            _cv2_local.imwrite(image_path, best_face, [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
+        except Exception as fs_err:
+            app.logger.debug(f"[face_id] Local disk face save skipped: {fs_err}")
 
         cur.execute(
             "UPDATE employees SET face_image_path=%s WHERE employee_id=%s",
@@ -3881,11 +3946,15 @@ def update_employee(employee_id):
                 continue
 
         if embeddings and best_face is not None:
-            # New face registered during edit
-            filename = f"{employee_id}.jpg"
-            image_path = os.path.join(UPLOAD_FOLDER, filename)
-            _cv2_local.imwrite(image_path, best_face, [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
-            face_path = f"face_images/{filename}"
+            # New face registered during edit (Base64 data URL for Aiven DB + local cache)
+            face_b64 = encode_face_crop_to_base64(best_face)
+            face_path = face_b64 if face_b64 else f"face_images/{employee_id}.jpg"
+            try:
+                filename = f"{employee_id}.jpg"
+                image_path = os.path.join(UPLOAD_FOLDER, filename)
+                _cv2_local.imwrite(image_path, best_face, [_cv2_local.IMWRITE_JPEG_QUALITY, 95])
+            except Exception as fs_err:
+                app.logger.debug(f"[face_id] Local disk face save skipped: {fs_err}")
 
             cur.execute(
                 """UPDATE employees
@@ -6033,6 +6102,40 @@ def product_management():
     return render_template("admin/product_management.html", full_name=full_name)
 
 
+# ── Product Image Base64 & Upload Handling ─────────────────────────────────────
+
+
+def _process_product_image_to_base64(file_storage, max_dimension=500, quality=82):
+    """
+    Reads an uploaded image, resizes it preserving aspect ratio (max_dimension on longest edge),
+    compresses it as WebP (or JPEG fallback), and returns a data URL string: 'data:image/webp;base64,...'.
+    Stored directly in Aiven MySQL so images survive Railway container redeployments.
+    """
+    from PIL import Image, ImageOps
+
+    file_storage.seek(0)
+    img = Image.open(file_storage)
+    try:
+        img = ImageOps.exif_transpose(img)
+    except Exception:
+        pass
+    img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    try:
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGBA" if "A" in img.mode else "RGB")
+        img.save(buf, format="WEBP", quality=quality, method=4)
+        mime = "image/webp"
+    except Exception:
+        buf = io.BytesIO()
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        mime = "image/jpeg"
+    b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:{mime};base64,{b64_str}"
+
+
 # ── POST /api/products/upload_image ───────────────────────────────────────────
 
 
@@ -6081,14 +6184,21 @@ def api_products_upload_image():
         )
 
     try:
-        ext = secure_filename(file.filename).rsplit(".", 1)[-1].lower()
-        uid = secrets.token_hex(12)
-        filename = f"prod_{uid}.{ext}"
-        save_path = os.path.join(PRODUCT_IMAGE_FOLDER, filename)
-        file.save(save_path)
-        image_url = f"/static/product_images/{filename}"
+        # ── 1. Create compressed Base64 Data URL for persistent Aiven DB storage ─
+        image_url = _process_product_image_to_base64(file, max_dimension=500, quality=82)
 
-        # Optionally persist to DB and clean up old image
+        # ── 2. Also save to local disk as a temporary cache/backup if folder exists ─
+        try:
+            ext = secure_filename(file.filename).rsplit(".", 1)[-1].lower()
+            uid = secrets.token_hex(12)
+            filename = f"prod_{uid}.{ext}"
+            save_path = os.path.join(PRODUCT_IMAGE_FOLDER, filename)
+            file.seek(0)
+            file.save(save_path)
+        except Exception as local_err:
+            app.logger.debug(f"[products] Local disk image cache skipped: {local_err}")
+
+        # ── 3. Optionally persist to DB and clean up old image ────────────────────
         product_id = request.form.get("product_id")
         if product_id:
             try:
@@ -6101,7 +6211,7 @@ def api_products_upload_image():
                 cur2.close()
                 if row and row.get("image_url"):
                     old_path = row["image_url"].lstrip("/")
-                    if os.path.exists(old_path):
+                    if not old_path.startswith("data:image/") and os.path.exists(old_path):
                         try:
                             os.remove(old_path)
                         except OSError:
@@ -8098,15 +8208,23 @@ def _ensure_inventory_tables():
         except Exception:
             pass  # column already exists
 
-        # ── add image_url column if missing (idempotent) ──────────────────────
+        # ── add or widen image_url column to MEDIUMTEXT for persistent Base64 ──
         try:
             cur.execute(
-                "ALTER TABLE `products` ADD COLUMN `image_url` VARCHAR(512) DEFAULT NULL"
+                "ALTER TABLE `products` ADD COLUMN `image_url` MEDIUMTEXT DEFAULT NULL"
             )
             conn.commit()
-            app.logger.info("[inventory] Added image_url column to products")
+            app.logger.info("[inventory] Added image_url column as MEDIUMTEXT to products")
         except Exception:
             pass  # column already exists
+        try:
+            cur.execute(
+                "ALTER TABLE `products` MODIFY COLUMN `image_url` MEDIUMTEXT DEFAULT NULL"
+            )
+            conn.commit()
+            app.logger.info("[inventory] Ensured products.image_url is MEDIUMTEXT")
+        except Exception as mod_err:
+            app.logger.debug(f"[inventory] image_url modify check: {mod_err}")
 
         # Seed default main categories if empty
         try:
