@@ -253,6 +253,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 1.25rem;
+            flex-wrap: wrap;
             margin-bottom: 1.75rem;
             padding-bottom: 1rem;
             border-bottom: 2px solid var(--gold);
@@ -262,6 +264,8 @@
             font-size: 1.4rem;
             font-weight: 700;
             color: var(--black);
+            margin: 0;
+            white-space: nowrap;
         }
 
         .btn-primary {
@@ -289,31 +293,71 @@
 
         .search-bar {
             position: relative;
-            max-width: min(500px, calc(100vw - 2rem));
+            width: 100%;
+            max-width: 360px;
+            min-width: 250px;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-bar .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #888;
+            pointer-events: none;
+            transition: color 0.2s ease;
+        }
+
+        .search-bar:focus-within .search-icon {
+            color: var(--gold);
         }
 
         .search-bar input {
             width: 100%;
-            padding: 1rem 1rem 1rem 3.5rem;
-            border: 2px solid #ddd;
+            padding: 0.7rem 2.2rem 0.7rem 2.6rem;
+            border: 1.5px solid #dcd7ce;
             border-radius: 8px;
-            font-size: 1rem;
+            font-size: 0.92rem;
             font-family: 'DM Sans', sans-serif;
+            background: #faf8f5;
+            color: var(--black);
             transition: all 0.2s ease;
+            box-sizing: border-box;
         }
 
         .search-bar input:focus {
             outline: none;
             border-color: var(--gold);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(201, 169, 97, 0.18);
         }
 
-        .search-bar::before {
-            content: '';
+        .search-clear-btn {
             position: absolute;
-            left: 1.2rem;
+            right: 0.75rem;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 1.1rem;
+            background: #e2ddd5;
+            border: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .search-clear-btn:hover {
+            background: var(--gold);
+            color: var(--black);
         }
 
         .table-container {
@@ -658,6 +702,104 @@
             margin-top: 0.5rem;
         }
 
+        /* Face ID Locked Card & Re-register UI */
+        .face-locked-card {
+            background: #ffffff;
+            border: 1.5px solid #e2ddd3;
+            border-radius: 12px;
+            padding: 1.75rem 1.25rem;
+            margin: 0.75rem auto;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+            animation: fadeIn 0.25s ease;
+        }
+
+        .face-locked-icon-wrap {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            background: rgba(39, 174, 96, 0.12);
+            color: #27ae60;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.75rem;
+            border: 2px solid rgba(39, 174, 96, 0.25);
+        }
+
+        .face-locked-badges {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 0.6rem;
+        }
+
+        .badge-face-registered {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(39, 174, 96, 0.12);
+            color: #1e824c;
+            border: 1px solid rgba(39, 174, 96, 0.35);
+            padding: 5px 13px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        .badge-face-code {
+            display: inline-flex;
+            align-items: center;
+            background: #1f1d1a;
+            color: var(--gold);
+            border: 1px solid rgba(201, 169, 97, 0.35);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            font-family: monospace;
+            letter-spacing: 0.5px;
+        }
+
+        .face-locked-desc {
+            color: #666;
+            font-size: 0.84rem;
+            line-height: 1.45;
+            margin: 0 auto 1.25rem;
+            max-width: 400px;
+        }
+
+        .btn-reregister-face {
+            background: var(--black);
+            color: var(--gold);
+            border: 2px solid var(--gold);
+            padding: 0.65rem 1.4rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.84rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            font-family: inherit;
+        }
+
+        .btn-reregister-face:hover {
+            background: var(--gold);
+            color: var(--black);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(201, 169, 97, 0.35);
+        }
+
         .camera-preview-wrapper {
             display: flex;
             flex-direction: column;
@@ -701,6 +843,137 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
             z-index: 2;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .face-guide.flash-success {
+            border-color: #27ae60 !important;
+            border-style: solid !important;
+            box-shadow: 0 0 20px rgba(39, 174, 96, 0.85) !important;
+        }
+
+        /* Guided head-motion step tracker */
+        .face-steps-tracker {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 0.75rem;
+        }
+
+        .face-step-pill {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 6px 3px;
+            border-radius: 6px;
+            background: #f4f1ea;
+            color: #8c827a;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+            user-select: none;
+        }
+
+        .face-step-pill.active {
+            background: #fff8e7;
+            color: #8f6805;
+            border-color: var(--gold);
+            box-shadow: 0 2px 8px rgba(184, 134, 11, 0.2);
+            font-weight: 700;
+            transform: translateY(-1px);
+        }
+
+        .face-step-pill.completed {
+            background: #eaf7ee;
+            color: #1e7e34;
+            border-color: #a3e0b2;
+        }
+
+        .face-step-pill .step-dot {
+            width: 17px;
+            height: 17px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+
+        .face-step-pill.active .step-dot {
+            background: var(--gold);
+            color: #fff;
+        }
+
+        .face-step-pill.completed .step-dot {
+            background: #1e7e34;
+            color: #fff;
+        }
+
+        /* In-circle motion guide arrow & cue */
+        .motion-guide-arrow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 3;
+            transition: all 0.3s ease;
+        }
+
+        .motion-guide-arrow.anim-up {
+            animation: floatUpAnim 1.3s ease-in-out infinite alternate;
+        }
+
+        .motion-guide-arrow.anim-down {
+            animation: floatDownAnim 1.3s ease-in-out infinite alternate;
+        }
+
+        .motion-guide-arrow.anim-pulse {
+            animation: pulseAnim 1.4s ease-in-out infinite;
+        }
+
+        @keyframes floatUpAnim {
+            0% { transform: translate(-50%, -38%); opacity: 0.85; }
+            100% { transform: translate(-50%, -62%); opacity: 1; }
+        }
+
+        @keyframes floatDownAnim {
+            0% { transform: translate(-50%, -62%); opacity: 0.85; }
+            100% { transform: translate(-50%, -38%); opacity: 1; }
+        }
+
+        @keyframes pulseAnim {
+            0%, 100% { transform: translate(-50%, -50%) scale(0.98); opacity: 0.85; }
+            50% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+        }
+
+        .motion-icon {
+            font-size: 26px;
+            color: var(--gold);
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+            line-height: 1;
+        }
+
+        .motion-text {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.68);
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-top: 3px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
 
         /* Overlays repositioned OUTSIDE the circle */
@@ -1405,7 +1678,12 @@
             <div class="chart-header">
                 <h3 class="chart-title">All Employees</h3>
                 <div class="search-bar">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
                     <input type="text" placeholder="Search by name, role, or status…" id="searchInput">
+                    <button type="button" class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display:none;" title="Clear search">✕</button>
                 </div>
             </div>
 
@@ -1482,7 +1760,9 @@
                                         data-role="{{ emp.role | e }}"
                                         data-contact="{{ emp.email | e }}"
                                         data-status="{{ emp.employment_status | e }}"
-                                        data-hourly-rate="{{ emp.hourly_rate | float }}">
+                                        data-hourly-rate="{{ emp.hourly_rate | float }}"
+                                        data-has-face="{{ 'true' if (emp.face_image_path or emp.face_model_path) else 'false' }}"
+                                        data-face-code="BB-{{ emp.created_at.strftime('%y%m') if emp.created_at else '0000' }}-{{ '%03d' | format(emp.employee_id) }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                         <span>Edit</span>
                                     </button>
@@ -1588,47 +1868,109 @@
 
                         <div class="face-capture-section">
                             <h3 style="margin-bottom:0.4rem;display:flex;align-items:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>Face ID Registration</h3>
-                            <p style="color:#888;font-size:0.83rem;margin-bottom:1rem;">
-                                Scan the employee's face to generate their unique Face ID number for clock-in recognition.
-                            </p>
 
-                            <!-- Progress bar -->
-                            <div
-                                style="width:100%;background:#e0e0e0;border-radius:8px;height:8px;margin-bottom:0.75rem;overflow:hidden;">
-                                <div id="captureProgress"
-                                    style="height:100%;background:var(--gold);border-radius:8px;width:0%;transition:width 0.4s ease;">
+                            <!-- LOCKED STATE (When editing employee who already has registered Face ID) -->
+                            <div id="faceLockedState" class="face-locked-card" style="display:none;">
+                                <div class="face-locked-icon-wrap">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                        <path d="m9 12 2 2 4-4"/>
+                                    </svg>
                                 </div>
+                                <div class="face-locked-badges">
+                                    <span class="badge-face-registered">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Face ID Already Registered
+                                    </span>
+                                    <span class="badge-face-code" id="faceLockedCodeBadge">BB-0000-000</span>
+                                </div>
+                                <p class="face-locked-desc">
+                                    This employee already has an active biometric Face ID on file. The camera scanner is locked to prevent accidental overwrite.
+                                </p>
+                                <button type="button" class="btn-reregister-face" id="btnUnlockFaceScanner" onclick="unlockFaceScanner()">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                        <circle cx="12" cy="13" r="4"/>
+                                    </svg>
+                                    Re-register Face ID
+                                </button>
                             </div>
 
-                            <!-- Step instruction -->
-                            <p id="faceInstruction"
-                                style="color:var(--gold);font-weight:700;font-size:0.9rem;min-height:1.4em;">
-                                Position your face in the circle
-                            </p>
-
-                            <div class="camera-preview-wrapper">
-                                <div class="camera-preview">
-                                    <video id="video" autoplay playsinline></video>
-                                    <canvas id="canvas" style="display:none;"></canvas>
-                                    <div class="face-guide"></div>
-                                    <!-- Frame counter stays inside circle (top-right corner, never over the face) -->
-                                    <div id="frameCounter" class="camera-frame-counter">0 / 3</div>
+                            <!-- ACTIVE SCANNER STATE (Default for new employee or when unlocked) -->
+                            <div id="faceScannerState">
+                                <div id="faceReRegisterNotice" style="display:none;margin-bottom:1rem;background:rgba(201,169,97,0.12);border:1px solid var(--gold);border-radius:8px;padding:0.6rem 0.9rem;font-size:0.83rem;color:var(--gold);align-items:center;justify-content:space-between;gap:8px;text-align:left;">
+                                    <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Scanner unlocked. Completing all 4 angles will overwrite the current Face ID.</span>
+                                    <button type="button" onclick="relockFaceScanner()" style="background:none;border:none;color:#888;cursor:pointer;font-size:0.78rem;text-decoration:underline;white-space:nowrap;">Keep Existing</button>
                                 </div>
-                                <!-- Status label now lives BELOW the circle, never obscuring the face -->
-                                <div id="face-status" class="camera-status-bar">Align your face</div>
+
+                                <p style="color:#888;font-size:0.83rem;margin-bottom:1rem;">
+                                    Scan the employee's face to generate their unique Face ID number for clock-in recognition.
+                                </p>
+
+                                <!-- Progress bar -->
+                                <div
+                                    style="width:100%;background:#e0e0e0;border-radius:8px;height:8px;margin-bottom:0.75rem;overflow:hidden;">
+                                    <div id="captureProgress"
+                                        style="height:100%;background:var(--gold);border-radius:8px;width:0%;transition:width 0.4s ease;">
+                                    </div>
+                                </div>
+
+                                <!-- Motion Step Badges Tracker -->
+                                <div class="face-steps-tracker" id="faceStepsTracker">
+                                    <div class="face-step-pill active" id="pill-step-1">
+                                        <span class="step-dot">1</span>
+                                        <span class="step-text">Steady</span>
+                                    </div>
+                                    <div class="face-step-pill" id="pill-step-2">
+                                        <span class="step-dot">2</span>
+                                        <span class="step-text">Tilt Up ↗</span>
+                                    </div>
+                                    <div class="face-step-pill" id="pill-step-3">
+                                        <span class="step-dot">3</span>
+                                        <span class="step-text">Tilt Down ↘</span>
+                                    </div>
+                                    <div class="face-step-pill" id="pill-step-4">
+                                        <span class="step-dot">4</span>
+                                        <span class="step-text">Center</span>
+                                    </div>
+                                </div>
+
+                                <!-- Step instruction -->
+                                <p id="faceInstruction"
+                                    style="color:var(--gold);font-weight:700;font-size:0.9rem;min-height:1.4em;">
+                                    Step 1 of 4: Look straight ahead and hold steady
+                                </p>
+
+                                <div class="camera-preview-wrapper">
+                                    <div class="camera-preview">
+                                        <video id="video" autoplay playsinline></video>
+                                        <canvas id="canvas" style="display:none;"></canvas>
+                                        <div class="face-guide" id="faceGuide">
+                                            <!-- In-circle motion guide arrow & cue -->
+                                            <div class="motion-guide-arrow anim-pulse" id="motionGuideArrow">
+                                                <span id="motionIcon" class="motion-icon">⊙</span>
+                                                <span id="motionText" class="motion-text">Steady</span>
+                                            </div>
+                                        </div>
+                                        <!-- Frame counter stays inside circle (top-right corner, never over the face) -->
+                                        <div id="frameCounter" class="camera-frame-counter">0 / 4</div>
+                                    </div>
+                                    <!-- Status label now lives BELOW the circle, never obscuring the face -->
+                                    <div id="face-status" class="camera-status-bar">Align your face</div>
+                                </div>
+
+                                <!-- Status line -->
+                                <p id="captureStatus"
+                                    style="margin-top:10px;font-weight:600;font-size:0.88rem;min-height:1.3em;"></p>
+
+                                <!-- Retake button -->
+                                <button type="button" id="retakeBtn" onclick="retakeCapture()" style="display:none;margin-top:0.5rem;
+                                       background:var(--black);color:var(--gold);
+                                       border:2px solid var(--gold);padding:0.5rem 1.25rem;
+                                       border-radius:8px;font-weight:700;cursor:pointer;font-size:0.83rem;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg> Retake Face ID
+                                </button>
                             </div>
-
-                            <!-- Status line -->
-                            <p id="captureStatus"
-                                style="margin-top:10px;font-weight:600;font-size:0.88rem;min-height:1.3em;"></p>
-
-                            <!-- Retake button -->
-                            <button type="button" id="retakeBtn" onclick="retakeCapture()" style="display:none;margin-top:0.5rem;
-                                   background:var(--black);color:var(--gold);
-                                   border:2px solid var(--gold);padding:0.5rem 1.25rem;
-                                   border-radius:8px;font-weight:700;cursor:pointer;font-size:0.83rem;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg> Retake Face ID
-                            </button>
                         </div>
                     </div>
                 </form>
@@ -1661,12 +2003,30 @@
         // ══════════════════════════════════════════════════════════════════════════
         //  TABLE SEARCH
         // ══════════════════════════════════════════════════════════════════════════
-        document.getElementById('searchInput').addEventListener('input', function (e) {
-            const term = e.target.value.toLowerCase();
+        const searchInputEl = document.getElementById('searchInput');
+        const searchClearBtnEl = document.getElementById('searchClearBtn');
+
+        function filterEmployees() {
+            const term = (searchInputEl?.value || '').toLowerCase().trim();
+            if (searchClearBtnEl) {
+                searchClearBtnEl.style.display = term ? 'flex' : 'none';
+            }
             document.querySelectorAll('#employeeTable tbody tr').forEach(row => {
                 row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
             });
-        });
+        }
+
+        if (searchInputEl) {
+            searchInputEl.addEventListener('input', filterEmployees);
+        }
+
+        function clearSearch() {
+            if (searchInputEl) {
+                searchInputEl.value = '';
+                filterEmployees();
+                searchInputEl.focus();
+            }
+        }
 
         // ══════════════════════════════════════════════════════════════════════════
         //  DELEGATED CLICK HANDLERS — Edit & Disable buttons
@@ -1686,7 +2046,9 @@
                     d.role    || '',
                     d.contact || '',
                     d.status  || '',
-                    d.hourlyRate || 0
+                    d.hourlyRate || 0,
+                    d.hasFace === 'true',
+                    d.faceCode || ''
                 );
                 return;
             }
@@ -1737,122 +2099,212 @@
         }
 
         // ══════════════════════════════════════════════════════════════════════════
-        //  FACE REGISTRATION STATE
+        //  GUIDED HEAD-MOTION SEQUENCE SPECIFICATION
         // ══════════════════════════════════════════════════════════════════════════
-        let regToken = null;   // unique ID for this registration session
-        let capturedCount = 0;      // frames accepted by the backend
-        const TARGET_FRAMES = 3;
+        const MOTION_STEPS = [
+            {
+                step: 1,
+                action: 'steady',
+                title: 'Step 1 of 4: Steady Position',
+                instruction: 'Look straight ahead and hold steady',
+                subtext: 'Align your face in the center of the circle',
+                icon: '⊙',
+                motionClass: 'anim-pulse',
+                badgeText: 'Steady'
+            },
+            {
+                step: 2,
+                action: 'tilt_up',
+                title: 'Step 2 of 4: Tilt Upward',
+                instruction: 'Slowly tilt your head slightly upward ↗',
+                subtext: 'Tilt chin up slightly while facing camera',
+                icon: '▲',
+                motionClass: 'anim-up',
+                badgeText: 'Tilt Up'
+            },
+            {
+                step: 3,
+                action: 'tilt_down',
+                title: 'Step 3 of 4: Tilt Downward',
+                instruction: 'Slowly tilt your head slightly downward ↘',
+                subtext: 'Tilt chin down slightly while facing camera',
+                icon: '▼',
+                motionClass: 'anim-down',
+                badgeText: 'Tilt Down'
+            },
+            {
+                step: 4,
+                action: 'steady_return',
+                title: 'Step 4 of 4: Return to Center',
+                instruction: 'Return head to center and hold steady',
+                subtext: 'Look straight ahead to complete scan',
+                icon: '⊙',
+                motionClass: 'anim-pulse',
+                badgeText: 'Center'
+            }
+        ];
+        const TARGET_FRAMES = MOTION_STEPS.length;
+        let regToken = null;         // unique ID for this registration session
+        let capturedCount = 0;       // frames accepted by the backend
+        let currentStepIdx = 0;      // current active step index (0 to 3)
+        let capturingActive = false; // flag to control sequence loop
+        let isCapturing = false;     // concurrency guard
 
         function genToken() {
             return 'reg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
         }
 
+        function updateStepUI(stepIdx) {
+            const isCompleted = capturedCount >= TARGET_FRAMES;
+
+            // Update top progress pills
+            for (let i = 0; i < TARGET_FRAMES; i++) {
+                const pill = document.getElementById('pill-step-' + (i + 1));
+                if (!pill) continue;
+                const dot = pill.querySelector('.step-dot');
+                if (i < capturedCount) {
+                    pill.className = 'face-step-pill completed';
+                    if (dot) dot.textContent = '✓';
+                } else if (i === stepIdx && !isCompleted) {
+                    pill.className = 'face-step-pill active';
+                    if (dot) dot.textContent = (i + 1);
+                } else {
+                    pill.className = 'face-step-pill';
+                    if (dot) dot.textContent = (i + 1);
+                }
+            }
+
+            // Update in-circle motion arrow & label
+            const arrowEl = document.getElementById('motionGuideArrow');
+            const iconEl = document.getElementById('motionIcon');
+            const textEl = document.getElementById('motionText');
+
+            if (isCompleted) {
+                if (arrowEl) arrowEl.className = 'motion-guide-arrow anim-pulse';
+                if (iconEl) { iconEl.textContent = '✓'; iconEl.style.color = '#27ae60'; }
+                if (textEl) textEl.textContent = 'Complete';
+                document.getElementById('faceInstruction').textContent = 'Face scan complete – multi-angle Face ID ready to save!';
+                updateUI('✓ Scan complete');
+                return;
+            }
+
+            const cur = MOTION_STEPS[stepIdx] || MOTION_STEPS[0];
+            if (arrowEl) arrowEl.className = 'motion-guide-arrow ' + cur.motionClass;
+            if (iconEl) { iconEl.textContent = cur.icon; iconEl.style.color = 'var(--gold)'; }
+            if (textEl) textEl.textContent = cur.badgeText;
+            document.getElementById('faceInstruction').textContent = cur.title + ': ' + cur.instruction;
+        }
+
         function resetCaptureState() {
             capturedCount = 0;
-            isCapturing = false;   // release any stuck guard
+            currentStepIdx = 0;
+            isCapturing = false;
             capturingActive = false;
             regToken = genToken();
             updateProgress(0);
             updateUI('Align your face');
             document.getElementById('captureStatus').textContent = '';
-            document.getElementById('faceInstruction').textContent = 'Position your face in the circle';
             document.getElementById('frameCounter').textContent = '0 / ' + TARGET_FRAMES;
             document.getElementById('retakeBtn').style.display = 'none';
+            updateStepUI(0);
         }
 
         // ══════════════════════════════════════════════════════════════════════════
-        //  AUTO CAPTURE LOOP
-        //  Uses a sequential setTimeout chain instead of setInterval so the next
-        //  frame is only scheduled AFTER the current async fetch + DeepFace call
-        //  finishes.  setInterval does NOT respect await — it would fire every
-        //  1500 ms regardless of whether the previous call had completed, stacking
-        //  concurrent DeepFace requests that exhaust CPU/RAM and crash the server.
+        //  GUIDED AUTO CAPTURE LOOP
         // ══════════════════════════════════════════════════════════════════════════
-        let capturingActive = false;   // flag to stop the loop cleanly
-
         function startAutoCapture() {
             resetCaptureState();
-            clearCaptureLoop();        // clear any previous interval (safety)
+            clearCaptureLoop();
             capturingActive = true;
-            schedulNextCapture();
+            // Allow 1.2s initial settling time for the user to look straight ahead
+            schedulNextCapture(1200);
         }
 
         function clearCaptureLoop() {
             capturingActive = false;
-            if (captureInterval) { clearInterval(captureInterval); captureInterval = null; }
+            if (captureInterval) { clearTimeout(captureInterval); captureInterval = null; }
         }
 
-        function schedulNextCapture() {
+        function schedulNextCapture(delayMs = 1800) {
             if (!capturingActive) return;
             if (capturedCount >= TARGET_FRAMES) { capturingActive = false; return; }
-            // Schedule next capture after a delay.  The delay is applied AFTER the
-            // previous captureOneFrame() fully resolves — no concurrency possible.
+
             captureInterval = setTimeout(async () => {
                 if (!capturingActive) return;
                 await captureOneFrame();
-                schedulNextCapture();   // chain: only fires after this frame is done
-            }, 2000);                   // 2 s gap — DeepFace needs ~1-3 s on CPU
+                // If sequence is still active, schedule next frame with sufficient time
+                // to allow the employee to transition their head angle comfortably
+                if (capturingActive && capturedCount < TARGET_FRAMES) {
+                    schedulNextCapture(1800);
+                }
+            }, delayMs);
         }
 
-        let isCapturing = false;   // hard guard — never two DeepFace calls at once
-
         async function captureOneFrame() {
-            if (isCapturing) return;   // drop frame if previous call still running
+            if (isCapturing || capturedCount >= TARGET_FRAMES) return;
             isCapturing = true;
+
+            const stepObj = MOTION_STEPS[currentStepIdx] || MOTION_STEPS[0];
 
             try {
                 const video = document.getElementById('video');
                 const canvas = document.getElementById('canvas');
 
-                // Guard: video must have real dimensions before we can capture
+                // Guard: video must have real dimensions before capture
                 if (!video.videoWidth || !video.videoHeight) return;
 
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 const ctx = canvas.getContext('2d');
-
-                // ── DO NOT mirror the canvas pixels ──────────────────────────────────
-                // The CSS `transform: scaleX(-1)` on the <video> element makes the
-                // display look mirrored to the user, but the pixels we send to the
-                // backend must be in natural (unmirrored) orientation because the Haar
-                // cascade was trained on unmirrored faces.
-                // The backend also calls cv2.flip(img, 1) as a safety net.
                 ctx.drawImage(video, 0, 0);
 
-                // Higher JPEG quality = less compression artefacts = higher Laplacian
-                // variance = less chance of triggering the blur check during verification.
                 const imageData = canvas.toDataURL('image/jpeg', 0.92);
 
                 const res = await fetch('/register_face_frame', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: regToken, image: imageData })
+                    body: JSON.stringify({
+                        token: regToken,
+                        image: imageData,
+                        step: stepObj.step,
+                        action: stepObj.action
+                    })
                 });
                 const data = await res.json();
 
                 updateUI(data.message);
 
                 if (data.success) {
+                    // Flash guide green for immediate tactile visual reinforcement
+                    const guide = document.getElementById('faceGuide');
+                    if (guide) {
+                        guide.classList.add('flash-success');
+                        setTimeout(() => guide.classList.remove('flash-success'), 450);
+                    }
+
                     capturedCount = data.captured;
-                    updateProgress(capturedCount / TARGET_FRAMES * 100);
+                    currentStepIdx = Math.min(capturedCount, TARGET_FRAMES - 1);
+                    updateProgress((capturedCount / TARGET_FRAMES) * 100);
                     document.getElementById('frameCounter').textContent = capturedCount + ' / ' + TARGET_FRAMES;
                     document.getElementById('captureStatus').textContent = data.message;
 
                     if (capturedCount >= TARGET_FRAMES) {
                         clearCaptureLoop();
                         capturingActive = false;
-                        document.getElementById('faceInstruction').textContent = 'Face scan complete – an ID number will be generated on save';
+                        updateStepUI(currentStepIdx);
                         document.getElementById('retakeBtn').style.display = 'inline-block';
+                    } else {
+                        // Immediately show instructions and motion guidance for the next pose
+                        updateStepUI(currentStepIdx);
                     }
                 } else {
-                    // Backend rejected frame – show reason and keep looping
+                    // Backend rejected frame (e.g. angle too extreme or face lost)
                     document.getElementById('faceInstruction').textContent = data.message;
                 }
             } catch {
-                /* network hiccup or server busy – retry on next scheduled tick */
                 document.getElementById('faceInstruction').textContent = 'Server busy – retrying…';
             } finally {
-                isCapturing = false;   // always release, even on error
+                isCapturing = false;
             }
         }
 
@@ -1865,9 +2317,19 @@
         }
 
         // ══════════════════════════════════════════════════════════════════════════
-        //  MODAL OPEN / CLOSE
+        //  MODAL OPEN / CLOSE & FACE LOCK LOGIC
         // ══════════════════════════════════════════════════════════════════════════
+        let editingEmployeeHasFace = false;
+        let editingEmployeeFaceCode = '';
+
         async function openAddModal() {
+            editingEmployeeHasFace = false;
+            editingEmployeeFaceCode = '';
+            document.getElementById('faceLockedState').style.display = 'none';
+            document.getElementById('faceScannerState').style.display = 'block';
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'none';
+
             document.getElementById('modalTitle').textContent = 'Add New Employee';
             // Show & require password fields for Add mode
             const pwGroup = document.getElementById('empPassword').closest('.form-group');
@@ -1882,13 +2344,8 @@
             document.getElementById('employeeForm').removeAttribute('data-id');
             document.getElementById('employeeModal').classList.add('active');
 
-            // ── CRITICAL: await camera ready before starting capture loop ──────────
-            // startAutoCapture() fired synchronously before would mean the first
-            // several frames always had videoWidth=0 and were silently discarded.
             try {
                 await startCamera();
-                // Extra 1.5 s warmup — gives the webcam sensor time to adjust auto-exposure
-                // so the first real captured frame isn't artificially dark / low-contrast.
                 updateUI('Camera warming up…');
                 document.getElementById('faceInstruction').textContent = 'Camera warming up…';
                 await new Promise(r => setTimeout(r, 1500));
@@ -1900,7 +2357,10 @@
             }
         }
 
-        async function openEditModal(id, name, username, role, contact, status, hourlyRate) {
+        async function openEditModal(id, name, username, role, contact, status, hourlyRate, hasFace, faceCode) {
+            editingEmployeeHasFace = Boolean(hasFace);
+            editingEmployeeFaceCode = faceCode || '';
+
             document.getElementById('modalTitle').textContent = 'Edit Employee';
             // Hide & un-require password fields — password change not supported in edit mode
             const pwGroup = document.getElementById('empPassword').closest('.form-group');
@@ -1917,8 +2377,50 @@
             if (document.getElementById('empHourlyRate'))
                 document.getElementById('empHourlyRate').value = parseFloat(hourlyRate || 0).toFixed(2);
             document.getElementById('employeeForm').setAttribute('data-id', id);
-            // Open modal immediately so the user sees it regardless of camera status
-            document.getElementById('employeeModal').classList.add('active');
+
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'none';
+
+            // ── CHECK IF EMPLOYEE HAS AN EXISTING REGISTERED FACE ID ──────────
+            if (editingEmployeeHasFace) {
+                // Lock and disable camera scanner by default
+                stopCamera();
+                resetCaptureState();
+                document.getElementById('faceLockedState').style.display = 'flex';
+                document.getElementById('faceScannerState').style.display = 'none';
+                const codeBadge = document.getElementById('faceLockedCodeBadge');
+                if (codeBadge) {
+                    codeBadge.textContent = editingEmployeeFaceCode || 'Registered';
+                    codeBadge.style.display = editingEmployeeFaceCode ? 'inline-flex' : 'none';
+                }
+                document.getElementById('employeeModal').classList.add('active');
+            } else {
+                // No Face ID registered yet — show camera scanner so admin can register one
+                document.getElementById('faceLockedState').style.display = 'none';
+                document.getElementById('faceScannerState').style.display = 'block';
+                document.getElementById('employeeModal').classList.add('active');
+                try {
+                    await startCamera();
+                    updateUI('Camera warming up…');
+                    document.getElementById('faceInstruction').textContent = 'Camera warming up…';
+                    await new Promise(r => setTimeout(r, 1500));
+                    startAutoCapture();
+                } catch (e) {
+                    updateUI('Camera unavailable');
+                    document.getElementById('faceInstruction').textContent = 'Camera unavailable — you can still edit details and save without updating Face ID.';
+                    console.warn('[openEditModal] camera error:', e);
+                }
+            }
+        }
+
+        async function unlockFaceScanner() {
+            // Explicitly unlock camera scanner to re-register / overwrite Face ID
+            document.getElementById('faceLockedState').style.display = 'none';
+            document.getElementById('faceScannerState').style.display = 'block';
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'flex';
+
+            resetCaptureState();
             try {
                 await startCamera();
                 updateUI('Camera warming up…');
@@ -1927,9 +2429,19 @@
                 startAutoCapture();
             } catch (e) {
                 updateUI('Camera unavailable');
-                document.getElementById('faceInstruction').textContent = 'Camera unavailable — you can still edit details and save without updating Face ID.';
-                console.warn('[openEditModal] camera error:', e);
+                document.getElementById('faceInstruction').textContent = 'Camera unavailable — please allow camera access and retry.';
+                console.warn('[unlockFaceScanner] camera error:', e);
             }
+        }
+
+        function relockFaceScanner() {
+            // Relock camera scanner and keep existing registered Face ID
+            stopCamera();
+            resetCaptureState();
+            document.getElementById('faceScannerState').style.display = 'none';
+            document.getElementById('faceLockedState').style.display = 'flex';
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'none';
         }
 
         function closeModal() {
@@ -1937,6 +2449,10 @@
             stopCamera();
             resetCaptureState();
             document.getElementById('captureStatus').textContent = '';
+            document.getElementById('faceLockedState').style.display = 'none';
+            document.getElementById('faceScannerState').style.display = 'block';
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'none';
         }
 
         document.getElementById('employeeModal').addEventListener('click', function (e) {
@@ -1966,7 +2482,7 @@
 
                 if (password !== confirmPassword) { alert('Passwords do not match!'); return; }
                 if (capturedCount < TARGET_FRAMES) {
-                    alert(`Face capture incomplete (${capturedCount}/${TARGET_FRAMES} frames). Please wait for the camera to finish capturing.`);
+                    alert(`Face registration incomplete (${capturedCount}/${TARGET_FRAMES} angles). Please complete all 4 guided head-motion steps (Steady, Tilt Up, Tilt Down, Center) before saving.`);
                     return;
                 }
 
@@ -2036,6 +2552,15 @@
                 formData.append('contact', contact);
                 formData.append('status', status);
                 formData.append('hourly_rate', hourlyRate);
+
+                // If re-registration was started but not finished, confirm whether to keep existing Face ID
+                if (capturedCount > 0 && capturedCount < TARGET_FRAMES) {
+                    const confirmSave = confirm(
+                        `Face re-registration is incomplete (${capturedCount}/${TARGET_FRAMES} angles completed).\n\n` +
+                        `Click OK to save employee profile details while keeping their current Face ID, or Cancel to finish scanning.`
+                    );
+                    if (!confirmSave) return;
+                }
 
                 // If new frames were captured during edit, append one unmirrored canvas frame
                 if (capturedCount >= TARGET_FRAMES) {
