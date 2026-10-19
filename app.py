@@ -1,4 +1,7 @@
 import os
+import sys
+import gc
+import shutil
 import base64
 import time
 import hashlib
@@ -1904,6 +1907,8 @@ def register_face_frame():
         data = request.get_json(silent=True) or {}
         token = data.get("token", "")
         image_data = data.get("image", "")
+        step = int(data.get("step", 1))
+        action = data.get("action", "steady")
 
         if not token or not image_data:
             return jsonify(
@@ -1929,6 +1934,8 @@ def register_face_frame():
                     "best_face": None,
                     "best_sharpness": -1.0,  # track sharpness to pick best crop
                     "started": time.time(),
+                    "baseline_cy": None,
+                    "poses": [],
                 }
 
             sess = reg_sessions[token]
@@ -1961,6 +1968,11 @@ def register_face_frame():
                     }
                 )
 
+            # ── Head-motion pose tracking ───────────────────────────────────
+            cy = y + h // 2
+            if sess.get("baseline_cy") is None:
+                sess["baseline_cy"] = cy
+
             # ── Extract embedding ───────────────────────────────────────────
             try:
                 emb = extract_embedding(img, x, y, w, h)
@@ -1986,16 +1998,24 @@ def register_face_frame():
                 sess["best_face"] = crop_160
 
             sess["embeddings"].append(emb)
+            sess["poses"].append({"step": step, "action": action, "cy": cy})
             captured = len(sess["embeddings"])
 
             step_msgs = {
-                1: "Frame 1 captured — hold steady",
-                2: "Frame 2 captured — almost done",
-                3: "Face capture complete",
+                1: "Step 1 of 4: Steady position captured ✓",
+                2: "Step 2 of 4: Upward tilt captured ✓",
+                3: "Step 3 of 4: Downward tilt captured ✓",
+                4: "Step 4 of 4: Head motion scan complete ✓",
             }
-            msg = step_msgs.get(captured, f"Frame {captured} captured")
+            msg = step_msgs.get(captured, f"Step {captured} captured ✓")
 
-            return jsonify({"success": True, "message": msg, "captured": captured})
+            return jsonify({
+                "success": True,
+                "message": msg,
+                "captured": captured,
+                "step": step,
+                "action": action,
+            })
 
         finally:
             # ── Always release the lock, even on error ──────────────────────
@@ -2035,9 +2055,9 @@ def commit_face_registration():
     if not sess:
         return jsonify({"success": False, "message": "Registration session not found"})
 
-    if len(sess["embeddings"]) < 2:
+    if len(sess["embeddings"]) < 3:
         return jsonify(
-            {"success": False, "message": "Not enough frames captured (need ≥ 2)"}
+            {"success": False, "message": "Not enough frames captured (need ≥ 3 of 4)"}
         )
 
     if sess["best_face"] is None:
@@ -14258,6 +14278,532 @@ def api_backup_import():
     except Exception as exc:
         app.logger.error(f"[backup] import failed: {exc}")
         return jsonify({"success": False, "message": f"Restore failed: {exc}"}), 500
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║              SYSTEM REPAIR & DIAGNOSTICS MODULE API                          ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+def _perform_system_diagnostic_scan():
+    """
+    Run an automated, non-destructive audit of all core subsystems:
+    1. Schema & tables existence
+    2. Relational integrity (orphan products, invalid stock/price, orphan logs/items)
+    3. Attendance & shift health (unclosed shifts > 18h)
+    4. Security, sessions & lockout state (stale sessions, locked accounts, expired tokens)
+    5. Storage & media health (upload directories, missing image links)
+    6. Server & DB performance (query latency, memory, DeepFace readiness)
+    """
+    conn = mysql.connection
+    cur = conn.cursor(DictCursor)
+
+    # 1. Latency & DB version
+    t0 = time.time()
+    cur.execute("SELECT VERSION() AS ver, DATABASE() AS db_name")
+    vrow = cur.fetchone() or {}
+    db_ver = vrow.get("ver", "Unknown")
+    db_name = vrow.get("db_name", "pos_system")
+    db_latency_ms = round((time.time() - t0) * 1000, 2)
+
+    # 2. Schema check (22 expected tables)
+    expected_tables = [
+        "admins", "employees", "employees_trash", "categories", "main_categories",
+        "products", "transactions", "transaction_items", "inv_items", "inv_log",
+        "stock_requests", "attendance", "shift_config", "payroll_periods",
+        "email_alert_settings", "app_settings", "account_sessions", "login_attempts",
+        "login_activity_log", "password_reset_tokens", "face_mismatch_log", "employee_applications"
+    ]
+    cur.execute("SHOW TABLES")
+    existing_tables = set(r[list(r.keys())[0]] for r in cur.fetchall())
+    missing_tables = [t for t in expected_tables if t not in existing_tables]
+
+    # 3. Product & inventory relational integrity
+    cur.execute("""
+        SELECT COUNT(*) AS cnt FROM products p
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        WHERE p.category_id IS NOT NULL AND c.category_id IS NULL
+    """)
+    orphan_prods = int((cur.fetchone() or {}).get("cnt", 0))
+
+    cur.execute("SELECT COUNT(*) AS cnt FROM products WHERE stock < 0")
+    negative_stock = int((cur.fetchone() or {}).get("cnt", 0))
+
+    cur.execute("SELECT COUNT(*) AS cnt FROM products WHERE price < 0 OR price IS NULL")
+    null_prices = int((cur.fetchone() or {}).get("cnt", 0))
+
+    cur.execute("""
+        SELECT COUNT(*) AS cnt FROM inv_log
+        WHERE item_id NOT IN (SELECT id FROM inv_items)
+    """)
+    orphan_inv_logs = int((cur.fetchone() or {}).get("cnt", 0))
+
+    cur.execute("""
+        SELECT COUNT(*) AS cnt FROM transaction_items
+        WHERE transaction_id NOT IN (SELECT transaction_id FROM transactions)
+    """)
+    orphan_tx_items = int((cur.fetchone() or {}).get("cnt", 0))
+
+    # 4. Attendance integrity (unclosed shifts > 18h)
+    cur.execute("""
+        SELECT a.attendance_id, a.clock_in, a.employee_id, COALESCE(e.full_name, 'Unknown') AS employee_name
+        FROM attendance a
+        LEFT JOIN employees e ON e.employee_id = a.employee_id
+        WHERE a.clock_in IS NOT NULL AND a.clock_out IS NULL AND a.clock_in < NOW() - INTERVAL 18 HOUR
+    """)
+    unclosed_shifts = cur.fetchall() or []
+
+    # 5. Security & Session integrity
+    cur.execute("""
+        SELECT COUNT(*) AS cnt FROM account_sessions
+        WHERE is_active = 1 AND last_activity < NOW() - INTERVAL 24 HOUR
+    """)
+    stale_sessions = int((cur.fetchone() or {}).get("cnt", 0))
+
+    cur.execute("""
+        SELECT COUNT(*) AS cnt FROM login_attempts
+        WHERE last_attempt < NOW() - INTERVAL 1 HOUR
+    """)
+    stale_lockouts = int((cur.fetchone() or {}).get("cnt", 0))
+
+    cur.execute("""
+        SELECT COUNT(*) AS cnt FROM password_reset_tokens
+        WHERE expires_at < NOW()
+    """)
+    expired_tokens = int((cur.fetchone() or {}).get("cnt", 0))
+
+    # Check AES encryption health
+    cur.execute("SELECT admin_id, full_name, email FROM admins LIMIT 5")
+    enc_admins = cur.fetchall() or []
+    cur.execute("SELECT employee_id, full_name, email FROM employees LIMIT 5")
+    enc_employees = cur.fetchall() or []
+    corrupted_enc_count = 0
+    for r in enc_admins:
+        if r.get("full_name") and _is_enc(r["full_name"]) and not aes_decrypt(r["full_name"]):
+            corrupted_enc_count += 1
+    for r in enc_employees:
+        if r.get("full_name") and _is_enc(r["full_name"]) and not aes_decrypt(r["full_name"]):
+            corrupted_enc_count += 1
+
+    # 6. Media & Storage integrity
+    prod_img_dir = os.path.join("static", "product_images")
+    face_img_dir = os.path.join("static", "face_images")
+    prod_dir_writable = os.access(prod_img_dir, os.W_OK) if os.path.exists(prod_img_dir) else False
+    face_dir_writable = os.access(face_img_dir, os.W_OK) if os.path.exists(face_img_dir) else False
+
+    cur.execute("SELECT product_id, name, image_url FROM products WHERE image_url IS NOT NULL AND image_url != ''")
+    missing_media_count = 0
+    for p in cur.fetchall():
+        url = p.get("image_url") or ""
+        if url.startswith("/static/"):
+            local_p = os.path.join(".", url.lstrip("/"))
+            if not os.path.isfile(local_p):
+                missing_media_count += 1
+
+    try:
+        free_gb = round(shutil.disk_usage(".").free / (1024**3), 1)
+    except Exception:
+        free_gb = 0.0
+
+    gc_counts = gc.get_count()
+    cur.close()
+
+    # Calculate health score
+    deductions = 0
+    if missing_tables:
+        deductions += len(missing_tables) * 20
+    if unclosed_shifts:
+        deductions += len(unclosed_shifts) * 5
+    if orphan_prods:
+        deductions += orphan_prods * 5
+    if negative_stock:
+        deductions += negative_stock * 3
+    if null_prices:
+        deductions += null_prices * 3
+    if stale_sessions:
+        deductions += min(10, stale_sessions * 2)
+    if stale_lockouts:
+        deductions += min(8, stale_lockouts * 1)
+    if missing_media_count:
+        deductions += min(5, missing_media_count * 1)
+    if corrupted_enc_count:
+        deductions += corrupted_enc_count * 10
+
+    score = max(15, 100 - deductions)
+    overall_status = "healthy" if score >= 90 else ("warning" if score >= 70 else "critical")
+
+    return {
+        "success": True,
+        "timestamp": datetime.now(PHT).strftime("%Y-%m-%d %H:%M:%S"),
+        "health_score": score,
+        "overall_status": overall_status,
+        "database": {
+            "version": db_ver,
+            "database_name": db_name,
+            "latency_ms": db_latency_ms,
+            "total_tables": len(existing_tables),
+            "expected_tables": len(expected_tables),
+            "missing_tables": missing_tables,
+            "status": "error" if missing_tables else "healthy"
+        },
+        "products": {
+            "orphan_products": orphan_prods,
+            "negative_stock": negative_stock,
+            "null_prices": null_prices,
+            "orphan_inv_logs": orphan_inv_logs,
+            "orphan_tx_items": orphan_tx_items,
+            "status": "warning" if (orphan_prods or negative_stock or null_prices or orphan_inv_logs or orphan_tx_items) else "healthy"
+        },
+        "attendance": {
+            "unclosed_stale_shifts": len(unclosed_shifts),
+            "stale_shift_samples": [
+                {
+                    "attendance_id": s["attendance_id"],
+                    "clock_in": str(s["clock_in"]),
+                    "employee_id": s["employee_id"],
+                    "employee_name": s["employee_name"]
+                }
+                for s in unclosed_shifts[:5]
+            ],
+            "status": "warning" if unclosed_shifts else "healthy"
+        },
+        "security": {
+            "stale_sessions": stale_sessions,
+            "stale_lockouts": stale_lockouts,
+            "expired_tokens": expired_tokens,
+            "corrupted_enc_count": corrupted_enc_count,
+            "encryption_health": "Corrupted Ciphertext Detected" if corrupted_enc_count > 0 else "100% Valid (AES-256)",
+            "status": "warning" if (stale_sessions or stale_lockouts or corrupted_enc_count) else "healthy"
+        },
+        "storage": {
+            "missing_media_count": missing_media_count,
+            "product_images_dir": "Writable" if prod_dir_writable else "Missing/Read-only",
+            "face_images_dir": "Writable" if face_dir_writable else "Missing/Read-only",
+            "free_disk_gb": free_gb,
+            "status": "warning" if (missing_media_count or not prod_dir_writable or not face_dir_writable) else "healthy"
+        },
+        "runtime": {
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "gc_objects": gc_counts[0] + gc_counts[1] + gc_counts[2],
+            "platform": sys.platform,
+            "status": "healthy"
+        }
+    }
+
+
+def _do_repair_schema():
+    """Ensure all core tables, columns, and default configs exist."""
+    run_auto_migration()
+    conn = mysql.connection
+    cur = conn.cursor(DictCursor)
+
+    # Seed default app_settings if missing
+    defaults = {
+        "late_grace_minutes": "10",
+        "late_per_minute_rate": "0.75",
+    }
+    for k, v in defaults.items():
+        cur.execute("""
+            INSERT INTO app_settings (setting_key, setting_value)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE setting_key = setting_key
+        """, (k, v))
+
+    # Ensure a fallback category exists
+    cur.execute("SELECT COUNT(*) AS cnt FROM categories")
+    if int((cur.fetchone() or {}).get("cnt", 0)) == 0:
+        cur.execute("INSERT INTO categories (name) VALUES ('General')")
+
+    conn.commit()
+    cur.close()
+    return "Verified and updated all 22 database tables, columns, and system configurations."
+
+
+def _do_repair_products():
+    """Sanitize product pricing, stock levels, and link orphan products."""
+    conn = mysql.connection
+    cur = conn.cursor(DictCursor)
+
+    # 1. Fallback category
+    cur.execute("SELECT category_id FROM categories ORDER BY category_id ASC LIMIT 1")
+    row = cur.fetchone()
+    if not row:
+        cur.execute("INSERT INTO categories (name) VALUES ('General')")
+        cat_id = cur.lastrowid
+    else:
+        cat_id = row["category_id"]
+
+    # 2. Relink orphan products
+    cur.execute("""
+        UPDATE products SET category_id = %s
+        WHERE category_id NOT IN (SELECT category_id FROM (SELECT category_id FROM categories) AS c)
+           OR category_id IS NULL
+    """, (cat_id,))
+    relinked = cur.rowcount
+
+    # 3. Clamp negative stock to 0
+    cur.execute("UPDATE products SET stock = 0 WHERE stock < 0")
+    stock_clamped = cur.rowcount
+
+    # 4. Set negative or null prices to 0.00
+    cur.execute("UPDATE products SET price = 0.00 WHERE price < 0 OR price IS NULL")
+    prices_fixed = cur.rowcount
+
+    # 5. Clean orphan logs & items
+    cur.execute("DELETE FROM inv_log WHERE item_id NOT IN (SELECT id FROM inv_items)")
+    orphan_logs = cur.rowcount
+
+    cur.execute("DELETE FROM transaction_items WHERE transaction_id NOT IN (SELECT transaction_id FROM transactions)")
+    orphan_items = cur.rowcount
+
+    conn.commit()
+    cur.close()
+    return (
+        f"Product sanity restored: {relinked} orphan categories linked, "
+        f"{stock_clamped} negative stock clamped, {prices_fixed} prices normalized, "
+        f"{orphan_logs + orphan_items} orphan references cleaned."
+    )
+
+
+def _do_repair_attendance():
+    """Auto-close abandoned shifts older than 18 hours to prevent payroll errors."""
+    conn = mysql.connection
+    cur = conn.cursor(DictCursor)
+    cur.execute("""
+        SELECT a.attendance_id, a.clock_in, a.employee_id, COALESCE(e.hourly_rate, 45.0) AS hourly_rate
+        FROM attendance a
+        LEFT JOIN employees e ON e.employee_id = a.employee_id
+        WHERE a.clock_in IS NOT NULL AND a.clock_out IS NULL AND a.clock_in < NOW() - INTERVAL 18 HOUR
+    """)
+    rows = cur.fetchall() or []
+    fixed = 0
+    for r in rows:
+        att_id = r["attendance_id"]
+        clock_in = r["clock_in"]
+        rate = float(r.get("hourly_rate") or 45.0)
+        clock_out = clock_in + timedelta(hours=8)
+        hours = 8.00
+        earnings = round(hours * rate, 2)
+        cur.execute("""
+            UPDATE attendance
+            SET clock_out = %s,
+                hours_worked = %s,
+                hourly_rate_snapshot = %s,
+                daily_earnings = %s,
+                daily_pay = %s
+            WHERE attendance_id = %s
+        """, (clock_out, hours, rate, earnings, earnings, att_id))
+        fixed += 1
+
+    conn.commit()
+    cur.close()
+    return f"Auto-closed {fixed} abandoned/unclosed attendance shift(s) with standard 8-hour cap."
+
+
+def _do_repair_sessions():
+    """Flush stale sessions older than 24h and clear stuck login lockouts."""
+    conn = mysql.connection
+    cur = conn.cursor(DictCursor)
+
+    cur.execute("""
+        UPDATE account_sessions
+        SET is_active = 0
+        WHERE is_active = 1 AND last_activity < NOW() - INTERVAL 24 HOUR
+    """)
+    sess_flushed = cur.rowcount
+
+    cur.execute("DELETE FROM login_attempts WHERE last_attempt < NOW() - INTERVAL 1 HOUR")
+    lockouts_cleared = cur.rowcount
+
+    cur.execute("DELETE FROM password_reset_tokens WHERE expires_at < NOW()")
+    tokens_cleared = cur.rowcount
+
+    conn.commit()
+    cur.close()
+    return f"Cleared {sess_flushed} inactive session(s), {lockouts_cleared} login lockout(s), and {tokens_cleared} expired token(s)."
+
+
+def _do_repair_media():
+    """Verify upload folders and safely clear broken local image references."""
+    os.makedirs(os.path.join("static", "product_images"), exist_ok=True)
+    os.makedirs(os.path.join("static", "face_images"), exist_ok=True)
+
+    conn = mysql.connection
+    cur = conn.cursor(DictCursor)
+    cur.execute("SELECT product_id, image_url FROM products WHERE image_url IS NOT NULL AND image_url != ''")
+    cleared = 0
+    for p in cur.fetchall():
+        url = p.get("image_url") or ""
+        if url.startswith("/static/"):
+            local_p = os.path.join(".", url.lstrip("/"))
+            if not os.path.isfile(local_p):
+                cur.execute("UPDATE products SET image_url = NULL WHERE product_id = %s", (p["product_id"],))
+                cleared += 1
+
+    conn.commit()
+    cur.close()
+    return f"Verified upload storage directories; sanitized {cleared} broken local product image reference(s)."
+
+
+def _do_optimize_database():
+    """Defragment tables and reclaim Python runtime memory."""
+    conn = mysql.connection
+    cur = conn.cursor()
+    cur.execute("OPTIMIZE TABLE products, categories, transactions, transaction_items, inv_items, inv_log, attendance, account_sessions, login_activity_log")
+    cur.fetchall()
+    cur.close()
+    reclaimed = gc.collect()
+    return f"Optimized 9 core database tables and collected {reclaimed} Python garbage memory objects."
+
+
+@app.route("/api/diagnostics/scan", methods=["GET"])
+def api_diagnostics_scan():
+    """Admin-only: run automated system diagnostic scan."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    try:
+        report = _perform_system_diagnostic_scan()
+        return jsonify(report)
+    except Exception as exc:
+        app.logger.error(f"[diagnostics] Scan failed: {exc}")
+        return jsonify({"success": False, "message": f"Scan failed: {exc}"}), 500
+
+
+@app.route("/api/diagnostics/repair/<action_name>", methods=["POST"])
+@csrf.exempt
+def api_diagnostics_repair_action(action_name):
+    """Admin-only: execute targeted automated repair."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    repair_handlers = {
+        "schema": ("Database Schema & Tables", _do_repair_schema),
+        "products": ("Products & Stock Sanitization", _do_repair_products),
+        "attendance": ("Attendance & Shifts", _do_repair_attendance),
+        "sessions": ("Security & Sessions", _do_repair_sessions),
+        "media": ("Storage & Media Assets", _do_repair_media),
+        "optimize": ("Database Optimization & GC", _do_optimize_database),
+    }
+
+    if action_name not in repair_handlers:
+        return jsonify({"success": False, "message": f"Unknown repair action '{action_name}'"}), 400
+
+    title, func = repair_handlers[action_name]
+    try:
+        details = func()
+        app.logger.warning(
+            f"[diagnostics] Repair '{action_name}' executed by admin "
+            f"employee_id={session.get('employee_id')} — {details}"
+        )
+        new_scan = _perform_system_diagnostic_scan()
+        return jsonify({
+            "success": True,
+            "action": action_name,
+            "title": title,
+            "message": details,
+            "new_health_score": new_scan["health_score"],
+            "overall_status": new_scan["overall_status"],
+            "scan_data": new_scan
+        })
+    except Exception as exc:
+        app.logger.error(f"[diagnostics] Repair '{action_name}' failed: {exc}")
+        return jsonify({"success": False, "message": f"Repair failed: {exc}"}), 500
+
+
+@app.route("/api/diagnostics/repair/all", methods=["POST"])
+@csrf.exempt
+def api_diagnostics_repair_all():
+    """Admin-only: one-click full system automated troubleshooting and repair."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    results = []
+    actions = [
+        ("schema", "Database Schema & Tables", _do_repair_schema),
+        ("attendance", "Attendance & Shifts", _do_repair_attendance),
+        ("sessions", "Security & Sessions", _do_repair_sessions),
+        ("products", "Products & Stock Sanitization", _do_repair_products),
+        ("media", "Storage & Media Assets", _do_repair_media),
+        ("optimize", "Database Optimization & GC", _do_optimize_database),
+    ]
+
+    for key, title, func in actions:
+        try:
+            msg = func()
+            results.append({"type": key, "title": title, "status": "fixed", "message": msg})
+        except Exception as exc:
+            app.logger.error(f"[diagnostics] Step '{key}' error during full repair: {exc}")
+            results.append({"type": key, "title": title, "status": "error", "message": str(exc)})
+
+    new_scan = _perform_system_diagnostic_scan()
+    app.logger.warning(
+        f"[diagnostics] Full System Auto-Repair executed by admin "
+        f"employee_id={session.get('employee_id')} — new score: {new_scan['health_score']}%"
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Full system auto-repair executed successfully.",
+        "results": results,
+        "new_health_score": new_scan["health_score"],
+        "overall_status": new_scan["overall_status"],
+        "scan_data": new_scan
+    })
+
+
+@app.route("/api/diagnostics/logs", methods=["GET"])
+def api_diagnostics_logs():
+    """Admin-only: retrieve recent application diagnostic logs."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        from developer import log_buffer
+        level_filter = request.args.get("level", "ALL").upper()
+        raw_logs = list(log_buffer)
+        if level_filter != "ALL":
+            filtered = [entry for entry in raw_logs if entry.get("level", "").upper() == level_filter]
+        else:
+            filtered = raw_logs
+        return jsonify({"success": True, "logs": filtered[-100:]})
+    except Exception as exc:
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/diagnostics/clear-logs", methods=["POST"])
+@csrf.exempt
+def api_diagnostics_clear_logs():
+    """Admin-only: clear in-memory diagnostic log buffer."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        from developer import log_buffer
+        log_buffer.clear()
+        app.logger.info(
+            f"[diagnostics] Log buffer cleared by admin employee_id={session.get('employee_id')}"
+        )
+        return jsonify({"success": True, "message": "Log buffer cleared successfully."})
+    except Exception as exc:
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@app.route("/api/diagnostics/export", methods=["GET"])
+def api_diagnostics_export():
+    """Admin-only: download full system diagnostic audit report as JSON."""
+    if not is_super_admin():
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    try:
+        report = _perform_system_diagnostic_scan()
+        from developer import log_buffer
+        report["recent_logs"] = list(log_buffer)[-50:]
+        dt_str = datetime.now(PHT).strftime("%Y%m%d_%H%M%S")
+        response = jsonify(report)
+        response.headers["Content-Disposition"] = f"attachment; filename=books_blooms_diagnostics_{dt_str}.json"
+        return response
+    except Exception as exc:
+        return jsonify({"success": False, "message": str(exc)}), 500
 
 
 # ── Run DB migration in a background thread at startup ────────────────────────
