@@ -931,6 +931,8 @@ def check_lockout(username_hash: str, role: str) -> dict:
 
     now = datetime.now(PHT)
     locked_until = row.get("locked_until")
+    if locked_until and getattr(locked_until, "tzinfo", None) is None:
+        locked_until = PHT.localize(locked_until)
 
     if locked_until and locked_until > now:
         delta = int((locked_until - now).total_seconds())
@@ -971,6 +973,8 @@ def record_failed_attempt(username_hash: str, role: str) -> dict:
 
         # If a previous lockout already expired, reset the counter first
         prev_locked_until = row.get("locked_until")
+        if prev_locked_until and getattr(prev_locked_until, "tzinfo", None) is None:
+            prev_locked_until = PHT.localize(prev_locked_until)
         if prev_locked_until and prev_locked_until <= now:
             row["fail_count"] = 0
 
