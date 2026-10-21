@@ -3,6 +3,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+startCommand = "sh -c 'gunicorn app:app -c gunicorn.conf.py --bind 0.0.0.0:${PORT:-8080}'"
 healthcheckPath = "/ping"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

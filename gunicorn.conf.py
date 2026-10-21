@@ -6,7 +6,10 @@
 # With preload_app = True the master process blocks on TF import (~60s)
 # before forking any worker, causing every request to 499-timeout.
 
-bind             = "0.0.0.0:8080"   # overridden at runtime by --bind in Dockerfile CMD
+import os
+
+port = os.environ.get("PORT", "8080")
+bind = f"0.0.0.0:{port}"
 workers          = 1
 threads          = 4
 timeout          = 120               # Railway proxy hard-cuts at 30s anyway; keep reasonable
