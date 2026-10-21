@@ -2818,7 +2818,7 @@
                             <button class="btn btn-primary" id="verifyBtn" onclick="verifyIdentity()">
                                 Verify Identity
                             </button>
-                            <button type="button" class="btn btn-outline" id="btnPinFallback" onclick="openPinFallbackModal()" style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--gold);color:var(--gold);background:rgba(201,169,97,0.08);font-weight:600;padding:0.75rem 1.25rem;border-radius:8px;cursor:pointer;transition:all 0.2s;">
+                            <button type="button" class="btn btn-outline" id="btnPinFallback" onclick="openPinFallbackModal()" style="display:none;align-items:center;gap:6px;border:1.5px solid var(--gold);color:var(--gold);background:rgba(201,169,97,0.08);font-weight:600;padding:0.75rem 1.25rem;border-radius:8px;cursor:pointer;transition:all 0.2s;">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
@@ -3015,6 +3015,9 @@
                 state.currentStep = 1;
                 state.isSubmitting = false;
                 state.cameraReady = false;
+                window.faceFailCount = 0;
+                const pinBtn = document.getElementById("btnPinFallback");
+                if (pinBtn) pinBtn.style.display = "none";
                 Object.values(hf).forEach(f => { if (f) f.value = ""; });
                 if (employeeSelect) employeeSelect.value = "";
                 showStep(1);
@@ -3041,6 +3044,11 @@
                     const overlay = document.getElementById("verifyOverlay");
                     if (overlay) overlay.textContent = "Position your face in frame";
                     lastCaptureTime = 0;   // allow immediate first send
+
+                    // Reset face failure count & ensure PIN fallback button is hidden by default
+                    window.faceFailCount = 0;
+                    const pinBtn = document.getElementById("btnPinFallback");
+                    if (pinBtn) pinBtn.style.display = "none";
 
                     // Tell backend to clear any stale liveness session for this employee
                     const empId = document.getElementById("employeeSelect")?.value;
@@ -3083,7 +3091,12 @@
             /* ── Camera ── */
             async function startCamera() {
                 if (state.stream) return;
-                if (!navigator.mediaDevices?.getUserMedia) { showToast("Camera not supported.", "error"); return; }
+                if (!navigator.mediaDevices?.getUserMedia) {
+                    showToast("Camera not supported.", "error");
+                    const pinBtn = document.getElementById("btnPinFallback");
+                    if (pinBtn) pinBtn.style.display = "inline-flex";
+                    return;
+                }
                 try {
                     state.stream = await navigator.mediaDevices.getUserMedia({
                         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
@@ -3103,6 +3116,8 @@
                     if (e.name === "NotAllowedError") showToast("Camera permission denied.", "error");
                     else if (e.name === "NotFoundError") showToast("No camera found.", "error");
                     else showToast("Unable to access camera.", "error");
+                    const pinBtn = document.getElementById("btnPinFallback");
+                    if (pinBtn) pinBtn.style.display = "inline-flex";
                 }
             }
 
@@ -4130,7 +4145,10 @@
                 }
 
                 if (!data.success) {
-                    faceFailCount++;
+                    window.faceFailCount = (window.faceFailCount || 0) + 1;
+                    const pinBtn = document.getElementById("btnPinFallback");
+                    if (pinBtn) pinBtn.style.display = "inline-flex";
+
                     if (data.locked) {
                         // ── Server-side lockout — prompt PIN fallback immediately ────
                         isMismatchLocked = true;
@@ -4192,7 +4210,7 @@
                                 btn.style.background = "";
                             }
                         }, 5000);
-                    } else if (faceFailCount >= 3) {
+                    } else if (window.faceFailCount >= 3) {
                         // Auto-prompt PIN fallback after repeated failure to recognize face
                         setTimeout(() => { openPinFallbackModal("Face could not be recognized automatically."); }, 600);
                     }
@@ -4200,7 +4218,7 @@
                 }
 
                 // ── Face verified → save attendance ───────────────────────────
-                faceFailCount = 0;
+                window.faceFailCount = 0;
                 isMismatchLocked = false;
                 showToast(data.message, "success");
                 await saveAttendance(imageData, data.verify_token);
@@ -4208,13 +4226,15 @@
             } catch (err) {
                 console.error("verifyIdentity error:", err);
                 if (overlayEl) overlayEl.textContent = "Connection error – retrying…";
+                const pinBtn = document.getElementById("btnPinFallback");
+                if (pinBtn) pinBtn.style.display = "inline-flex";
             } finally {
                 isVerifying = false;
                 if (btn) { btn.disabled = false; btn.textContent = "Verify Identity"; }
             }
         }
 
-        let faceFailCount = 0;
+        window.faceFailCount = 0;
         let pinModalActive = false;
 
         /**
