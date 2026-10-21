@@ -1762,7 +1762,8 @@
                                         data-status="{{ emp.employment_status | e }}"
                                         data-hourly-rate="{{ emp.hourly_rate | float }}"
                                         data-has-face="{{ 'true' if (emp.face_image_path or emp.face_model_path) else 'false' }}"
-                                        data-face-code="BB-{{ emp.created_at.strftime('%y%m') if emp.created_at else '0000' }}-{{ '%03d' | format(emp.employee_id) }}">
+                                        data-face-code="BB-{{ emp.created_at.strftime('%y%m') if emp.created_at else '0000' }}-{{ '%03d' | format(emp.employee_id) }}"
+                                        data-pin="{{ emp.pin_code_plain or '' }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                         <span>Edit</span>
                                     </button>
@@ -1856,6 +1857,29 @@
                             <label for="empHourlyRate">Hourly Rate (₱)</label>
                             <input type="number" id="empHourlyRate" min="0" step="0.50" placeholder="e.g. 60.00"
                                 value="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="empPin" style="display:flex;align-items:center;justify-content:space-between;">
+                                <span>PIN Code (4–6 Digits) *</span>
+                                <span style="font-size:0.75rem;font-weight:600;color:var(--gold);">Clock-In Fallback</span>
+                            </label>
+                            <div style="position:relative;display:flex;align-items:center;">
+                                <input type="password" id="empPin" name="pin_code" required
+                                    pattern="[0-9]{4,6}" maxlength="6" inputmode="numeric"
+                                    placeholder="Enter 4-6 digit PIN"
+                                    style="padding-right:42px;letter-spacing:3px;font-family:monospace;font-size:1rem;"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6);">
+                                <button type="button" id="togglePinVisibilityBtn" onclick="togglePinVisibility()"
+                                    title="View / Hide PIN"
+                                    style="position:absolute;right:8px;background:none;border:none;cursor:pointer;color:#888;padding:6px;display:flex;align-items:center;justify-content:center;">
+                                    <svg id="pinEyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </button>
+                            </div>
+                            <small style="font-size:0.75rem;color:#888;display:block;margin-top:4px;">Fallback authentication if facial recognition cannot identify the employee.</small>
                         </div>
 
                         <div class="form-group full-width">
@@ -2048,7 +2072,8 @@
                     d.status  || '',
                     d.hourlyRate || 0,
                     d.hasFace === 'true',
-                    d.faceCode || ''
+                    d.faceCode || '',
+                    d.pin || ''
                 );
                 return;
             }
@@ -2340,6 +2365,16 @@
             document.getElementById('empConfirmPassword').setAttribute('required', '');
             document.getElementById('empPassword').value = '';
             document.getElementById('empConfirmPassword').value = '';
+            const pinEl = document.getElementById('empPin');
+            if (pinEl) {
+                pinEl.value = '';
+                pinEl.type = 'password';
+                pinEl.setAttribute('required', '');
+            }
+            const pinEye = document.getElementById('pinEyeIcon');
+            if (pinEye) {
+                pinEye.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            }
             document.getElementById('employeeForm').reset();
             document.getElementById('employeeForm').removeAttribute('data-id');
             document.getElementById('employeeModal').classList.add('active');
@@ -2357,7 +2392,7 @@
             }
         }
 
-        async function openEditModal(id, name, username, role, contact, status, hourlyRate, hasFace, faceCode) {
+        async function openEditModal(id, name, username, role, contact, status, hourlyRate, hasFace, faceCode, pinCode) {
             editingEmployeeHasFace = Boolean(hasFace);
             editingEmployeeFaceCode = faceCode || '';
 
@@ -2369,6 +2404,19 @@
             if (cpwGroup) cpwGroup.style.display = 'none';
             document.getElementById('empPassword').removeAttribute('required');
             document.getElementById('empConfirmPassword').removeAttribute('required');
+
+            // Populate PIN field for admin view/edit
+            const pinEl = document.getElementById('empPin');
+            if (pinEl) {
+                pinEl.value = pinCode || '';
+                pinEl.type = 'password';
+                pinEl.removeAttribute('required');
+            }
+            const pinEye = document.getElementById('pinEyeIcon');
+            if (pinEye) {
+                pinEye.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            }
+
             document.getElementById('fullName').value = name;
             document.getElementById('empUsername').value = username;
             document.getElementById('empRole').value = role;
@@ -2413,6 +2461,23 @@
             }
         }
 
+        function togglePinVisibility() {
+            const pinInput = document.getElementById('empPin');
+            const eyeIcon = document.getElementById('pinEyeIcon');
+            if (!pinInput) return;
+            if (pinInput.type === 'password') {
+                pinInput.type = 'text';
+                if (eyeIcon) {
+                    eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+                }
+            } else {
+                pinInput.type = 'password';
+                if (eyeIcon) {
+                    eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+                }
+            }
+        }
+
         async function unlockFaceScanner() {
             // Explicitly unlock camera scanner to re-register / overwrite Face ID
             document.getElementById('faceLockedState').style.display = 'none';
@@ -2451,6 +2516,12 @@
             document.getElementById('captureStatus').textContent = '';
             document.getElementById('faceLockedState').style.display = 'none';
             document.getElementById('faceScannerState').style.display = 'block';
+            const pinEl = document.getElementById('empPin');
+            if (pinEl) pinEl.type = 'password';
+            const pinEye = document.getElementById('pinEyeIcon');
+            if (pinEye) {
+                pinEye.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            }
             const reNotice = document.getElementById('faceReRegisterNotice');
             if (reNotice) reNotice.style.display = 'none';
         }
@@ -2479,8 +2550,11 @@
             if (!id) {
                 const password = document.getElementById('empPassword').value;
                 const confirmPassword = document.getElementById('empConfirmPassword').value;
+                const pinCode = document.getElementById('empPin')?.value.trim() || '';
 
                 if (password !== confirmPassword) { alert('Passwords do not match!'); return; }
+                if (!pinCode) { alert('PIN Code is required.'); return; }
+                if (!/^\d{4,6}$/.test(pinCode)) { alert('PIN Code must be between 4 and 6 numeric digits.'); return; }
                 if (capturedCount < TARGET_FRAMES) {
                     alert(`Face registration incomplete (${capturedCount}/${TARGET_FRAMES} angles). Please complete all 4 guided head-motion steps (Steady, Tilt Up, Tilt Down, Center) before saving.`);
                     return;
@@ -2501,6 +2575,7 @@
                         formData.append('full_name', fullName);
                         formData.append('username', username);
                         formData.append('password', password);
+                        formData.append('pin_code', pinCode);
                         formData.append('role', role);
                         formData.append('contact', contact);
                         formData.append('status', status);
@@ -2545,6 +2620,12 @@
 
                 // ── EDIT MODE ─────────────────────────────────────────────────────────
             } else {
+                const pinCode = document.getElementById('empPin')?.value.trim() || '';
+                if (pinCode && !/^\d{4,6}$/.test(pinCode)) {
+                    alert('PIN Code must be between 4 and 6 numeric digits.');
+                    return;
+                }
+
                 const formData = new FormData();
                 formData.append('full_name', fullName);
                 formData.append('username', username);
@@ -2552,6 +2633,9 @@
                 formData.append('contact', contact);
                 formData.append('status', status);
                 formData.append('hourly_rate', hourlyRate);
+                if (pinCode) {
+                    formData.append('pin_code', pinCode);
+                }
 
                 // If re-registration was started but not finished, confirm whether to keep existing Face ID
                 if (capturedCount > 0 && capturedCount < TARGET_FRAMES) {

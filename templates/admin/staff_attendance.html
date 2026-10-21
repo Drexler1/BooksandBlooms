@@ -1172,6 +1172,37 @@
             gap: 0.65rem;
         }
 
+        /* ── PIN FALLBACK KEYPAD ── */
+        .pin-key {
+            background: #f4f4f5;
+            border: 1px solid #e4e4e7;
+            border-radius: 8px;
+            padding: 0.75rem 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--black, #222);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pin-key:hover {
+            background: #e4e4e7;
+            border-color: #d4d4d8;
+        }
+        .pin-key:active {
+            background: var(--gold, #c9a961);
+            color: white;
+            transform: scale(0.96);
+        }
+        .pin-key-action {
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 1.05rem;
+        }
+
         /* Form elements */
         .form-row {
             display: grid;
@@ -2783,13 +2814,20 @@
                             </div>
                             <div class="camera-overlay-corners"></div>
                         </div>
-                        <div class="face-actions">
+                        <div class="face-actions" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
                             <button class="btn btn-primary" id="verifyBtn" onclick="verifyIdentity()">
                                 Verify Identity
                             </button>
+                            <button type="button" class="btn btn-outline" id="btnPinFallback" onclick="openPinFallbackModal()" style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--gold);color:var(--gold);background:rgba(201,169,97,0.08);font-weight:600;padding:0.75rem 1.25rem;border-radius:8px;cursor:pointer;transition:all 0.2s;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                Enter PIN Fallback
+                            </button>
                         </div>
                         <p class="face-tip">
-                            <strong>Face verification:</strong> Look directly at the camera with your face centered and well-lit. The system will match your face automatically.
+                            <strong>Face verification:</strong> Look toward the camera with your face centered and well-lit. The system matches against your multi-angle Face ID profile automatically.
                         </p>
                     </div>
                 </div>
@@ -4092,8 +4130,9 @@
                 }
 
                 if (!data.success) {
+                    faceFailCount++;
                     if (data.locked) {
-                        // ── Server-side lockout — hard stop, no auto-retry ────
+                        // ── Server-side lockout — prompt PIN fallback immediately ────
                         isMismatchLocked = true;
                         showToast(data.message, "error");
                         if (overlayEl) { overlayEl.textContent = data.message; overlayEl.style.color = "#ff4444"; }
@@ -4102,12 +4141,13 @@
                             btn.textContent = "Locked";
                             btn.style.background = "#7f1d1d";
                         }
-                        // Parse lockout duration from message if present (e.g. "30s")
+                        // Automatically prompt PIN Code entry modal as fallback
+                        setTimeout(() => { openPinFallbackModal("Facial verification temporarily locked."); }, 600);
+
                         const lockMatch = data.message.match(/(\d+)s/);
                         const lockMs = lockMatch ? parseInt(lockMatch[1]) * 1000 : 30000;
                         setTimeout(async () => {
                             isMismatchLocked = false;
-                            // Tell the backend to clear the liveness session too
                             const empId = document.getElementById("employeeSelect").value;
                             if (empId) {
                                 await fetch("/reset_liveness", {
@@ -4124,15 +4164,17 @@
                             }
                         }, lockMs);
                     } else if (data.mismatch) {
-                        // ── Confirmed face mismatch — temporary UI lock ────────
+                        // ── Confirmed face mismatch — prompt PIN fallback immediately ─
                         isMismatchLocked = true;
-                        showToast("Face does not match. Attendance denied.", "error");
+                        showToast("Face does not match. You can verify using employee PIN.", "error");
                         if (btn) {
                             btn.disabled = true;
                             btn.textContent = "Face Mismatch";
                             btn.style.background = "#c0392b";
                         }
-                        // Auto-unlock after 5 s and reset liveness on backend too
+                        // Automatically prompt PIN Code entry modal as fallback
+                        setTimeout(() => { openPinFallbackModal("Face did not match registered Face ID."); }, 600);
+
                         setTimeout(async () => {
                             isMismatchLocked = false;
                             const empId = document.getElementById("employeeSelect").value;
@@ -4150,12 +4192,15 @@
                                 btn.style.background = "";
                             }
                         }, 5000);
+                    } else if (faceFailCount >= 3) {
+                        // Auto-prompt PIN fallback after repeated failure to recognize face
+                        setTimeout(() => { openPinFallbackModal("Face could not be recognized automatically."); }, 600);
                     }
-                    // Keep loop running for liveness instructions (non-mismatch failures)
                     return;
                 }
 
                 // ── Face verified → save attendance ───────────────────────────
+                faceFailCount = 0;
                 isMismatchLocked = false;
                 showToast(data.message, "success");
                 await saveAttendance(imageData, data.verify_token);
@@ -4169,26 +4214,184 @@
             }
         }
 
+        let faceFailCount = 0;
+        let pinModalActive = false;
+
         /**
          * autoVerifyLoop()
          * ─────────────────
          * Runs while the user is on Step 3 (Face Verify).
          * Sends a frame every 2.5 seconds until the face
          * is matched, then attendance is recorded automatically.
-         *
-         * Interval is intentionally generous (2.5 s) so the server has time to
-         * finish the DeepFace embedding call before the next frame arrives —
-         * stacking simultaneous DeepFace calls is what causes the server crash.
          */
         function autoVerifyLoop() {
             setInterval(() => {
                 if (state.currentStep !== 3) return;
+                if (pinModalActive) return;          // pause camera verification while user is in PIN fallback
                 if (isVerifying) return;            // don't stack – wait for current call
                 if (isMismatchLocked) return;       // halted after face mismatch — wait for cooldown
                 if (!state.cameraReady) return;     // wait for auto-exposure to settle
                 lastCaptureTime = Date.now();
                 verifyIdentity();
             }, 2500);
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  PIN VERIFICATION FALLBACK LOGIC
+        // ══════════════════════════════════════════════════════════════════════════
+        function openPinFallbackModal(reason) {
+            const empSelect = document.getElementById("employeeSelect");
+            const empId = empSelect ? empSelect.value : "";
+            if (!empId) {
+                showToast("Please select an employee first.", "error");
+                return;
+            }
+            const empName = empSelect && empSelect.selectedOptions[0]
+                ? empSelect.selectedOptions[0].text.split(" — ")[0]
+                : "Selected Employee";
+
+            const empNameEl = document.getElementById("pinModalEmpName");
+            if (empNameEl) empNameEl.textContent = empName;
+
+            const reasonEl = document.getElementById("pinModalReason");
+            if (reasonEl && reason) {
+                reasonEl.textContent = reason + " Enter your 4–6 digit employee PIN to proceed.";
+            } else if (reasonEl) {
+                reasonEl.textContent = "Facial verification unsuccessful. Enter your 4–6 digit employee PIN to proceed.";
+            }
+
+            const pinInput = document.getElementById("pinCodeInput");
+            if (pinInput) {
+                pinInput.value = "";
+                pinInput.type = "password";
+            }
+            clearPinError();
+
+            const eyeIcon = document.getElementById("pinModalEyeIcon");
+            if (eyeIcon) {
+                eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            }
+
+            pinModalActive = true;
+            const modal = document.getElementById("pinFallbackModal");
+            if (modal) modal.classList.add("open");
+            setTimeout(() => { if (pinInput) pinInput.focus(); }, 150);
+        }
+
+        function closePinFallbackModal() {
+            pinModalActive = false;
+            const modal = document.getElementById("pinFallbackModal");
+            if (modal) modal.classList.remove("open");
+        }
+
+        function appendPinDigit(digit) {
+            const input = document.getElementById("pinCodeInput");
+            if (input && input.value.length < 6) {
+                input.value += digit;
+                clearPinError();
+            }
+        }
+
+        function clearPinInput() {
+            const input = document.getElementById("pinCodeInput");
+            if (input) {
+                input.value = "";
+                clearPinError();
+            }
+        }
+
+        function backspacePinDigit() {
+            const input = document.getElementById("pinCodeInput");
+            if (input && input.value.length > 0) {
+                input.value = input.value.slice(0, -1);
+                clearPinError();
+            }
+        }
+
+        function togglePinModalVisibility() {
+            const pinInput = document.getElementById("pinCodeInput");
+            const eyeIcon = document.getElementById("pinModalEyeIcon");
+            if (!pinInput) return;
+            if (pinInput.type === "password") {
+                pinInput.type = "text";
+                if (eyeIcon) {
+                    eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+                }
+            } else {
+                pinInput.type = "password";
+                if (eyeIcon) {
+                    eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+                }
+            }
+        }
+
+        function showPinError(msg) {
+            const errEl = document.getElementById("pinModalError");
+            if (errEl) {
+                errEl.textContent = msg;
+                errEl.style.display = "block";
+            }
+        }
+
+        function clearPinError() {
+            const errEl = document.getElementById("pinModalError");
+            if (errEl) errEl.style.display = "none";
+        }
+
+        async function submitPinVerification() {
+            const pinInput = document.getElementById("pinCodeInput");
+            const pin = pinInput ? pinInput.value.trim() : "";
+            if (!pin || pin.length < 4 || pin.length > 6) {
+                showPinError("Please enter a valid 4–6 digit numeric PIN.");
+                return;
+            }
+
+            const empSelect = document.getElementById("employeeSelect");
+            const employee_id = empSelect ? empSelect.value : "";
+            if (!employee_id) {
+                showPinError("No employee selected.");
+                return;
+            }
+
+            const btn = document.getElementById("btnSubmitPin");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span>Verifying…</span>';
+            }
+
+            try {
+                const res = await fetch("/verify_pin", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ employee_id, pin })
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    showPinError(data.message || "Incorrect PIN code. Please try again.");
+                    if (pinInput) {
+                        pinInput.value = "";
+                        pinInput.focus();
+                    }
+                    return;
+                }
+
+                // PIN verified!
+                closePinFallbackModal();
+                showToast(data.message || "PIN verified successfully!", "success");
+
+                // Record attendance seamlessly with the issued verify_token
+                await window.saveAttendance(null, data.verify_token);
+
+            } catch (err) {
+                console.error("submitPinVerification error:", err);
+                showPinError("Connection error. Please try again.");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>Verify & Clock In</span>';
+                }
+            }
         }
 
         /* ── Sync nav top to actual header height ── */
@@ -4291,6 +4494,82 @@
                 <button class="btn-outline" id="cancelOverrideBtn">Cancel</button>
                 <div class="modal-footer-right">
                     <button class="btn-primary" id="confirmOverrideBtn">Save Clock-Out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── PIN Verification Fallback Modal ────────────────────────────────────── -->
+    <div class="modal-overlay" id="pinFallbackModal">
+        <div class="modal" style="max-width:min(440px, calc(100vw - 2rem)); border: 1.5px solid rgba(201,169,97,0.3);">
+            <div class="modal-header">
+                <h2>PIN Code <span>Fallback</span></h2>
+                <button type="button" class="modal-close" onclick="closePinFallbackModal()">✕</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem; text-align: center;">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(201, 169, 97, 0.12); color: var(--gold); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--black); margin-bottom: 0.25rem;">
+                    Secondary Verification
+                </h3>
+                <p id="pinModalReason" style="font-size: 0.85rem; color: #666; margin-bottom: 1.1rem; line-height: 1.4;">
+                    Facial verification was unsuccessful. Enter your 4–6 digit employee PIN to proceed with clock-in/out.
+                </p>
+
+                <div style="background: var(--light-gray, #f9f9f9); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; text-align: left;">
+                    <div>
+                        <span style="font-size: 0.75rem; text-transform: uppercase; color: #888; font-weight: 600; display: block;">Employee</span>
+                        <strong id="pinModalEmpName" style="font-size: 0.95rem; color: var(--black);">Selected Employee</strong>
+                    </div>
+                    <span style="background: rgba(201,169,97,0.18); color: var(--gold); font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 12px;">PIN Fallback</span>
+                </div>
+
+                <!-- PIN input field with reveal button -->
+                <div style="position: relative; max-width: 280px; margin: 0 auto 1rem;">
+                    <input type="password" id="pinCodeInput" maxlength="6" inputmode="numeric" placeholder="● ● ● ●"
+                        autocomplete="off"
+                        style="width: 100%; text-align: center; font-size: 1.6rem; letter-spacing: 10px; font-weight: 700; font-family: monospace; padding: 0.75rem 2.8rem 0.75rem 1rem; border: 2px solid #ddd; border-radius: 12px; transition: border-color 0.2s;"
+                        oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6); clearPinError();"
+                        onkeydown="if(event.key === 'Enter') submitPinVerification();">
+                    <button type="button" onclick="togglePinModalVisibility()" title="Show/Hide PIN"
+                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #888; padding: 6px; display: flex; align-items: center; justify-content: center;">
+                        <svg id="pinModalEyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- On-screen numeric keypad for kiosk touchscreens -->
+                <div class="pin-keypad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 280px; margin: 0 auto 1.25rem;">
+                    <button type="button" class="pin-key" onclick="appendPinDigit('1')">1</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('2')">2</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('3')">3</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('4')">4</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('5')">5</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('6')">6</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('7')">7</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('8')">8</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('9')">9</button>
+                    <button type="button" class="pin-key pin-key-action" onclick="clearPinInput()">C</button>
+                    <button type="button" class="pin-key" onclick="appendPinDigit('0')">0</button>
+                    <button type="button" class="pin-key pin-key-action" onclick="backspacePinDigit()">⌫</button>
+                </div>
+
+                <!-- Error message container -->
+                <div id="pinModalError" style="display: none; background: #fde8e8; color: #9b1c1c; border: 1px solid #f8b4b4; border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.84rem; margin-bottom: 1rem; font-weight: 500;"></div>
+
+                <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                    <button type="button" class="btn btn-secondary" onclick="closePinFallbackModal()" style="flex: 1; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btnSubmitPin" onclick="submitPinVerification()" style="flex: 2; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span>Verify & Clock In</span>
+                    </button>
                 </div>
             </div>
         </div>
