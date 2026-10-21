@@ -1063,7 +1063,38 @@ def _dec_emp(row: dict) -> dict:
         for f in ("username", "full_name", "password", "email"):
             if row.get(f):
                 row[f] = aes_decrypt(row[f])
+        if row.get("pin_encrypted"):
+            row["pin_code_plain"] = aes_decrypt(row["pin_encrypted"])
+        else:
+            row["pin_code_plain"] = ""
     return row
+
+
+def verify_emp_pin(plaintext_pin: str, row: dict) -> bool:
+    """
+    Verify employee's 4-6 digit PIN against bcrypt hash (pin_code)
+    with fallback to reversible AES encryption (pin_encrypted).
+    """
+    if not plaintext_pin or not row:
+        return False
+    pc = (row.get("pin_code") or "").strip()
+    if pc:
+        try:
+            if bcrypt.checkpw(plaintext_pin.encode("utf-8"), pc.encode("utf-8")):
+                return True
+        except Exception:
+            pass
+    pe = (row.get("pin_encrypted") or "").strip()
+    if pe:
+        try:
+            if aes_decrypt(pe) == plaintext_pin:
+                return True
+        except Exception:
+            pass
+    if pc and pc == plaintext_pin:
+        return True
+    return False
+
 
 
 def _dec_adm(row: dict) -> dict:
@@ -2354,6 +2385,111 @@ def verify_face():
             "verify_token": verify_token,
         }
     )
+
+
+@app.route("/verify_pin", methods=["POST"])
+@csrf.exempt
+def verify_pin():
+    """
+    Secondary attendance clock-in authentication via 4-6 digit employee PIN.
+    Fallback when facial recognition fails or cannot recognize the employee.
+
+    POST JSON:
+        { "employee_id": str|int, "pin": "1234" }
+
+    Response JSON:
+        { "success": bool, "message": str, "verify_token": str }
+    """
+    data = request.get_json(silent=True) or {}
+    employee_id = str(data.get("employee_id", "")).strip()
+    pin = str(data.get("pin", "")).strip()
+
+    if not employee_id or not pin:
+        return jsonify({"success": False, "message": "Employee ID and PIN Code are required."}), 400
+
+    if not re.match(r"^\d{4,6}$", pin):
+        return jsonify({"success": False, "message": "PIN Code must be 4 to 6 numeric digits."}), 400
+
+    # Role-based verification authorization
+    is_mgmt = (
+        is_admin()
+        or session.get("role") in ("admin", "manager")
+        or session.get("admin_auth_id")
+        or session.get("admin_auth_emp_id")
+    )
+    if not is_mgmt:
+        cashier_emp = str(session.get("cashier_auth_emp_id") or session.get("employee_id") or "")
+        if cashier_emp and cashier_emp != employee_id:
+            app.logger.warning(
+                f"[verify_pin] BLOCKED — cashier employee {cashier_emp} "
+                f"tried to verify PIN for employee {employee_id} ip={request.remote_addr}"
+            )
+            return jsonify({
+                "success": False,
+                "message": "🚫 You can only verify your own identity."
+            }), 403
+
+    cur = mysql.connection.cursor(DictCursor)
+    try:
+        cur.execute(
+            """SELECT employee_id, full_name, pin_code, pin_encrypted, employment_status
+               FROM employees WHERE employee_id=%s LIMIT 1""",
+            (employee_id,)
+        )
+        emp = cur.fetchone()
+        if not emp:
+            return jsonify({"success": False, "message": "Employee not found."}), 404
+
+        if emp.get("employment_status") != "active":
+            return jsonify({"success": False, "message": "Account is inactive. Attendance cannot be recorded."}), 403
+
+        if not emp.get("pin_code") and not emp.get("pin_encrypted"):
+            return jsonify({
+                "success": False,
+                "message": "No PIN Code configured for this employee. Please ask an administrator to set your PIN."
+            }), 400
+
+        # Check PIN against bcrypt hash or encrypted fallback
+        if not verify_emp_pin(pin, emp):
+            app.logger.warning(
+                f"[verify_pin] FAILED PIN attempt for employee {employee_id} ip={request.remote_addr}"
+            )
+            return jsonify({
+                "success": False,
+                "message": "❌ Incorrect PIN code. Please try again."
+            }), 401
+
+        # Clear mismatch lockout counter on successful authentication
+        face_mismatch_counts.pop(employee_id, None)
+
+        # Issue one-time verification token for /log_attendance
+        verify_token = secrets.token_urlsafe(32)
+        verified_tokens[verify_token] = {
+            "employee_id": employee_id,
+            "expires": datetime.now(PHT) + timedelta(seconds=VERIFY_TOKEN_TTL),
+            "auth_method": "pin",
+        }
+
+        # Purge expired tokens
+        _now = datetime.now(PHT)
+        for _t in [t for t, v in list(verified_tokens.items()) if v["expires"] < _now]:
+            verified_tokens.pop(_t, None)
+
+        app.logger.info(
+            f"[verify_pin] SUCCESS PIN verified for employee {employee_id} ip={request.remote_addr}"
+        )
+        return jsonify({
+            "success": True,
+            "message": "✅ PIN verified successfully!",
+            "verify_token": verify_token,
+            "auth_method": "pin",
+        })
+
+    except Exception as e:
+        app.logger.error(f"[verify_pin] error: {e}")
+        return jsonify({"success": False, "message": "A server error occurred during PIN verification."}), 500
+    finally:
+        cur.close()
 
 
 @app.route("/api/face_mismatch_log", methods=["GET"])
@@ -3648,7 +3784,8 @@ def employee_management():
         SELECT employee_id, full_name, username, role, email,
                employment_status, face_image_path, face_model_path,
                last_login, created_at,
-               COALESCE(hourly_rate, 0) AS hourly_rate
+               COALESCE(hourly_rate, 0) AS hourly_rate,
+               pin_code, pin_encrypted
         FROM employees
         ORDER BY created_at DESC
         LIMIT 50
@@ -3801,6 +3938,7 @@ def add_employee():
     full_name = request.form.get("full_name", "").strip()
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "").strip()
+    pin_code = request.form.get("pin_code", "").strip()
     role = request.form.get("role", "").strip()
     contact = request.form.get("contact", "").strip()  # now stores email
     status = request.form.get("status", "active")
@@ -3809,22 +3947,28 @@ def add_employee():
     except (ValueError, TypeError):
         hourly_rate = 0.0
 
-    if not all([full_name, username, password, role, contact]):
-        return jsonify({"success": False, "message": "All fields are required"})
+    if not all([full_name, username, password, pin_code, role, contact]):
+        return jsonify({"success": False, "message": "All fields including PIN Code are required."})
+
+    if not re.match(r"^\d{4,6}$", pin_code):
+        return jsonify({"success": False, "message": "PIN Code must be 4 to 6 numeric digits."})
 
     try:
         cur = mysql.connection.cursor()
         cur.execute(
             """INSERT INTO employees
                (full_name, username, username_hash, password, password_hash,
+                pin_code, pin_encrypted,
                 role, email, employment_status, hourly_rate)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (
                 aes_encrypt(full_name),
                 aes_encrypt(username),
                 aes_username_hash(username),
                 aes_encrypt(password),
                 hash_password(password),
+                hash_password(pin_code),
+                aes_encrypt(pin_code),
                 role,
                 aes_encrypt(contact),  # email column
                 status,
@@ -3924,6 +4068,7 @@ def update_employee(employee_id):
 
     full_name = request.form.get("full_name", "").strip()
     username = request.form.get("username", "").strip()
+    pin_code = request.form.get("pin_code", "").strip()
     role = request.form.get("role", "").strip()
     contact = request.form.get("contact", "").strip()  # now stores email
     status = request.form.get("status", "").strip()
@@ -3931,6 +4076,9 @@ def update_employee(employee_id):
         hourly_rate = float(request.form.get("hourly_rate", 0) or 0)
     except (ValueError, TypeError):
         hourly_rate = 0.0
+
+    if pin_code and not re.match(r"^\d{4,6}$", pin_code):
+        return jsonify({"success": False, "message": "PIN Code must be 4 to 6 numeric digits."})
 
     enc_name = aes_encrypt(full_name)
     enc_username = aes_encrypt(username)
@@ -3980,46 +4128,91 @@ def update_employee(employee_id):
             except Exception as fs_err:
                 app.logger.debug(f"[face_id] Local disk face save skipped: {fs_err}")
 
-            cur.execute(
-                """UPDATE employees
-                   SET full_name=%s, username=%s, username_hash=%s, role=%s,
-                       email=%s, employment_status=%s,
-                       face_image_path=%s, hourly_rate=%s
-                   WHERE employee_id=%s""",
-                (
-                    enc_name,
-                    enc_username,
-                    u_hash,
-                    role,
-                    enc_contact,  # email column
-                    status,
-                    face_path,
-                    hourly_rate,
-                    employee_id,
-                ),
-            )
+            if pin_code:
+                cur.execute(
+                    """UPDATE employees
+                       SET full_name=%s, username=%s, username_hash=%s, role=%s,
+                           email=%s, employment_status=%s,
+                           face_image_path=%s, hourly_rate=%s,
+                           pin_code=%s, pin_encrypted=%s
+                       WHERE employee_id=%s""",
+                    (
+                        enc_name,
+                        enc_username,
+                        u_hash,
+                        role,
+                        enc_contact,
+                        status,
+                        face_path,
+                        hourly_rate,
+                        hash_password(pin_code),
+                        aes_encrypt(pin_code),
+                        employee_id,
+                    ),
+                )
+            else:
+                cur.execute(
+                    """UPDATE employees
+                       SET full_name=%s, username=%s, username_hash=%s, role=%s,
+                           email=%s, employment_status=%s,
+                           face_image_path=%s, hourly_rate=%s
+                       WHERE employee_id=%s""",
+                    (
+                        enc_name,
+                        enc_username,
+                        u_hash,
+                        role,
+                        enc_contact,
+                        status,
+                        face_path,
+                        hourly_rate,
+                        employee_id,
+                    ),
+                )
             # Persist new averaged embedding; also invalidates old cache entry
             _, _np_local = _get_cv2_np()
             avg_emb_ue = _np_local.mean(embeddings, axis=0).tolist()
             persist_embedding(str(employee_id), avg_emb_ue)
         else:
-            cur.execute(
-                """UPDATE employees
-                   SET full_name=%s, username=%s, username_hash=%s, role=%s,
-                       email=%s, employment_status=%s,
-                       hourly_rate=%s
-                   WHERE employee_id=%s""",
-                (
-                    enc_name,
-                    enc_username,
-                    u_hash,
-                    role,
-                    enc_contact,  # email column
-                    status,
-                    hourly_rate,
-                    employee_id,
-                ),
-            )
+            if pin_code:
+                cur.execute(
+                    """UPDATE employees
+                       SET full_name=%s, username=%s, username_hash=%s, role=%s,
+                           email=%s, employment_status=%s,
+                           hourly_rate=%s,
+                           pin_code=%s, pin_encrypted=%s
+                       WHERE employee_id=%s""",
+                    (
+                        enc_name,
+                        enc_username,
+                        u_hash,
+                        role,
+                        enc_contact,
+                        status,
+                        hourly_rate,
+                        hash_password(pin_code),
+                        aes_encrypt(pin_code),
+                        employee_id,
+                    ),
+                )
+            else:
+                cur.execute(
+                    """UPDATE employees
+                       SET full_name=%s, username=%s, username_hash=%s, role=%s,
+                           email=%s, employment_status=%s,
+                           hourly_rate=%s
+                       WHERE employee_id=%s""",
+                    (
+                        enc_name,
+                        enc_username,
+                        u_hash,
+                        role,
+                        enc_contact,
+                        status,
+                        hourly_rate,
+                        employee_id,
+                    ),
+                )
 
         mysql.connection.commit()
         cur.close()
@@ -6856,6 +7049,19 @@ def run_auto_migration():
             app.logger.info("[migration] Added email column to employees")
         except Exception:
             pass  # column already exists — expected on re-runs
+
+        # STEP 1c: add pin_code and pin_encrypted columns to employees if missing
+        for col_name in ("pin_code", "pin_encrypted"):
+            try:
+                cur.execute(
+                    f"ALTER TABLE `employees` "
+                    f"ADD COLUMN `{col_name}` VARCHAR(255) DEFAULT NULL"
+                )
+                conn.commit()
+                app.logger.info(f"[migration] Added {col_name} column to employees")
+            except Exception:
+                pass  # column already exists — expected on re-runs
+
 
         # STEP 2: widen narrow columns before writing ciphertext
         # AES-256-CBC base64(IV+ciphertext) is always >= 44 chars.

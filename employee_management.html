@@ -1,0 +1,2971 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Books & Blooms Café - Employee Management</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --gold: #c9a961;
+            --dark-gold: #a88850;
+            --black: #1a1a1a;
+            --dark-gray: #2d2d2d;
+            --light-gray: #f5f5f5;
+            --cream: #faf8f4;
+            --white: #ffffff;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --success: #4caf50;
+            --warning: #ff9800;
+            --danger: #dc3545;
+            --info: #2196f3;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: #f0f0f0;
+            color: var(--black);
+            overflow-x: hidden;
+        }
+
+        header {
+            background: var(--black);
+            border-bottom: 3px solid var(--gold);
+            padding: 1.25rem 2rem;
+            min-height: 90px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .logo-icon {
+            width: 55px;
+            height: 55px;
+            background: transparent;
+            border: 2px solid var(--gold);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gold);
+            font-size: 28px;
+        }
+
+        .logo-text h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.75rem;
+            font-weight: 400;
+            color: var(--white);
+            letter-spacing: 1px;
+            line-height: 1.2;
+        }
+
+        .logo-text h1 span {
+            color: var(--gold);
+        }
+
+        .logo-subtitle {
+            font-size: 0.7rem;
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            font-weight: 400;
+            margin-top: 2px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .date-time {
+            text-align: right;
+        }
+
+        .date-time .date {
+            color: var(--gold);
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .date-time .time {
+            color: #999;
+            font-size: 0.85rem;
+            margin-top: 2px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            background: var(--dark-gray);
+            padding: 0.6rem 1.1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(201, 169, 97, 0.3);
+        }
+
+        .user-details h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--white);
+            margin-bottom: 2px;
+        }
+
+        .user-details p {
+            font-size: 0.8rem;
+            color: var(--gold);
+        }
+
+        .logout-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+        }
+
+        nav {
+            background: var(--dark-gray);
+            border-bottom: 1px solid rgba(201, 169, 97, 0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 87px;
+            z-index: 99;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 0;
+            margin: 0;
+            padding: 0;
+            overflow-x: auto;
+        }
+
+        nav ul::-webkit-scrollbar {
+            height: 3px;
+        }
+
+        nav ul::-webkit-scrollbar-track {
+            background: var(--black);
+        }
+
+        nav ul::-webkit-scrollbar-thumb {
+            background: var(--gold);
+        }
+
+        nav li {
+            flex-shrink: 0;
+        }
+
+        nav a {
+            display: block;
+            padding: 1rem 1.75rem;
+            text-decoration: none;
+            color: #aaa;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+        }
+
+        nav a:hover {
+            background: rgba(201, 169, 97, 0.1);
+            color: var(--gold);
+        }
+
+        nav a.active {
+            color: var(--gold);
+            background: rgba(201, 169, 97, 0.15);
+            border-bottom-color: var(--gold);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--black);
+            margin-bottom: 0.5rem;
+        }
+
+        .page-subtitle {
+            color: #666;
+            font-size: 1.05rem;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px var(--shadow);
+            border: 1px solid #e0e0e0;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.75rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--gold);
+        }
+
+        .chart-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--black);
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--black);
+            color: var(--gold);
+            border: 2px solid var(--gold);
+            padding: 0.9rem 1.75rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .btn-primary:hover {
+            background: var(--gold);
+            color: var(--black);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(201, 169, 97, 0.3);
+        }
+
+        .search-bar {
+            position: relative;
+            width: 100%;
+            max-width: 360px;
+            min-width: 250px;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-bar .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #888;
+            pointer-events: none;
+            transition: color 0.2s ease;
+        }
+
+        .search-bar:focus-within .search-icon {
+            color: var(--gold);
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 0.7rem 2.2rem 0.7rem 2.6rem;
+            border: 1.5px solid #dcd7ce;
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-family: 'DM Sans', sans-serif;
+            background: #faf8f5;
+            color: var(--black);
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: var(--gold);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(201, 169, 97, 0.18);
+        }
+
+        .search-clear-btn {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #e2ddd5;
+            border: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .search-clear-btn:hover {
+            background: var(--gold);
+            color: var(--black);
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--black);
+            color: var(--gold);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.9rem;
+            vertical-align: middle;
+        }
+
+        tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: var(--light-gray);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.35rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge.active {
+            background: #e8f5e9;
+            color: var(--success);
+        }
+
+        .badge.inactive {
+            background: #ffebee;
+            color: var(--danger);
+        }
+
+        .badge.admin {
+            background: #fff3e0;
+            color: var(--warning);
+        }
+
+        .badge.cashier {
+            background: #f3e5f5;
+            color: #9c27b0;
+        }
+
+        .employee-details h4 {
+            font-weight: 700;
+            color: var(--black);
+            margin-bottom: 2px;
+            white-space: nowrap;
+        }
+
+        .employee-details p {
+            font-size: 0.85rem;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        /* Face ID display */
+        .face-id-badge {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+        }
+        .face-id-badge.unregistered {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: #aaa;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.6rem;
+            align-items: center;
+        }
+
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 0.9rem;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 700;
+            font-size: 0.75rem;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            line-height: 1;
+        }
+
+        .btn-edit {
+            background: var(--black);
+            color: var(--gold);
+            border-color: var(--gold);
+        }
+
+        .btn-edit:hover {
+            background: var(--gold);
+            color: var(--black);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(201, 169, 97, 0.35);
+        }
+
+        .btn-delete {
+            background: var(--white);
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .btn-delete:hover {
+            background: var(--danger);
+            color: var(--white);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.35);
+        }
+
+        /* ── Trash panel ── */
+        .trash-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #f0f0f0;
+            gap: 1rem;
+        }
+
+        .trash-row:last-child {
+            border-bottom: none;
+        }
+
+        .trash-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .trash-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #333;
+        }
+
+        .trash-role {
+            font-size: 0.78rem;
+            color: #888;
+            text-transform: capitalize;
+            margin-top: 2px;
+        }
+
+        .trash-countdown {
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+
+        .trash-countdown.urgent {
+            background: #fff0f0;
+            color: #c0392b;
+        }
+
+        .trash-countdown.warning {
+            background: #fff8e1;
+            color: #e67e22;
+        }
+
+        .trash-countdown.safe {
+            background: #f0fdf4;
+            color: #27ae60;
+        }
+
+        .btn-restore {
+            font-size: 0.78rem;
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid #27ae60;
+            color: #27ae60;
+            background: #fff;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .btn-restore:hover {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .trash-empty {
+            text-align: center;
+            padding: 2rem;
+            color: #bbb;
+            font-size: 0.88rem;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: min(600px, calc(100vw - 2rem));
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            background: var(--black);
+            color: var(--gold);
+            padding: 1.5rem 2rem;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--gold);
+        }
+
+        .modal-header h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.75rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--gold);
+            font-size: 1.75rem;
+            cursor: pointer;
+            line-height: 1;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            transform: scale(1.2);
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--black);
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.9rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: 'DM Sans', sans-serif;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .face-capture-section {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 2rem;
+            background: var(--light-gray);
+            border-radius: 8px;
+            border: 2px dashed #ddd;
+            margin-top: 0.5rem;
+        }
+
+        /* Face ID Locked Card & Re-register UI */
+        .face-locked-card {
+            background: #ffffff;
+            border: 1.5px solid #e2ddd3;
+            border-radius: 12px;
+            padding: 1.75rem 1.25rem;
+            margin: 0.75rem auto;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+            animation: fadeIn 0.25s ease;
+        }
+
+        .face-locked-icon-wrap {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            background: rgba(39, 174, 96, 0.12);
+            color: #27ae60;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.75rem;
+            border: 2px solid rgba(39, 174, 96, 0.25);
+        }
+
+        .face-locked-badges {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 0.6rem;
+        }
+
+        .badge-face-registered {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(39, 174, 96, 0.12);
+            color: #1e824c;
+            border: 1px solid rgba(39, 174, 96, 0.35);
+            padding: 5px 13px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        .badge-face-code {
+            display: inline-flex;
+            align-items: center;
+            background: #1f1d1a;
+            color: var(--gold);
+            border: 1px solid rgba(201, 169, 97, 0.35);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            font-family: monospace;
+            letter-spacing: 0.5px;
+        }
+
+        .face-locked-desc {
+            color: #666;
+            font-size: 0.84rem;
+            line-height: 1.45;
+            margin: 0 auto 1.25rem;
+            max-width: 400px;
+        }
+
+        .btn-reregister-face {
+            background: var(--black);
+            color: var(--gold);
+            border: 2px solid var(--gold);
+            padding: 0.65rem 1.4rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.84rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            font-family: inherit;
+        }
+
+        .btn-reregister-face:hover {
+            background: var(--gold);
+            color: var(--black);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(201, 169, 97, 0.35);
+        }
+
+        .camera-preview-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            margin: 1.25rem auto 0;
+            width: fit-content;
+        }
+
+        .camera-preview {
+            width: 260px;
+            height: 260px;
+            background: var(--dark-gray);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid var(--gold);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .camera-preview video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            display: block;
+        }
+
+        .face-guide {
+            position: absolute;
+            width: 72%;
+            height: 72%;
+            border: 2px dashed rgba(255, 255, 255, 0.65);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 2;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .face-guide.flash-success {
+            border-color: #27ae60 !important;
+            border-style: solid !important;
+            box-shadow: 0 0 20px rgba(39, 174, 96, 0.85) !important;
+        }
+
+        /* Guided head-motion step tracker */
+        .face-steps-tracker {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 0.75rem;
+        }
+
+        .face-step-pill {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 6px 3px;
+            border-radius: 6px;
+            background: #f4f1ea;
+            color: #8c827a;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+            user-select: none;
+        }
+
+        .face-step-pill.active {
+            background: #fff8e7;
+            color: #8f6805;
+            border-color: var(--gold);
+            box-shadow: 0 2px 8px rgba(184, 134, 11, 0.2);
+            font-weight: 700;
+            transform: translateY(-1px);
+        }
+
+        .face-step-pill.completed {
+            background: #eaf7ee;
+            color: #1e7e34;
+            border-color: #a3e0b2;
+        }
+
+        .face-step-pill .step-dot {
+            width: 17px;
+            height: 17px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+
+        .face-step-pill.active .step-dot {
+            background: var(--gold);
+            color: #fff;
+        }
+
+        .face-step-pill.completed .step-dot {
+            background: #1e7e34;
+            color: #fff;
+        }
+
+        /* In-circle motion guide arrow & cue */
+        .motion-guide-arrow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 3;
+            transition: all 0.3s ease;
+        }
+
+        .motion-guide-arrow.anim-up {
+            animation: floatUpAnim 1.3s ease-in-out infinite alternate;
+        }
+
+        .motion-guide-arrow.anim-down {
+            animation: floatDownAnim 1.3s ease-in-out infinite alternate;
+        }
+
+        .motion-guide-arrow.anim-pulse {
+            animation: pulseAnim 1.4s ease-in-out infinite;
+        }
+
+        @keyframes floatUpAnim {
+            0% { transform: translate(-50%, -38%); opacity: 0.85; }
+            100% { transform: translate(-50%, -62%); opacity: 1; }
+        }
+
+        @keyframes floatDownAnim {
+            0% { transform: translate(-50%, -62%); opacity: 0.85; }
+            100% { transform: translate(-50%, -38%); opacity: 1; }
+        }
+
+        @keyframes pulseAnim {
+            0%, 100% { transform: translate(-50%, -50%) scale(0.98); opacity: 0.85; }
+            50% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+        }
+
+        .motion-icon {
+            font-size: 26px;
+            color: var(--gold);
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+            line-height: 1;
+        }
+
+        .motion-text {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.68);
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-top: 3px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Overlays repositioned OUTSIDE the circle */
+        .camera-frame-counter {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.72);
+            color: var(--gold);
+            padding: 3px 9px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .camera-status-bar {
+            width: 260px;
+            margin-top: 10px;
+            background: rgba(0, 0, 0, 0.78);
+            color: #fff;
+            border-radius: 20px;
+            padding: 7px 14px;
+            font-size: 12.5px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-capture {
+            background: var(--gold);
+            color: var(--black);
+            padding: 0.9rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 1rem;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .btn-capture:hover {
+            background: var(--dark-gold);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(201, 169, 97, 0.3);
+        }
+
+        .modal-footer {
+            padding: 1.5rem 2rem;
+            border-top: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        .btn-cancel {
+            background: white;
+            color: var(--black);
+            border: 2px solid #ddd;
+            padding: 0.9rem 1.75rem;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .btn-cancel:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .btn-save {
+            background: var(--black);
+            color: var(--gold);
+            border: 2px solid var(--gold);
+            padding: 0.9rem 1.75rem;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .btn-save:hover {
+            background: var(--gold);
+            color: var(--black);
+        }
+
+        /* ══════════════════════════════════════════
+           HAMBURGER MENU BUTTON (mobile only)
+        ══════════════════════════════════════════ */
+        .hamburger-btn {
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            width: 40px;
+            height: 40px;
+            background: var(--dark-gray);
+            border: 1px solid rgba(201,169,97,0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .hamburger-btn span {
+            display: block;
+            width: 20px;
+            height: 2px;
+            background: var(--gold);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .hamburger-btn.open span:nth-child(1) {
+            transform: translateY(7px) rotate(45deg);
+        }
+
+        .hamburger-btn.open span:nth-child(2) {
+            opacity: 0;
+            transform: scaleX(0);
+        }
+
+        .hamburger-btn.open span:nth-child(3) {
+            transform: translateY(-7px) rotate(-45deg);
+        }
+
+        .nav-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 98;
+        }
+
+        /* ══════════════════════════════════════════
+           TABLET — max 1024px
+        ══════════════════════════════════════════ */
+        @media (max-width: 1024px) {
+            .container {
+                padding: 1.5rem;
+            }
+
+            .date-time {
+                display: none;
+            }
+
+            .chart-card {
+                padding: 1.5rem;
+            }
+        }
+
+        /* ══════════════════════════════════════════
+           MOBILE — max 768px
+        ══════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            /* Header */
+            header {
+                padding: 0 1rem;
+                gap: 0.6rem;
+            }
+
+            .logo-icon {
+                width: 42px;
+                height: 42px;
+                font-size: 22px;
+            }
+
+            .logo-text h1 {
+                font-size: 1.3rem;
+            }
+
+            .logo-subtitle {
+                font-size: 0.6rem;
+                letter-spacing: 3px;
+            }
+
+            .header-actions {
+                gap: 0.5rem;
+            }
+
+            .date-time {
+                display: none;
+            }
+
+            .user-info {
+                padding: 0.45rem 0.65rem;
+                gap: 0.45rem;
+            }
+
+            .user-details {
+                display: block;
+            }
+
+            .user-details h3 {
+                font-size: 0.82rem;
+            }
+
+            .user-details p {
+                font-size: 0.72rem;
+            }
+
+            .logout-btn {
+                padding: 0.38rem 0.65rem;
+                font-size: 0.76rem;
+            }
+
+            /* Hamburger */
+            .hamburger-btn {
+                display: flex;
+            }
+
+            /* Nav — slide-in drawer */
+            nav {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark-gray);
+                border-bottom: none;
+                z-index: 999;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                overflow-y: auto;
+                padding-top: 1rem;
+            }
+
+            nav.mobile-open {
+                transform: translateX(0);
+            }
+
+            nav ul {
+                flex-direction: column;
+                overflow-x: visible;
+            }
+
+            nav li {
+                flex-shrink: unset;
+                border-bottom: 1px solid rgba(201,169,97,0.1);
+            }
+
+            nav a {
+                padding: 1.1rem 1.75rem;
+                font-size: 1rem;
+                border-bottom: none;
+                border-left: 4px solid transparent;
+            }
+
+            nav a.active {
+                border-left-color: var(--gold);
+                border-bottom-color: transparent;
+                background: rgba(201,169,97,0.12);
+            }
+
+            /* Container & spacing */
+            .container {
+                padding: 1rem;
+            }
+
+            /* Page header */
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+                margin-bottom: 1.25rem;
+            }
+
+            .page-title {
+                font-size: 1.85rem;
+            }
+
+            .page-subtitle {
+                font-size: 0.88rem;
+            }
+
+            .btn-primary {
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* Chart card */
+            .chart-card {
+                padding: 0;
+                overflow: hidden;
+            }
+
+            .chart-header {
+                padding: 0.85rem 1rem;
+                margin-bottom: 0;
+                gap: 0.65rem;
+            }
+
+            .chart-title {
+                font-size: 1.1rem;
+            }
+
+            /* Search bar */
+            .search-bar {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .chart-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.65rem;
+            }
+
+            /* Table — horizontal scroll */
+            .table-container {
+                overflow-x: auto;
+            }
+
+            table {
+                min-width: 700px;
+            }
+
+            td, th {
+                padding: 0.75rem 0.85rem;
+                font-size: 0.82rem;
+            }
+
+            /* Action buttons */
+            .btn-icon span:not(.btn-icon-emoji) {
+                display: none;
+            }
+
+            .btn-icon {
+                padding: 0.55rem 0.7rem;
+            }
+
+            /* Form grid */
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Modal */
+            .modal-content {
+                width: 95%;
+                max-height: 95vh;
+            }
+
+            .modal-header {
+                padding: 1rem 1.25rem;
+            }
+
+            .modal-header h2 {
+                font-size: 1.4rem;
+            }
+
+            .modal-body {
+                padding: 1.25rem;
+            }
+
+            .modal-footer {
+                padding: 1rem 1.25rem;
+                flex-direction: column;
+            }
+
+            .modal-footer button {
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* Camera preview */
+            .camera-preview {
+                width: 200px;
+                height: 200px;
+            }
+
+            .camera-status-bar {
+                width: 200px;
+                font-size: 11.5px;
+            }
+
+            /* Trash panel */
+            .trash-row {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .trash-countdown {
+                font-size: 0.72rem;
+            }
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           EMPLOYEE OF THE MONTH
+        ══════════════════════════════════════════════════════════════ */
+        .eotm-section {
+            margin-bottom: 1.75rem;
+        }
+
+        .eotm-card {
+            background: var(--black);
+            border-radius: 14px;
+            border: 1px solid rgba(201, 169, 97, 0.35);
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 6px 30px rgba(0,0,0,0.18);
+        }
+
+        .eotm-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--gold), var(--dark-gold), var(--gold), transparent);
+        }
+
+        .eotm-inner {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            padding: 2rem 2.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .eotm-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .eotm-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 0.3rem;
+            opacity: 0.85;
+        }
+
+        .eotm-name {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--white);
+            line-height: 1.1;
+            margin-bottom: 0.3rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .eotm-role-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: rgba(201,169,97,0.15);
+            border: 1px solid rgba(201,169,97,0.4);
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 0.75rem;
+        }
+
+        .eotm-runner-up {
+            font-size: 0.78rem;
+            color: #888;
+        }
+
+        .eotm-runner-up span {
+            color: #aaa;
+            font-weight: 600;
+        }
+
+        .eotm-stats {
+            display: flex;
+            gap: 1px;
+            background: rgba(201,169,97,0.15);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(201,169,97,0.2);
+            flex-shrink: 0;
+        }
+
+        .eotm-stat {
+            padding: 1.1rem 1.5rem;
+            background: rgba(26,26,26,0.85);
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .eotm-stat + .eotm-stat {
+            border-left: 1px solid rgba(201,169,97,0.15);
+        }
+
+        .eotm-stat-value {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--gold);
+            line-height: 1;
+            margin-bottom: 0.25rem;
+        }
+
+        .eotm-stat-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #777;
+        }
+
+        .eotm-month-picker {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            position: absolute;
+            top: 1.25rem;
+            right: 1.5rem;
+            z-index: 2;
+        }
+
+        .eotm-month-picker select {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(201,169,97,0.3);
+            border-radius: 6px;
+            color: #aaa;
+            font-size: 0.78rem;
+            font-family: 'DM Sans', sans-serif;
+            padding: 0.3rem 0.6rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .eotm-month-picker select:focus {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .eotm-month-picker select option {
+            background: #2d2d2d;
+        }
+
+        .eotm-empty {
+            padding: 2.5rem;
+            text-align: center;
+        }
+
+        .eotm-empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .eotm-empty-text { color: #666; font-size: 0.9rem; }
+        .eotm-loading    { padding: 2.5rem; text-align: center; color: #666; font-size: 0.9rem; }
+
+        @media (max-width: 768px) {
+            .eotm-inner {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1.25rem;
+                /* extra top padding clears the absolutely-positioned month picker */
+                padding: 3.5rem 1.25rem 1.25rem;
+            }
+            .eotm-stats {
+                width: 100%;
+            }
+            .eotm-stat {
+                flex: 1;
+                padding: 0.9rem 0.5rem;
+                min-width: 0;
+            }
+            .eotm-stat-value { font-size: 1.3rem; }
+            .eotm-stat-label { font-size: 0.62rem; }
+            .eotm-name { font-size: 1.5rem; white-space: normal; }
+            .eotm-month-picker {
+                top: 0.75rem;
+                right: 0.75rem;
+                /* stack selects vertically on very narrow screens */
+                flex-wrap: wrap;
+                gap: 0.35rem;
+            }
+            .eotm-month-picker select {
+                font-size: 0.72rem;
+                padding: 0.25rem 0.45rem;
+            }
+        }
+
+
+        /* ── iOS: prevent auto-zoom on input focus (font-size must be ≥ 16px) ── */
+        @media (max-width: 768px) {
+            input[type="text"],
+            input[type="email"],
+            input[type="password"],
+            input[type="number"],
+            input[type="search"],
+            input[type="date"],
+            input[type="time"],
+            input[type="tel"],
+            select,
+            textarea {
+                font-size: 1rem !important;
+            }
+        }
+        /* ══════════════════════════════════════════
+           SMALL MOBILE — max 480px
+        ══════════════════════════════════════════ */
+        @media (max-width: 480px) {
+            .logo-text h1 {
+                font-size: 1.1rem;
+            }
+
+            .logo-subtitle {
+                display: none;
+            }
+
+            .page-title {
+                font-size: 1.5rem;
+            }
+
+            .camera-preview {
+                width: 170px;
+                height: 170px;
+            }
+
+            .camera-status-bar {
+                width: 170px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="nav-overlay" id="navOverlay"></div>
+
+    <header>
+        <div class="logo">
+            <div class="logo-text">
+                <h1>Books <span>&</span> Blooms</h1>
+            </div>
+        </div>
+        <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <div class="header-actions">
+            <div class="date-time">
+                <div class="date" id="currentDate"></div>
+                <div class="time" id="currentTime"></div>
+            </div>
+            <div class="user-info">
+                <div class="user-details">
+                    <h3>{{ full_name or 'Admin User' }}</h3>
+                    <p>{{ session.get('role')|capitalize }}</p>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('admin_logout') }}" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="logout-btn" title="Logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button></form>
+        </div>
+    </header>
+
+    <nav id="mainNav">
+        <ul>
+            {% if can_access('dashboard') %}<li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>{% endif %}
+            {% if can_access('sales') %}<li><a href="{{ url_for('admin_sales') }}">Sales</a></li>{% endif %}
+            {% if can_access('inventory') %}<li><a href="{{ url_for('inventory') }}">Inventory</a></li>{% endif %}
+            {% if can_access('staff_attendance') %}<li><a href="{{ url_for('staff_attendance') }}">Staff Attendance</a></li>{% endif %}
+            {% if can_access('product_management') %}<li><a href="{{ url_for('product_management') }}">Product Management</a></li>{% endif %}
+            {% if can_access('settings') %}<li><a href="{{ url_for('admin_settings') }}">Settings</a></li>{% endif %}
+            {% if can_access('employee_management') %}<li><a href="{{ url_for('employee_management') }}" class="active">Employee Management</a></li>{% endif %}
+            {% if can_access('payroll') %}<li><a href="{{ url_for('payroll') }}">Payroll</a></li>{% endif %}
+            {% if can_access('pos') %}<li><a href="{{ url_for('cashier_dashboard') }}" style="color:var(--gold);">POS Terminal</a></li>{% endif %}
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Employee Management</h1>
+                <p class="page-subtitle">Manage your team members and their access permissions</p>
+            </div>
+            {% if session.get('role') == 'admin' %}
+            <button class="btn-primary" onclick="openAddModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Add New Employee</button>
+            {% endif %}
+        </div>
+
+        <!-- ── Employee of the Month ───────────────────────────────────────── -->
+        <div class="eotm-section">
+            <div class="eotm-card" id="eotmCard">
+                <!-- Month picker -->
+                <div class="eotm-month-picker">
+                    <select id="eotmMonthSel" onchange="loadEotm()"></select>
+                    <select id="eotmYearSel"  onchange="loadEotm()"></select>
+                </div>
+                <!-- Content injected by JS -->
+                <div id="eotmBody" class="eotm-loading">Loading…</div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3 class="chart-title">All Employees</h3>
+                <div class="search-bar">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" placeholder="Search by name, role, or status…" id="searchInput">
+                    <button type="button" class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display:none;" title="Clear search">✕</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="employeeTable">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Email</th>
+                            <th>Hourly Rate</th>
+                            <th>Status</th>
+                            <th>Last Login</th>
+                            <th>Face ID</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in employees %}
+                        <tr>
+                            <td>
+                                <div class="employee-details">
+                                    <h4>{{ emp.full_name or '(name missing — please edit)' }}</h4>
+                                    <p>Joined: {{ emp.created_at }}</p>
+                                </div>
+                            </td>
+
+                            <td>{{ emp.username or '—' }}</td>
+
+                            <td>
+                                <span class="badge {{ emp.role }}">{{ emp.role|capitalize }}</span>
+                            </td>
+
+                            <td>
+                                {% if emp.email %}
+                                {{ emp.email }}
+                                {% else %}
+                                <span style="color:#ff9800;font-size:0.8rem;font-weight:700;display:inline-flex;align-items:center;gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>Update needed</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if emp.hourly_rate and emp.hourly_rate > 0 %}
+                                <span style="font-weight:700;color:#2a7a2a;">₱{{ '%.2f'|format(emp.hourly_rate|float)
+                                    }}/hr</span>
+                                {% else %}
+                                <span style="color:#ff9800;font-size:0.8rem;font-weight:700;display:inline-flex;align-items:center;gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>Not set</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {{ emp.employment_status }}">{{ emp.employment_status|capitalize
+                                    }}</span>
+                            </td>
+
+                            <td>
+                                {% if emp.last_login %}{{ emp.last_login }}{% else %}Never{% endif %}
+                            </td>
+
+                            <td>
+                                {% if emp.face_image_path %}
+                                <span class="face-id-badge">BB-{{ emp.created_at.strftime('%y%m') }}-{{ '%03d' | format(emp.employee_id) }}</span>
+                                {% else %}
+                                <span class="face-id-badge unregistered">No Face ID</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <div class="action-buttons">
+                                    <button type="button" class="btn-icon btn-edit js-edit-btn"
+                                        data-id="{{ emp.employee_id }}"
+                                        data-name="{{ emp.full_name | e }}"
+                                        data-username="{{ emp.username | e }}"
+                                        data-role="{{ emp.role | e }}"
+                                        data-contact="{{ emp.email | e }}"
+                                        data-status="{{ emp.employment_status | e }}"
+                                        data-hourly-rate="{{ emp.hourly_rate | float }}"
+                                        data-has-face="{{ 'true' if (emp.face_image_path or emp.face_model_path) else 'false' }}"
+                                        data-face-code="BB-{{ emp.created_at.strftime('%y%m') if emp.created_at else '0000' }}-{{ '%03d' | format(emp.employee_id) }}"
+                                        data-pin="{{ emp.pin_code_plain or '' }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                        <span>Edit</span>
+                                    </button>
+
+                                    {% if session.get('role') == 'admin' %}
+                                    <button type="button" class="btn-icon btn-delete js-disable-btn"
+                                        data-id="{{ emp.employee_id }}"
+                                        data-name="{{ emp.full_name | e }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                        <span>Disable</span>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Trash Panel ─────────────────────────────────────────────────────── -->
+    {% if session.get('role') == 'admin' %}
+    <div class="container" style="margin-top:1.5rem;">
+        <div class="chart-card" id="trashPanel">
+            <div class="chart-header" style="cursor:pointer;" onclick="toggleTrash()">
+                <h3 class="chart-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>Trash <span id="trashCount"
+                        style="font-size:0.85rem;color:#aaa;font-weight:400;"></span></h3>
+                <span id="trashChevron" style="font-size:1.1rem;color:#aaa;">▼</span>
+            </div>
+            <div id="trashBody" style="display:none; padding:0 1rem 1rem;">
+                <p style="font-size:0.82rem;color:#888;margin:0.5rem 0 1rem;">
+                    Disabled employees are permanently deleted after 24 hours. You can restore them before then.
+                </p>
+                <div id="trashList">
+                    <p style="color:#aaa;font-size:0.9rem;">Loading…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal -->
+    <div class="modal" id="employeeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Employee</h2>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+
+            <div class="modal-body">
+                <form id="employeeForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="fullName">Full Name *</label>
+                            <input type="text" id="fullName" required placeholder="Enter full name">
+                        </div>
+
+                        <!-- changed id to avoid conflict -->
+                        <div class="form-group">
+                            <label for="empUsername">Username *</label>
+                            <input type="text" id="empUsername" required placeholder="Enter username">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="empPassword">Password *</label>
+                            <input type="password" id="empPassword" required placeholder="Enter password">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="empConfirmPassword">Confirm Password *</label>
+                            <input type="password" id="empConfirmPassword" required placeholder="Confirm password">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="empRole">Role *</label>
+                            <select id="empRole" required>
+                                <option value="">Select role</option>
+                                <option value="manager">Manager</option>
+                                <option value="cashier">Cashier</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="empContact">Email Address *</label>
+                            <input type="email" id="empContact" required placeholder="employee@gmail.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="empHourlyRate">Hourly Rate (₱)</label>
+                            <input type="number" id="empHourlyRate" min="0" step="0.50" placeholder="e.g. 60.00"
+                                value="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="empPin" style="display:flex;align-items:center;justify-content:space-between;">
+                                <span>PIN Code (4–6 Digits) *</span>
+                                <span style="font-size:0.75rem;font-weight:600;color:var(--gold);">Clock-In Fallback</span>
+                            </label>
+                            <div style="position:relative;display:flex;align-items:center;">
+                                <input type="password" id="empPin" name="pin_code" required
+                                    pattern="[0-9]{4,6}" maxlength="6" inputmode="numeric"
+                                    placeholder="Enter 4-6 digit PIN"
+                                    style="padding-right:42px;letter-spacing:3px;font-family:monospace;font-size:1rem;"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6);">
+                                <button type="button" id="togglePinVisibilityBtn" onclick="togglePinVisibility()"
+                                    title="View / Hide PIN"
+                                    style="position:absolute;right:8px;background:none;border:none;cursor:pointer;color:#888;padding:6px;display:flex;align-items:center;justify-content:center;">
+                                    <svg id="pinEyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </button>
+                            </div>
+                            <small style="font-size:0.75rem;color:#888;display:block;margin-top:4px;">Fallback authentication if facial recognition cannot identify the employee.</small>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label for="empStatus">Account Status *</label>
+                            <select id="empStatus" required>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+
+                        <div class="face-capture-section">
+                            <h3 style="margin-bottom:0.4rem;display:flex;align-items:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>Face ID Registration</h3>
+
+                            <!-- LOCKED STATE (When editing employee who already has registered Face ID) -->
+                            <div id="faceLockedState" class="face-locked-card" style="display:none;">
+                                <div class="face-locked-icon-wrap">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                        <path d="m9 12 2 2 4-4"/>
+                                    </svg>
+                                </div>
+                                <div class="face-locked-badges">
+                                    <span class="badge-face-registered">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Face ID Already Registered
+                                    </span>
+                                    <span class="badge-face-code" id="faceLockedCodeBadge">BB-0000-000</span>
+                                </div>
+                                <p class="face-locked-desc">
+                                    This employee already has an active biometric Face ID on file. The camera scanner is locked to prevent accidental overwrite.
+                                </p>
+                                <button type="button" class="btn-reregister-face" id="btnUnlockFaceScanner" onclick="unlockFaceScanner()">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                        <circle cx="12" cy="13" r="4"/>
+                                    </svg>
+                                    Re-register Face ID
+                                </button>
+                            </div>
+
+                            <!-- ACTIVE SCANNER STATE (Default for new employee or when unlocked) -->
+                            <div id="faceScannerState">
+                                <div id="faceReRegisterNotice" style="display:none;margin-bottom:1rem;background:rgba(201,169,97,0.12);border:1px solid var(--gold);border-radius:8px;padding:0.6rem 0.9rem;font-size:0.83rem;color:var(--gold);align-items:center;justify-content:space-between;gap:8px;text-align:left;">
+                                    <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Scanner unlocked. Completing all 4 angles will overwrite the current Face ID.</span>
+                                    <button type="button" onclick="relockFaceScanner()" style="background:none;border:none;color:#888;cursor:pointer;font-size:0.78rem;text-decoration:underline;white-space:nowrap;">Keep Existing</button>
+                                </div>
+
+                                <p style="color:#888;font-size:0.83rem;margin-bottom:1rem;">
+                                    Scan the employee's face to generate their unique Face ID number for clock-in recognition.
+                                </p>
+
+                                <!-- Progress bar -->
+                                <div
+                                    style="width:100%;background:#e0e0e0;border-radius:8px;height:8px;margin-bottom:0.75rem;overflow:hidden;">
+                                    <div id="captureProgress"
+                                        style="height:100%;background:var(--gold);border-radius:8px;width:0%;transition:width 0.4s ease;">
+                                    </div>
+                                </div>
+
+                                <!-- Motion Step Badges Tracker -->
+                                <div class="face-steps-tracker" id="faceStepsTracker">
+                                    <div class="face-step-pill active" id="pill-step-1">
+                                        <span class="step-dot">1</span>
+                                        <span class="step-text">Steady</span>
+                                    </div>
+                                    <div class="face-step-pill" id="pill-step-2">
+                                        <span class="step-dot">2</span>
+                                        <span class="step-text">Tilt Up ↗</span>
+                                    </div>
+                                    <div class="face-step-pill" id="pill-step-3">
+                                        <span class="step-dot">3</span>
+                                        <span class="step-text">Tilt Down ↘</span>
+                                    </div>
+                                    <div class="face-step-pill" id="pill-step-4">
+                                        <span class="step-dot">4</span>
+                                        <span class="step-text">Center</span>
+                                    </div>
+                                </div>
+
+                                <!-- Step instruction -->
+                                <p id="faceInstruction"
+                                    style="color:var(--gold);font-weight:700;font-size:0.9rem;min-height:1.4em;">
+                                    Step 1 of 4: Look straight ahead and hold steady
+                                </p>
+
+                                <div class="camera-preview-wrapper">
+                                    <div class="camera-preview">
+                                        <video id="video" autoplay playsinline></video>
+                                        <canvas id="canvas" style="display:none;"></canvas>
+                                        <div class="face-guide" id="faceGuide">
+                                            <!-- In-circle motion guide arrow & cue -->
+                                            <div class="motion-guide-arrow anim-pulse" id="motionGuideArrow">
+                                                <span id="motionIcon" class="motion-icon">⊙</span>
+                                                <span id="motionText" class="motion-text">Steady</span>
+                                            </div>
+                                        </div>
+                                        <!-- Frame counter stays inside circle (top-right corner, never over the face) -->
+                                        <div id="frameCounter" class="camera-frame-counter">0 / 4</div>
+                                    </div>
+                                    <!-- Status label now lives BELOW the circle, never obscuring the face -->
+                                    <div id="face-status" class="camera-status-bar">Align your face</div>
+                                </div>
+
+                                <!-- Status line -->
+                                <p id="captureStatus"
+                                    style="margin-top:10px;font-weight:600;font-size:0.88rem;min-height:1.3em;"></p>
+
+                                <!-- Retake button -->
+                                <button type="button" id="retakeBtn" onclick="retakeCapture()" style="display:none;margin-top:0.5rem;
+                                       background:var(--black);color:var(--gold);
+                                       border:2px solid var(--gold);padding:0.5rem 1.25rem;
+                                       border-radius:8px;font-weight:700;cursor:pointer;font-size:0.83rem;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg> Retake Face ID
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn-save" onclick="saveEmployee()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Save Employee
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ══════════════════════════════════════════════════════════════════════════
+        //  DATE / TIME
+        // ══════════════════════════════════════════════════════════════════════════
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('currentDate').textContent =
+                now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('currentTime').textContent =
+                now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  TABLE SEARCH
+        // ══════════════════════════════════════════════════════════════════════════
+        const searchInputEl = document.getElementById('searchInput');
+        const searchClearBtnEl = document.getElementById('searchClearBtn');
+
+        function filterEmployees() {
+            const term = (searchInputEl?.value || '').toLowerCase().trim();
+            if (searchClearBtnEl) {
+                searchClearBtnEl.style.display = term ? 'flex' : 'none';
+            }
+            document.querySelectorAll('#employeeTable tbody tr').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+            });
+        }
+
+        if (searchInputEl) {
+            searchInputEl.addEventListener('input', filterEmployees);
+        }
+
+        function clearSearch() {
+            if (searchInputEl) {
+                searchInputEl.value = '';
+                filterEmployees();
+                searchInputEl.focus();
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  DELEGATED CLICK HANDLERS — Edit & Disable buttons
+        //  Using event delegation on the table body ensures clicks always fire,
+        //  even when the target is the inner <svg> or <span> child element.
+        // ══════════════════════════════════════════════════════════════════════════
+        document.getElementById('employeeTable').addEventListener('click', function (e) {
+            const editBtn   = e.target.closest('.js-edit-btn');
+            const disableBtn = e.target.closest('.js-disable-btn');
+
+            if (editBtn) {
+                const d = editBtn.dataset;
+                openEditModal(
+                    d.id,
+                    d.name    || '',
+                    d.username || '',
+                    d.role    || '',
+                    d.contact || '',
+                    d.status  || '',
+                    d.hourlyRate || 0,
+                    d.hasFace === 'true',
+                    d.faceCode || '',
+                    d.pin || ''
+                );
+                return;
+            }
+
+            if (disableBtn) {
+                const d = disableBtn.dataset;
+                confirmDelete(d.id, d.name || '');
+            }
+        });
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  CAMERA
+        // ══════════════════════════════════════════════════════════════════════════
+        let videoStream = null;
+        let captureInterval = null;
+
+        async function startCamera() {
+            // Errors are intentionally NOT caught here — callers handle them so they
+            // can still open the modal even when camera is unavailable.
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user',
+                    advanced: [{ brightness: 100 }, { exposureMode: 'continuous' }]
+                },
+                audio: false
+            });
+            const video = document.getElementById('video');
+            video.srcObject = videoStream;
+
+            // Wait until video has real dimensions, with a 10s timeout so it never hangs.
+            await Promise.race([
+                new Promise((resolve, reject) => {
+                    let resolved = false;
+                    const done = () => { if (!resolved) { resolved = true; resolve(); } };
+                    video.onloadedmetadata = () => video.play().then(done).catch(reject);
+                    video.oncanplay = () => { if (video.videoWidth > 0) done(); };
+                    video.onerror = reject;
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Camera timed out')), 10000))
+            ]);
+        }
+
+        function stopCamera() {
+            if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+            clearCaptureLoop();
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  GUIDED HEAD-MOTION SEQUENCE SPECIFICATION
+        // ══════════════════════════════════════════════════════════════════════════
+        const MOTION_STEPS = [
+            {
+                step: 1,
+                action: 'steady',
+                title: 'Step 1 of 4: Steady Position',
+                instruction: 'Look straight ahead and hold steady',
+                subtext: 'Align your face in the center of the circle',
+                icon: '⊙',
+                motionClass: 'anim-pulse',
+                badgeText: 'Steady'
+            },
+            {
+                step: 2,
+                action: 'tilt_up',
+                title: 'Step 2 of 4: Tilt Upward',
+                instruction: 'Slowly tilt your head slightly upward ↗',
+                subtext: 'Tilt chin up slightly while facing camera',
+                icon: '▲',
+                motionClass: 'anim-up',
+                badgeText: 'Tilt Up'
+            },
+            {
+                step: 3,
+                action: 'tilt_down',
+                title: 'Step 3 of 4: Tilt Downward',
+                instruction: 'Slowly tilt your head slightly downward ↘',
+                subtext: 'Tilt chin down slightly while facing camera',
+                icon: '▼',
+                motionClass: 'anim-down',
+                badgeText: 'Tilt Down'
+            },
+            {
+                step: 4,
+                action: 'steady_return',
+                title: 'Step 4 of 4: Return to Center',
+                instruction: 'Return head to center and hold steady',
+                subtext: 'Look straight ahead to complete scan',
+                icon: '⊙',
+                motionClass: 'anim-pulse',
+                badgeText: 'Center'
+            }
+        ];
+        const TARGET_FRAMES = MOTION_STEPS.length;
+        let regToken = null;         // unique ID for this registration session
+        let capturedCount = 0;       // frames accepted by the backend
+        let currentStepIdx = 0;      // current active step index (0 to 3)
+        let capturingActive = false; // flag to control sequence loop
+        let isCapturing = false;     // concurrency guard
+
+        function genToken() {
+            return 'reg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        }
+
+        function updateStepUI(stepIdx) {
+            const isCompleted = capturedCount >= TARGET_FRAMES;
+
+            // Update top progress pills
+            for (let i = 0; i < TARGET_FRAMES; i++) {
+                const pill = document.getElementById('pill-step-' + (i + 1));
+                if (!pill) continue;
+                const dot = pill.querySelector('.step-dot');
+                if (i < capturedCount) {
+                    pill.className = 'face-step-pill completed';
+                    if (dot) dot.textContent = '✓';
+                } else if (i === stepIdx && !isCompleted) {
+                    pill.className = 'face-step-pill active';
+                    if (dot) dot.textContent = (i + 1);
+                } else {
+                    pill.className = 'face-step-pill';
+                    if (dot) dot.textContent = (i + 1);
+                }
+            }
+
+            // Update in-circle motion arrow & label
+            const arrowEl = document.getElementById('motionGuideArrow');
+            const iconEl = document.getElementById('motionIcon');
+            const textEl = document.getElementById('motionText');
+
+            if (isCompleted) {
+                if (arrowEl) arrowEl.className = 'motion-guide-arrow anim-pulse';
+                if (iconEl) { iconEl.textContent = '✓'; iconEl.style.color = '#27ae60'; }
+                if (textEl) textEl.textContent = 'Complete';
+                document.getElementById('faceInstruction').textContent = 'Face scan complete – multi-angle Face ID ready to save!';
+                updateUI('✓ Scan complete');
+                return;
+            }
+
+            const cur = MOTION_STEPS[stepIdx] || MOTION_STEPS[0];
+            if (arrowEl) arrowEl.className = 'motion-guide-arrow ' + cur.motionClass;
+            if (iconEl) { iconEl.textContent = cur.icon; iconEl.style.color = 'var(--gold)'; }
+            if (textEl) textEl.textContent = cur.badgeText;
+            document.getElementById('faceInstruction').textContent = cur.title + ': ' + cur.instruction;
+        }
+
+        function resetCaptureState() {
+            capturedCount = 0;
+            currentStepIdx = 0;
+            isCapturing = false;
+            capturingActive = false;
+            regToken = genToken();
+            updateProgress(0);
+            updateUI('Align your face');
+            document.getElementById('captureStatus').textContent = '';
+            document.getElementById('frameCounter').textContent = '0 / ' + TARGET_FRAMES;
+            document.getElementById('retakeBtn').style.display = 'none';
+            updateStepUI(0);
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  GUIDED AUTO CAPTURE LOOP
+        // ══════════════════════════════════════════════════════════════════════════
+        function startAutoCapture() {
+            resetCaptureState();
+            clearCaptureLoop();
+            capturingActive = true;
+            // Allow 1.2s initial settling time for the user to look straight ahead
+            schedulNextCapture(1200);
+        }
+
+        function clearCaptureLoop() {
+            capturingActive = false;
+            if (captureInterval) { clearTimeout(captureInterval); captureInterval = null; }
+        }
+
+        function schedulNextCapture(delayMs = 1800) {
+            if (!capturingActive) return;
+            if (capturedCount >= TARGET_FRAMES) { capturingActive = false; return; }
+
+            captureInterval = setTimeout(async () => {
+                if (!capturingActive) return;
+                await captureOneFrame();
+                // If sequence is still active, schedule next frame with sufficient time
+                // to allow the employee to transition their head angle comfortably
+                if (capturingActive && capturedCount < TARGET_FRAMES) {
+                    schedulNextCapture(1800);
+                }
+            }, delayMs);
+        }
+
+        async function captureOneFrame() {
+            if (isCapturing || capturedCount >= TARGET_FRAMES) return;
+            isCapturing = true;
+
+            const stepObj = MOTION_STEPS[currentStepIdx] || MOTION_STEPS[0];
+
+            try {
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
+
+                // Guard: video must have real dimensions before capture
+                if (!video.videoWidth || !video.videoHeight) return;
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+
+                const imageData = canvas.toDataURL('image/jpeg', 0.92);
+
+                const res = await fetch('/register_face_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: regToken,
+                        image: imageData,
+                        step: stepObj.step,
+                        action: stepObj.action
+                    })
+                });
+                const data = await res.json();
+
+                updateUI(data.message);
+
+                if (data.success) {
+                    // Flash guide green for immediate tactile visual reinforcement
+                    const guide = document.getElementById('faceGuide');
+                    if (guide) {
+                        guide.classList.add('flash-success');
+                        setTimeout(() => guide.classList.remove('flash-success'), 450);
+                    }
+
+                    capturedCount = data.captured;
+                    currentStepIdx = Math.min(capturedCount, TARGET_FRAMES - 1);
+                    updateProgress((capturedCount / TARGET_FRAMES) * 100);
+                    document.getElementById('frameCounter').textContent = capturedCount + ' / ' + TARGET_FRAMES;
+                    document.getElementById('captureStatus').textContent = data.message;
+
+                    if (capturedCount >= TARGET_FRAMES) {
+                        clearCaptureLoop();
+                        capturingActive = false;
+                        updateStepUI(currentStepIdx);
+                        document.getElementById('retakeBtn').style.display = 'inline-block';
+                    } else {
+                        // Immediately show instructions and motion guidance for the next pose
+                        updateStepUI(currentStepIdx);
+                    }
+                } else {
+                    // Backend rejected frame (e.g. angle too extreme or face lost)
+                    document.getElementById('faceInstruction').textContent = data.message;
+                }
+            } catch {
+                document.getElementById('faceInstruction').textContent = 'Server busy – retrying…';
+            } finally {
+                isCapturing = false;
+            }
+        }
+
+        function retakeCapture() {
+            startAutoCapture();
+        }
+
+        function updateProgress(pct) {
+            document.getElementById('captureProgress').style.width = pct + '%';
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  MODAL OPEN / CLOSE & FACE LOCK LOGIC
+        // ══════════════════════════════════════════════════════════════════════════
+        let editingEmployeeHasFace = false;
+        let editingEmployeeFaceCode = '';
+
+        async function openAddModal() {
+            editingEmployeeHasFace = false;
+            editingEmployeeFaceCode = '';
+            document.getElementById('faceLockedState').style.display = 'none';
+            document.getElementById('faceScannerState').style.display = 'block';
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'none';
+
+            document.getElementById('modalTitle').textContent = 'Add New Employee';
+            // Show & require password fields for Add mode
+            const pwGroup = document.getElementById('empPassword').closest('.form-group');
+            const cpwGroup = document.getElementById('empConfirmPassword').closest('.form-group');
+            if (pwGroup) pwGroup.style.display = '';
+            if (cpwGroup) cpwGroup.style.display = '';
+            document.getElementById('empPassword').setAttribute('required', '');
+            document.getElementById('empConfirmPassword').setAttribute('required', '');
+            document.getElementById('empPassword').value = '';
+            document.getElementById('empConfirmPassword').value = '';
+            const pinEl = document.getElementById('empPin');
+            if (pinEl) {
+                pinEl.value = '';
+                pinEl.type = 'password';
+                pinEl.setAttribute('required', '');
+            }
+            const pinEye = document.getElementById('pinEyeIcon');
+            if (pinEye) {
+                pinEye.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            }
+            document.getElementById('employeeForm').reset();
+            document.getElementById('employeeForm').removeAttribute('data-id');
+            document.getElementById('employeeModal').classList.add('active');
+
+            try {
+                await startCamera();
+                updateUI('Camera warming up…');
+                document.getElementById('faceInstruction').textContent = 'Camera warming up…';
+                await new Promise(r => setTimeout(r, 1500));
+                startAutoCapture();
+            } catch (e) {
+                updateUI('Camera unavailable');
+                document.getElementById('faceInstruction').textContent = 'Camera unavailable — please allow camera access and retry.';
+                console.warn('[openAddModal] camera error:', e);
+            }
+        }
+
+        async function openEditModal(id, name, username, role, contact, status, hourlyRate, hasFace, faceCode, pinCode) {
+            editingEmployeeHasFace = Boolean(hasFace);
+            editingEmployeeFaceCode = faceCode || '';
+
+            document.getElementById('modalTitle').textContent = 'Edit Employee';
+            // Hide & un-require password fields — password change not supported in edit mode
+            const pwGroup = document.getElementById('empPassword').closest('.form-group');
+            const cpwGroup = document.getElementById('empConfirmPassword').closest('.form-group');
+            if (pwGroup) pwGroup.style.display = 'none';
+            if (cpwGroup) cpwGroup.style.display = 'none';
+            document.getElementById('empPassword').removeAttribute('required');
+            document.getElementById('empConfirmPassword').removeAttribute('required');
+
+            // Populate PIN field for admin view/edit
+            const pinEl = document.getElementById('empPin');
+            if (pinEl) {
+                pinEl.value = pinCode || '';
+                pinEl.type = 'password';
+                pinEl.removeAttribute('required');
+            }
+            const pinEye = document.getElementById('pinEyeIcon');
+            if (pinEye) {
+                pinEye.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            }
+
+            document.getElementById('fullName').value = name;
+            document.getElementById('empUsername').value = username;
+            document.getElementById('empRole').value = role;
+            document.getElementById('empContact').value = contact;
+            document.getElementById('empStatus').value = status;
+            if (document.getElementById('empHourlyRate'))
+                document.getElementById('empHourlyRate').value = parseFloat(hourlyRate || 0).toFixed(2);
+            document.getElementById('employeeForm').setAttribute('data-id', id);
+
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'none';
+
+            // ── CHECK IF EMPLOYEE HAS AN EXISTING REGISTERED FACE ID ──────────
+            if (editingEmployeeHasFace) {
+                // Lock and disable camera scanner by default
+                stopCamera();
+                resetCaptureState();
+                document.getElementById('faceLockedState').style.display = 'flex';
+                document.getElementById('faceScannerState').style.display = 'none';
+                const codeBadge = document.getElementById('faceLockedCodeBadge');
+                if (codeBadge) {
+                    codeBadge.textContent = editingEmployeeFaceCode || 'Registered';
+                    codeBadge.style.display = editingEmployeeFaceCode ? 'inline-flex' : 'none';
+                }
+                document.getElementById('employeeModal').classList.add('active');
+            } else {
+                // No Face ID registered yet — show camera scanner so admin can register one
+                document.getElementById('faceLockedState').style.display = 'none';
+                document.getElementById('faceScannerState').style.display = 'block';
+                document.getElementById('employeeModal').classList.add('active');
+                try {
+                    await startCamera();
+                    updateUI('Camera warming up…');
+                    document.getElementById('faceInstruction').textContent = 'Camera warming up…';
+                    await new Promise(r => setTimeout(r, 1500));
+                    startAutoCapture();
+                } catch (e) {
+                    updateUI('Camera unavailable');
+                    document.getElementById('faceInstruction').textContent = 'Camera unavailable — you can still edit details and save without updating Face ID.';
+                    console.warn('[openEditModal] camera error:', e);
+                }
+            }
+        }
+
+        function togglePinVisibility() {
+            const pinInput = document.getElementById('empPin');
+            const eyeIcon = document.getElementById('pinEyeIcon');
+            if (!pinInput) return;
+            if (pinInput.type === 'password') {
+                pinInput.type = 'text';
+                if (eyeIcon) {
+                    eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+                }
+            } else {
+                pinInput.type = 'password';
+                if (eyeIcon) {
+                    eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+                }
+            }
+        }
+
+        async function unlockFaceScanner() {
+            // Explicitly unlock camera scanner to re-register / overwrite Face ID
+            document.getElementById('faceLockedState').style.display = 'none';
+            document.getElementById('faceScannerState').style.display = 'block';
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'flex';
+
+            resetCaptureState();
+            try {
+                await startCamera();
+                updateUI('Camera warming up…');
+                document.getElementById('faceInstruction').textContent = 'Camera warming up…';
+                await new Promise(r => setTimeout(r, 1500));
+                startAutoCapture();
+            } catch (e) {
+                updateUI('Camera unavailable');
+                document.getElementById('faceInstruction').textContent = 'Camera unavailable — please allow camera access and retry.';
+                console.warn('[unlockFaceScanner] camera error:', e);
+            }
+        }
+
+        function relockFaceScanner() {
+            // Relock camera scanner and keep existing registered Face ID
+            stopCamera();
+            resetCaptureState();
+            document.getElementById('faceScannerState').style.display = 'none';
+            document.getElementById('faceLockedState').style.display = 'flex';
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'none';
+        }
+
+        function closeModal() {
+            document.getElementById('employeeModal').classList.remove('active');
+            stopCamera();
+            resetCaptureState();
+            document.getElementById('captureStatus').textContent = '';
+            document.getElementById('faceLockedState').style.display = 'none';
+            document.getElementById('faceScannerState').style.display = 'block';
+            const pinEl = document.getElementById('empPin');
+            if (pinEl) pinEl.type = 'password';
+            const pinEye = document.getElementById('pinEyeIcon');
+            if (pinEye) {
+                pinEye.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            }
+            const reNotice = document.getElementById('faceReRegisterNotice');
+            if (reNotice) reNotice.style.display = 'none';
+        }
+
+        document.getElementById('employeeModal').addEventListener('click', function (e) {
+            if (e.target === this) closeModal();
+        });
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  SAVE EMPLOYEE
+        // ══════════════════════════════════════════════════════════════════════════
+        async function saveEmployee() {
+            const id = document.getElementById('employeeForm').getAttribute('data-id');
+            const fullName = document.getElementById('fullName').value.trim();
+            const username = document.getElementById('empUsername').value.trim();
+            const role = document.getElementById('empRole').value;
+            const contact = document.getElementById('empContact').value.trim();
+            const status = document.getElementById('empStatus').value;
+            const hourlyRate = parseFloat(document.getElementById('empHourlyRate')?.value || 0) || 0;
+
+            if (!fullName || !username || !role || !contact) {
+                alert('Please fill in all required fields.'); return;
+            }
+
+            // ── ADD MODE ──────────────────────────────────────────────────────────
+            if (!id) {
+                const password = document.getElementById('empPassword').value;
+                const confirmPassword = document.getElementById('empConfirmPassword').value;
+                const pinCode = document.getElementById('empPin')?.value.trim() || '';
+
+                if (password !== confirmPassword) { alert('Passwords do not match!'); return; }
+                if (!pinCode) { alert('PIN Code is required.'); return; }
+                if (!/^\d{4,6}$/.test(pinCode)) { alert('PIN Code must be between 4 and 6 numeric digits.'); return; }
+                if (capturedCount < TARGET_FRAMES) {
+                    alert(`Face registration incomplete (${capturedCount}/${TARGET_FRAMES} angles). Please complete all 4 guided head-motion steps (Steady, Tilt Up, Tilt Down, Center) before saving.`);
+                    return;
+                }
+
+                // Capture one unmirrored frame as the initial face sample for /add_employee.
+                // Backend calls cv2.flip() itself — do NOT mirror here (double-flip = wrong orientation).
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                // Draw WITHOUT mirroring
+                canvas.getContext('2d').drawImage(video, 0, 0);
+
+                await new Promise(resolve => {
+                    canvas.toBlob(async (blob) => {
+                        const formData = new FormData();
+                        formData.append('full_name', fullName);
+                        formData.append('username', username);
+                        formData.append('password', password);
+                        formData.append('pin_code', pinCode);
+                        formData.append('role', role);
+                        formData.append('contact', contact);
+                        formData.append('status', status);
+                        formData.append('hourly_rate', hourlyRate);
+                        formData.append('face_images[]', blob, 'face_0.jpg');
+
+                        const res1 = await fetch('/add_employee', { method: 'POST', body: formData });
+                        const data1 = await res1.json();
+
+                        if (!data1.success) {
+                            alert('Error: ' + data1.message);
+                            resolve();
+                            return;
+                        }
+
+                        const newEmpId = data1.employee_id;
+
+                        // ── Commit the multi-frame registration session ───────────────
+                        if (newEmpId && regToken) {
+                            try {
+                                const res2 = await fetch('/commit_face_registration', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ token: regToken, employee_id: newEmpId })
+                                });
+                                const data2 = await res2.json();
+                                if (!data2.success) {
+                                    console.warn('[commit_face_registration]', data2.message);
+                                }
+                            } catch (e) {
+                                console.warn('[commit_face_registration] network error:', e);
+                            }
+                        }
+
+                        updateUI('Saved!');
+                        const _yymm = data1.created_yymm || (String(new Date().getFullYear()).slice(2) + String(new Date().getMonth() + 1).padStart(2, '0'));
+                        alert('Employee registered! Face ID number assigned: BB-' + _yymm + '-' + String(newEmpId).padStart(3, '0'));
+                        location.reload();
+                        resolve();
+                    }, 'image/jpeg', 0.92);
+                });
+
+                // ── EDIT MODE ─────────────────────────────────────────────────────────
+            } else {
+                const pinCode = document.getElementById('empPin')?.value.trim() || '';
+                if (pinCode && !/^\d{4,6}$/.test(pinCode)) {
+                    alert('PIN Code must be between 4 and 6 numeric digits.');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('full_name', fullName);
+                formData.append('username', username);
+                formData.append('role', role);
+                formData.append('contact', contact);
+                formData.append('status', status);
+                formData.append('hourly_rate', hourlyRate);
+                if (pinCode) {
+                    formData.append('pin_code', pinCode);
+                }
+
+                // If re-registration was started but not finished, confirm whether to keep existing Face ID
+                if (capturedCount > 0 && capturedCount < TARGET_FRAMES) {
+                    const confirmSave = confirm(
+                        `Face re-registration is incomplete (${capturedCount}/${TARGET_FRAMES} angles completed).\n\n` +
+                        `Click OK to save employee profile details while keeping their current Face ID, or Cancel to finish scanning.`
+                    );
+                    if (!confirmSave) return;
+                }
+
+                // If new frames were captured during edit, append one unmirrored canvas frame
+                if (capturedCount >= TARGET_FRAMES) {
+                    const video = document.getElementById('video');
+                    const canvas = document.getElementById('canvas');
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    canvas.getContext('2d').drawImage(video, 0, 0);  // no mirror — backend flips
+                    await new Promise(resolve => {
+                        canvas.toBlob(blob => {
+                            formData.append('face_images[]', blob, 'face_0.jpg');
+                            resolve();
+                        }, 'image/jpeg', 0.92);
+                    });
+                }
+
+                const res = await fetch('/update_employee/' + id, { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    // If new face frames were captured, commit the multi-frame averaged
+                    // embedding from the regToken session — much more accurate than a
+                    // single frame that update_employee received above.
+                    if (capturedCount >= TARGET_FRAMES && regToken) {
+                        try {
+                            const commitRes = await fetch('/commit_face_registration', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ token: regToken, employee_id: id })
+                            });
+                            const commitData = await commitRes.json();
+                            if (!commitData.success) {
+                                console.warn('[commit_face_registration edit]', commitData.message);
+                            }
+                        } catch (e) {
+                            console.warn('[commit_face_registration edit] network error:', e);
+                        }
+                    }
+                    // Invalidate the in-memory embedding cache so the next verification
+                    // loads the freshly-persisted averaged embedding from DB, not a stale one.
+                    await fetch('/invalidate_face_cache/' + id, { method: 'POST' });
+                    alert('Employee updated successfully.');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  DELETE / DISABLE
+        // ══════════════════════════════════════════════════════════════════════════
+        async function confirmDelete(id, name) {
+            if (!confirm(`Move "${name}" to trash?\n\nThey will be disabled immediately and permanently deleted in 24 hours.\nYou can restore them from the Trash section before then.`)) return;
+            const res = await fetch('/delete_employee/' + id, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                alert(`\u2705 "${name}" moved to trash.\nWill be permanently deleted at: ${data.delete_at}`);
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  TRASH PANEL
+        // ══════════════════════════════════════════════════════════════════════════
+        let trashOpen = false;
+        let trashCountdownInterval = null;
+        let trashData = [];
+
+        function toggleTrash() {
+            trashOpen = !trashOpen;
+            document.getElementById('trashBody').style.display = trashOpen ? 'block' : 'none';
+            document.getElementById('trashChevron').textContent = trashOpen ? '\u25b2' : '\u25bc';
+            if (trashOpen) loadTrash();
+        }
+
+        async function loadTrash() {
+            try {
+                const res = await fetch('/api/trash');
+                const data = await res.json();
+                if (!data.success) return;
+                trashData = data.trash;
+                const countEl = document.getElementById('trashCount');
+                if (countEl) countEl.textContent = trashData.length ? `(${trashData.length})` : '';
+                renderTrash();
+                if (trashCountdownInterval) clearInterval(trashCountdownInterval);
+                if (trashData.length) {
+                    trashCountdownInterval = setInterval(() => renderTrash(), 1000);
+                }
+            } catch (e) {
+                document.getElementById('trashList').innerHTML =
+                    '<p style="color:#e74c3c;font-size:0.85rem;">Failed to load trash.</p>';
+            }
+        }
+
+        function renderTrash() {
+            const list = document.getElementById('trashList');
+            if (!list) return;
+            if (!trashData.length) {
+                list.innerHTML = '<div class="trash-empty">\u{1f5d1}\ufe0f Trash is empty</div>';
+                if (trashCountdownInterval) { clearInterval(trashCountdownInterval); trashCountdownInterval = null; }
+                return;
+            }
+            const now = Date.now();
+            list.innerHTML = trashData.map(row => {
+                const deleteAt = new Date(row.delete_at.replace(' ', 'T')).getTime();
+                const secsLeft = Math.max(0, Math.floor((deleteAt - now) / 1000));
+                const h = Math.floor(secsLeft / 3600);
+                const m = Math.floor((secsLeft % 3600) / 60);
+                const s = secsLeft % 60;
+                const countdownStr = secsLeft <= 0
+                    ? '\u23f0 Deleting soon\u2026'
+                    : `\u23f3 ${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+                const urgencyClass = secsLeft < 3600 ? 'urgent' : secsLeft < 10800 ? 'warning' : 'safe';
+                return `
+        <div class="trash-row" id="trash-row-${row.employee_id}">
+            <div class="trash-info">
+                <div class="trash-name">${escHtml(row.full_name)}</div>
+                <div class="trash-role">${escHtml(row.role)} &middot; Disabled ${formatRelative(row.disabled_at)}</div>
+            </div>
+            <span class="trash-countdown ${urgencyClass}">${countdownStr}</span>
+            <button class="btn-restore" onclick="restoreEmployee(${row.employee_id}, '${escHtml(row.full_name)}')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+                Restore
+            </button>
+        </div>`;
+            }).join('');
+        }
+
+        async function restoreEmployee(id, name) {
+            if (!confirm(`Restore "${name}" to active status?`)) return;
+            const res = await fetch('/restore_employee/' + id, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                trashData = trashData.filter(r => r.employee_id !== id);
+                const countEl = document.getElementById('trashCount');
+                if (countEl) countEl.textContent = trashData.length ? `(${trashData.length})` : '';
+                renderTrash();
+                alert(`\u2705 "${name}" has been restored.`);
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        }
+
+        function escHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function formatRelative(dtStr) {
+            if (!dtStr) return '';
+            const diff = Math.floor((Date.now() - new Date(dtStr.replace(' ', 'T')).getTime()) / 60000);
+            if (diff < 1) return 'just now';
+            if (diff < 60) return `${diff}m ago`;
+            const h = Math.floor(diff / 60);
+            return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
+        }
+
+        // Auto-load trash count badge on page load (panel stays collapsed)
+        (async () => {
+            try {
+                const res = await fetch('/api/trash');
+                const data = await res.json();
+                if (data.success && data.trash.length) {
+                    trashData = data.trash;
+                    const countEl = document.getElementById('trashCount');
+                    if (countEl) countEl.textContent = `(${data.trash.length})`;
+                }
+            } catch { }
+        })();
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  EMPLOYEE OF THE MONTH
+        // ══════════════════════════════════════════════════════════════════════════
+        (function initEotmPicker() {
+            const monthSel = document.getElementById('eotmMonthSel');
+            const yearSel  = document.getElementById('eotmYearSel');
+            const today    = new Date();
+            const months   = ['January','February','March','April','May','June',
+                              'July','August','September','October','November','December'];
+
+            months.forEach((m, i) => {
+                const opt = document.createElement('option');
+                opt.value = i + 1;
+                opt.textContent = m;
+                if (i + 1 === today.getMonth() + 1) opt.selected = true;
+                monthSel.appendChild(opt);
+            });
+
+            for (let y = today.getFullYear(); y >= today.getFullYear() - 2; y--) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                if (y === today.getFullYear()) opt.selected = true;
+                yearSel.appendChild(opt);
+            }
+        })();
+
+        async function loadEotm() {
+            const month = document.getElementById('eotmMonthSel').value;
+            const year  = document.getElementById('eotmYearSel').value;
+            const body  = document.getElementById('eotmBody');
+            body.innerHTML = '<div class="eotm-loading">Loading…</div>';
+
+            try {
+                const res  = await fetch(`/api/employee_of_month?month=${month}&year=${year}`);
+                const data = await res.json();
+
+                if (!data.success) {
+                    body.innerHTML = `<div class="eotm-empty"><div class="eotm-empty-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div><div class="eotm-empty-text">${escHtml(data.message || 'Could not load data.')}</div></div>`;
+                    return;
+                }
+
+                if (!data.winner) {
+                    body.innerHTML = `<div class="eotm-empty"><div class="eotm-empty-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg></div><div class="eotm-empty-text">No attendance records found for <strong style="color:#aaa;">${escHtml(data.month_label)}</strong>.<br>Once employees clock in, the top performer will appear here.</div></div>`;
+                    return;
+                }
+
+                const w = data.winner;
+                const runnerHtml = data.runner_up
+                    ? `<div class="eotm-runner-up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a8a8a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><circle cx="12" cy="8" r="6"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>Runner-up: <span>${escHtml(data.runner_up)}</span></div>`
+                    : '';
+
+                const avgH = w.days_worked > 0 ? (w.total_hours / w.days_worked).toFixed(1) : '—';
+
+                body.innerHTML = `
+                    <div class="eotm-inner">
+                        <div class="eotm-info">
+                            <div class="eotm-label">⭐ Employee of the Month — ${escHtml(data.month_label)}</div>
+                            <div class="eotm-name">${escHtml(w.full_name)}</div>
+                            <div class="eotm-role-badge">${escHtml((w.role || '').replace(/^./, c => c.toUpperCase()))}</div>
+                            ${runnerHtml}
+                        </div>
+                        <div class="eotm-stats">
+                            <div class="eotm-stat">
+                                <div class="eotm-stat-value">${w.total_hours.toFixed(1)}</div>
+                                <div class="eotm-stat-label">Total Hours</div>
+                            </div>
+                            <div class="eotm-stat">
+                                <div class="eotm-stat-value">${w.days_worked}</div>
+                                <div class="eotm-stat-label">Days Worked</div>
+                            </div>
+                            <div class="eotm-stat">
+                                <div class="eotm-stat-value">${avgH}</div>
+                                <div class="eotm-stat-label">Avg Hrs/Day</div>
+                            </div>
+                            <div class="eotm-stat">
+                                <div class="eotm-stat-value">₱${Number(w.total_earnings).toLocaleString('en-PH', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                                <div class="eotm-stat-label">Earned</div>
+                            </div>
+                        </div>
+                    </div>`;
+            } catch(e) {
+                body.innerHTML = `<div class="eotm-empty"><div class="eotm-empty-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div><div class="eotm-empty-text">Failed to load Employee of the Month.</div></div>`;
+                console.error('[eotm]', e);
+            }
+        }
+
+        // Auto-load on page open
+        loadEotm();
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  SYNC NAV TOP TO ACTUAL HEADER HEIGHT (prevents sticky nav shift)
+        // ══════════════════════════════════════════════════════════════════════════
+        (function () {
+            var hdr = document.querySelector('header');
+            var nav = document.getElementById('mainNav');
+            if (!hdr || !nav) return;
+            function syncNavTop() {
+                nav.style.top = hdr.getBoundingClientRect().height + 'px';
+            }
+            syncNavTop();
+            window.addEventListener('resize', syncNavTop);
+            document.fonts && document.fonts.ready && document.fonts.ready.then(syncNavTop);
+        })();
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  MOBILE NAV — hamburger drawer
+        // ══════════════════════════════════════════════════════════════════════════
+        (function () {
+            var hamburger = document.getElementById('hamburgerBtn');
+            var nav       = document.getElementById('mainNav');
+            var overlay   = document.getElementById('navOverlay');
+            if (!hamburger || !nav) return;
+
+            function openNav() {
+                nav.classList.add('mobile-open');
+                overlay.style.display = 'block';
+                hamburger.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeNav() {
+                nav.classList.remove('mobile-open');
+                overlay.style.display = 'none';
+                hamburger.classList.remove('open');
+                document.body.style.overflow = '';
+            }
+
+            hamburger.addEventListener('click', function () {
+                nav.classList.contains('mobile-open') ? closeNav() : openNav();
+            });
+            overlay.addEventListener('click', closeNav);
+
+            nav.querySelectorAll('a').forEach(function (a) {
+                a.addEventListener('click', function () {
+                    if (window.innerWidth <= 768) closeNav();
+                });
+            });
+            window.addEventListener('resize', function () {
+                if (window.innerWidth > 768) closeNav();
+            });
+        })();
+
+        // ── UI HELPERS
+        function updateUI(message) {
+            const el = document.getElementById('face-status');
+            if (el) el.innerText = message;
+        }
+    </script>
+
+</body>
+
+</html>
