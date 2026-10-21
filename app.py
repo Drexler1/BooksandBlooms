@@ -1138,7 +1138,7 @@ Compress(app)
 # ── Developer Monitoring Blueprint ──────────────────────────────────────
 init_developer_bp(app, mysql)
 
-# ── Warm DeepFace/Facenet at startup so first face-verify is fast ──────────
+# ── Warm DeepFace/Facenet512 at startup so first face-verify is fast ───────
 def _warm_deepface():
     try:
         import numpy as _np_warm
@@ -1146,11 +1146,11 @@ def _warm_deepface():
         _get_cv2_np()
         DeepFace.represent(
             _np_warm.zeros((160, 160, 3), dtype=_np_warm.uint8),
-            model_name="Facenet",
+            model_name="Facenet512",
             detector_backend="skip",
             enforce_detection=False,
         )
-        app.logger.info("[startup] DeepFace/FaceNet warm complete.")
+        app.logger.info("[startup] DeepFace/FaceNet-512 warm complete.")
     except Exception as e:
         app.logger.warning(f"[startup] DeepFace warm failed (non-fatal): {e}")
 
@@ -1180,12 +1180,12 @@ def _preload_embedding_cache():
                     if raw.startswith("{"):
                         payload = json.loads(raw)
                         emb = payload.get("emb")
-                        if emb and len(emb) in (128, 512):
+                        if emb and len(emb) == 512:
                             embedding_cache[str(row["employee_id"])] = emb
                             loaded += 1
                 except Exception:
                     pass
-            app.logger.info(f"[startup] Pre-loaded {loaded} embeddings into cache.")
+            app.logger.info(f"[startup] Pre-loaded {loaded} FaceNet512 embeddings into cache.")
     except Exception as exc:
         app.logger.warning(f"[startup] Embedding cache pre-load failed (non-fatal): {exc}")
 
@@ -1768,7 +1768,7 @@ def extract_embedding(img, x, y, w, h):
     # Crop to the detected face bounding box
     face_crop = img[y : y + h, x : x + w]
 
-    # Resize to the exact input size Facenet expects (same as Facenet512: 160x160)
+    # Resize to the exact input size Facenet512 expects: 160x160
     face_crop = cv2.resize(face_crop, (160, 160))
 
     # ── IMPORTANT: keep as uint8 (0-255) ────────────────────────────────────
@@ -1779,7 +1779,7 @@ def extract_embedding(img, x, y, w, h):
 
     result = DeepFace.represent(
         img_path=face_crop,
-        model_name="Facenet",
+        model_name="Facenet512",
         detector_backend="skip",
         enforce_detection=False,
     )
@@ -1805,11 +1805,11 @@ def sharpness_score(img_bgr):
 
 def persist_embedding(employee_id, embedding_vector):
     """
-    Serialize the averaged Facenet embedding to JSON and store it in
+    Serialize the averaged Facenet512 embedding to JSON and store it in
     the face_model_path column.  Also warms the in-memory cache.
 
     Using face_model_path as the storage column (it exists but was unused).
-    The value is a JSON string: '{"v":1,"emb":[...128 floats...]}'
+    The value is a JSON string: '{"v":1,"emb":[...512 floats...]}'
     """
     payload = json.dumps({"v": 1, "emb": embedding_vector}, separators=(",", ":"))
     try:
@@ -1831,7 +1831,7 @@ def load_embedding_from_db(employee_id, cur):
     Load the persisted FaceNet-512 embedding from face_model_path.
     Returns the embedding list on success, or None if not found / malformed.
     Falls back to re-extracting from the saved face image if the JSON column
-    is missing or from an older registration.
+    is missing, malformed, or holds a legacy 128-d vector.
     """
     cur.execute(
         "SELECT face_model_path, face_image_path FROM employees WHERE employee_id=%s",
@@ -1847,11 +1847,15 @@ def load_embedding_from_db(employee_id, cur):
         try:
             payload = json.loads(model_path)
             emb = payload.get("emb")
-            if emb and len(emb) in (128, 512):  # 128 = Facenet, 512 = Facenet512 (legacy)
+            if emb and len(emb) == 512:
                 app.logger.info(
-                    f"[load_embedding] employee {employee_id}: loaded from DB JSON"
+                    f"[load_embedding] employee {employee_id}: loaded 512-d from DB JSON"
                 )
                 return emb
+            elif emb and len(emb) == 128:
+                app.logger.info(
+                    f"[load_embedding] employee {employee_id}: upgrading legacy 128-d to Facenet512"
+                )
         except (json.JSONDecodeError, KeyError):
             pass
 
@@ -1880,14 +1884,14 @@ def load_embedding_from_db(employee_id, cur):
         reg_img = cv2.resize(reg_img, (160, 160))
         reg_result = DeepFace.represent(
             img_path=reg_img,
-            model_name="Facenet",
+            model_name="Facenet512",
             detector_backend="skip",
             enforce_detection=False,
         )
         emb = reg_result[0]["embedding"]
-        app.logger.warning(
-            f"[load_embedding] employee {employee_id}: fell back to image re-extraction "
-            f"(face_model_path missing). Consider re-registering the face for best accuracy."
+        persist_embedding(employee_id, emb)
+        app.logger.info(
+            f"[load_embedding] employee {employee_id}: upgraded and saved Facenet512 embedding."
         )
         return emb
     except Exception as e:
@@ -2311,7 +2315,7 @@ def verify_face():
 
     last_frame_time[employee_id] = now
 
-    MATCH_THRESHOLD = 0.40
+    MATCH_THRESHOLD = 0.38  # FaceNet512 cosine distance threshold (DeepFace default 0.30; 0.38 accounts for ambient lighting)
     if distance >= MATCH_THRESHOLD:
         # ── Increment server-side mismatch counter ───────────────────────────
         fm = face_mismatch_counts.get(employee_id, {"count": 0, "locked_until": None})

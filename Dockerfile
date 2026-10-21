@@ -18,12 +18,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Bake FaceNet weights into the image at build time so the first
+# Bake FaceNet-512 weights into the image at build time so the first
 # clock-in is fast (Railway has enough RAM to hold TF + the model).
 RUN python -c "\
 from deepface import DeepFace; \
 import numpy as np; \
-DeepFace.represent(np.zeros((160,160,3), dtype=np.uint8), model_name='Facenet', enforce_detection=False)"
+DeepFace.represent(np.zeros((160,160,3), dtype=np.uint8), model_name='Facenet512', enforce_detection=False)"
 
 EXPOSE 8080
 
