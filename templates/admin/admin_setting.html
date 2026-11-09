@@ -2056,6 +2056,10 @@
                 <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span>
                 <div>Permissions<div class="sidebar-item-desc">Role-based access control (RBAC)</div></div>
             </a>
+            <a class="sidebar-item" href="#pos_workflow" data-pane="pos_workflow" onclick="switchSettingsPane('pos_workflow', event)">
+                <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
+                <div>POS &amp; Attendance<div class="sidebar-item-desc">Mandatory attendance toggle</div></div>
+            </a>
             <a class="sidebar-item" href="#diagnostics" data-pane="diagnostics" onclick="switchSettingsPane('diagnostics', event)">
                 <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg></span>
                 <div>System Repair<div class="sidebar-item-desc">Diagnostics, troubleshooting &amp; auto-fix</div></div>
@@ -2643,6 +2647,24 @@
                     </div>
 
                     <div class="rbac-perm-list">
+                        <div class="rbac-perm-card" style="border-color:#c9a961; background:rgba(201,169,97,0.04);">
+                            <div class="rbac-perm-info">
+                                <div class="rbac-perm-category">Attendance Workflow Policy</div>
+                                <div class="rbac-perm-title" style="color:#8a6d2b;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a6d2b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                    Mandatory Clock-In Before POS Access
+                                </div>
+                                <div class="rbac-perm-desc">When enabled, the POS system is initially locked upon cashier login. Cashiers are restricted to the Attendance page until they successfully clock in.</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span id="cashierTabMandatoryBadge" class="rbac-badge rbac-badge-gold">Loading…</span>
+                                <label class="rbac-toggle-switch">
+                                    <input type="checkbox" id="cashierTabMandatoryToggle" onchange="toggleMandatoryAttendance(this.checked)">
+                                    <span class="rbac-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="rbac-perm-card" style="border-color:#4caf50; background:rgba(76,175,80,0.04);">
                             <div class="rbac-perm-info">
                                 <div class="rbac-perm-category">POS Operations</div>
@@ -2709,6 +2731,98 @@
             </div>
         </div>
         <!-- /PERMISSIONS (RBAC) CARD -->
+
+        <!-- ══ POS & ATTENDANCE WORKFLOW CARD ══ -->
+        <div class="setting-card setting-pane" id="pos_workflow">
+            <div class="card-head">
+                <div class="card-head-icon icon-gold">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+                <div class="card-head-text">
+                    <h2>POS &amp; Mandatory Attendance Configuration</h2>
+                    <p>Global administrative toggle governing cashier attendance requirements before Point-of-Sale terminal access.</p>
+                </div>
+            </div>
+            <div class="card-body">
+                <div>
+                    <p class="section-label">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        Mandatory Attendance Workflow Switch
+                    </p>
+                    <div style="background:#fafafa; border:1.5px solid #e0e0e0; border-radius:10px; padding:1.4rem; display:flex; align-items:center; justify-content:space-between; gap:1.5rem; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:260px;">
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+                                <strong style="font-size:1.05rem; color:#1a1a1a;">Mandatory Clock-In Before POS Access</strong>
+                                <span id="mandatoryBadge" class="rbac-badge rbac-badge-gold">Loading…</span>
+                            </div>
+                            <span style="font-size:0.87rem; color:#555; line-height:1.5; display:block;">
+                                When enabled, the POS register is locked upon cashier login. Cashiers are restricted exclusively to the Attendance module until they complete their daily clock-in via facial verification. Once clocked in, POS terminal, transactions, and supply monitors unlock automatically.
+                            </span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="mandatoryAttendanceToggle" onchange="toggleMandatoryAttendance(this.checked)">
+                                <span class="toggle-track"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Workflow Progression Guide -->
+                <div style="background:#fff; border:1px solid #e8e8e8; border-radius:10px; padding:1.25rem;">
+                    <p class="section-label" style="margin-bottom:12px;">Workflow Progression Overview</p>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:1rem;">
+                        <div style="padding:1rem; background:#f9f9f9; border-radius:8px; border-left:4px solid #c9a961;">
+                            <div style="font-weight:700; font-size:0.88rem; color:#1a1a1a; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                                <span>1.</span> Cashier Login
+                            </div>
+                            <div style="font-size:0.8rem; color:#666; line-height:1.4;">
+                                Employee authenticates at terminal. System verifies role and active credentials.
+                            </div>
+                        </div>
+
+                        <div style="padding:1rem; background:#fff8e1; border-radius:8px; border-left:4px solid #f57f17;">
+                            <div style="font-weight:700; font-size:0.88rem; color:#b26a00; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                                <span>2.</span> POS System Locked 🔒
+                            </div>
+                            <div style="font-size:0.8rem; color:#795548; line-height:1.4;">
+                                Register and sales are disabled. Cashier is redirected directly to the Attendance screen.
+                            </div>
+                        </div>
+
+                        <div style="padding:1rem; background:#e3f2fd; border-radius:8px; border-left:4px solid #1976d2;">
+                            <div style="font-weight:700; font-size:0.88rem; color:#1565c0; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                                <span>3.</span> Face Attendance 👤
+                            </div>
+                            <div style="font-size:0.8rem; color:#546e7a; line-height:1.4;">
+                                Cashier performs facial biometric check to record shift start time.
+                            </div>
+                        </div>
+
+                        <div style="padding:1rem; background:#e8f5e9; border-radius:8px; border-left:4px solid #2e7d32;">
+                            <div style="font-weight:700; font-size:0.88rem; color:#2e7d32; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                                <span>4.</span> POS Terminal Unlocks 🔓
+                            </div>
+                            <div style="font-size:0.8rem; color:#388e3c; line-height:1.4;">
+                                System unlocks POS terminal and auto-navigates employee directly into active register.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <span style="font-size:0.84rem; color:#666;" id="mandatoryStatusNotice">
+                    Loading mandatory attendance status…
+                </span>
+            </div>
+        </div>
+        <!-- /POS & ATTENDANCE WORKFLOW CARD -->
 
         <!-- ══ SYSTEM REPAIR & DIAGNOSTICS CARD ══ -->
         <div class="setting-card setting-pane" id="diagnostics">
@@ -4604,6 +4718,67 @@ async function resetRbacPermissions() {
 
 // Auto-load on script execution
 loadRbacPermissions();
+
+// ── Mandatory Cashier Attendance Workflow Settings ──────────────────────────
+async function loadMandatoryAttendanceSetting() {
+    try {
+        const res = await fetch('/api/settings/mandatory_attendance');
+        const data = await res.json();
+        if (data.success) {
+            updateMandatoryAttendanceUI(Boolean(data.enabled));
+        }
+    } catch (err) {
+        console.warn('Failed to load mandatory attendance setting:', err);
+    }
+}
+
+function updateMandatoryAttendanceUI(enabled) {
+    const toggle1 = document.getElementById('mandatoryAttendanceToggle');
+    const toggle2 = document.getElementById('cashierTabMandatoryToggle');
+    if (toggle1) toggle1.checked = enabled;
+    if (toggle2) toggle2.checked = enabled;
+
+    const badge1 = document.getElementById('mandatoryBadge');
+    const badge2 = document.getElementById('cashierTabMandatoryBadge');
+    const text = enabled ? 'Enforced' : 'Disabled';
+    const cls = enabled ? 'rbac-badge rbac-badge-gold' : 'rbac-badge rbac-badge-gray';
+
+    if (badge1) { badge1.textContent = text; badge1.className = cls; }
+    if (badge2) { badge2.textContent = text; badge2.className = cls; }
+
+    const notice = document.getElementById('mandatoryStatusNotice');
+    if (notice) {
+        notice.textContent = enabled
+            ? '✓ Mandatory attendance is ENFORCED: Cashier POS is initially locked upon login until employee clocks in.'
+            : '○ Mandatory attendance is DISABLED: Cashiers can immediately access POS without clocking in first.';
+    }
+}
+
+async function toggleMandatoryAttendance(enabled) {
+    try {
+        const res = await fetch('/api/settings/mandatory_attendance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        });
+        const data = await res.json();
+        if (data.success) {
+            updateMandatoryAttendanceUI(Boolean(data.enabled));
+            if (typeof showToast === 'function') {
+                showToast(data.message || (enabled ? 'Mandatory attendance enabled' : 'Mandatory attendance disabled'), 'success');
+            }
+        } else {
+            if (typeof showToast === 'function') showToast(data.message || 'Failed to update setting', 'error');
+            loadMandatoryAttendanceSetting();
+        }
+    } catch (err) {
+        if (typeof showToast === 'function') showToast('Network error updating mandatory attendance setting', 'error');
+        loadMandatoryAttendanceSetting();
+    }
+}
+
+// Auto-load mandatory attendance setting on startup
+loadMandatoryAttendanceSetting();
 </script>
 
 <script>
@@ -5085,7 +5260,7 @@ loadRbacPermissions();
     (function () {
         function initSettingsPane() {
             var hash = (window.location.hash || '').replace('#', '');
-            var validPanes = ['account', 'notifications', 'backup', 'permissions', 'diagnostics', 'danger'];
+            var validPanes = ['account', 'notifications', 'backup', 'permissions', 'pos_workflow', 'diagnostics', 'danger'];
             var initialPane = validPanes.indexOf(hash) !== -1 ? hash : 'account';
             switchSettingsPane(initialPane);
         }
@@ -5098,7 +5273,7 @@ loadRbacPermissions();
 
         window.addEventListener('hashchange', function () {
             var hash = (window.location.hash || '').replace('#', '');
-            var validPanes = ['account', 'notifications', 'backup', 'permissions', 'diagnostics', 'danger'];
+            var validPanes = ['account', 'notifications', 'backup', 'permissions', 'pos_workflow', 'diagnostics', 'danger'];
             if (validPanes.indexOf(hash) !== -1) {
                 switchSettingsPane(hash);
             }
