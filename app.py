@@ -1550,10 +1550,81 @@ def _ensure_rbac_schema():
                 VALUES (%s, %s)
             """, (f"rbac_{role}", json.dumps(perms)))
         conn.commit()
+
+        # Seed mandatory attendance setting (0 = disabled by default)
+        cur.execute("""
+            INSERT IGNORE INTO app_settings (setting_key, setting_value)
+            VALUES ('mandatory_attendance_enabled', '0')
+        """)
+        conn.commit()
         cur.close()
         app.logger.info("[rbac] schema and default permissions ensured")
     except Exception as exc:
         app.logger.error(f"[rbac] _ensure_rbac_schema: {exc}")
+
+
+def _is_mandatory_attendance_enabled() -> bool:
+    """Return True if the mandatory cashier attendance workflow is enabled globally."""
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            "SELECT setting_value FROM app_settings WHERE setting_key = 'mandatory_attendance_enabled' LIMIT 1"
+        )
+        row = cur.fetchone()
+        cur.close()
+        if row and str(row.get("setting_value", "")).strip().lower() in ("1", "true", "yes", "on"):
+            return True
+        return False
+    except Exception as exc:
+        app.logger.warning(f"[_is_mandatory_attendance_enabled] {exc}")
+        return False
+
+
+def _set_mandatory_attendance_enabled(enabled: bool) -> bool:
+    """Update the global mandatory cashier attendance setting in app_settings."""
+    try:
+        conn = mysql.connection
+        cur = conn.cursor()
+        val = "1" if enabled else "0"
+        cur.execute("""
+            INSERT INTO app_settings (setting_key, setting_value)
+            VALUES ('mandatory_attendance_enabled', %s)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+        """, (val,))
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as exc:
+        app.logger.error(f"[_set_mandatory_attendance_enabled] {exc}")
+        return False
+
+
+def _is_cashier_attendance_locked(employee_id) -> bool:
+    """
+    Check if the POS system should be locked for the specified cashier.
+    Returns True when mandatory attendance is active AND the employee has NOT clocked in today.
+    Once clocked in today, returns False (POS is unlocked).
+    """
+    if not employee_id:
+        return False
+    if not _is_mandatory_attendance_enabled():
+        return False
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute(
+            """SELECT attendance_id FROM attendance
+               WHERE employee_id = %s
+                 AND attendance_date = CURDATE()
+                 AND clock_in IS NOT NULL
+               LIMIT 1""",
+            (employee_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        return row is None
+    except Exception as exc:
+        app.logger.error(f"[_is_cashier_attendance_locked] {exc}")
+        return False
 
 
 def _get_rbac_permissions() -> dict:
@@ -1631,7 +1702,21 @@ def inject_rbac():
     role = session.get("role") or ""
     def can_access(module_name):
         return has_permission(role, module_name)
-    return dict(can_access=can_access, user_role=role)
+
+    # Mandatory cashier attendance lock evaluation
+    pos_locked = False
+    mandatory_enabled = _is_mandatory_attendance_enabled()
+    if mandatory_enabled and _is_cashier():
+        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+        if emp_id and _is_cashier_attendance_locked(emp_id):
+            pos_locked = True
+
+    return dict(
+        can_access=can_access,
+        user_role=role,
+        is_pos_locked=pos_locked,
+        mandatory_attendance_enabled=mandatory_enabled,
+    )
 
 
 
@@ -2748,7 +2833,11 @@ def login():
                 )
                 mysql.connection.commit()
                 auth_ok = True
-                redirect_to = url_for("cashier_dashboard")
+                if _is_cashier_attendance_locked(user["employee_id"]):
+                    flash("Mandatory Attendance: Please clock in via Attendance to unlock the POS terminal.")
+                    redirect_to = url_for("cashier_attendance")
+                else:
+                    redirect_to = url_for("cashier_dashboard")
 
         cur.close()
 
@@ -4628,6 +4717,7 @@ def log_attendance():
             "employee": emp,
             "action": "clock_in",
             "shift_type": shift_type,
+            "pos_unlocked": True,
         }
         if late_minutes > 0:
             resp["late_minutes"] = late_minutes
@@ -6212,6 +6302,10 @@ def cashier_dashboard():
     if not emp_id:
         return redirect(url_for("login"))
 
+    if _is_cashier_attendance_locked(emp_id):
+        flash("Mandatory Attendance Policy: Please clock in via Attendance to unlock the POS terminal.")
+        return redirect(url_for("cashier_attendance"))
+
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
         "SELECT full_name, username, role, email, last_login FROM employees WHERE employee_id=%s",
@@ -6244,6 +6338,10 @@ def cashier_transactions():
     emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
     if not emp_id:
         return redirect(url_for("login"))
+
+    if _is_cashier_attendance_locked(emp_id):
+        flash("Mandatory Attendance Policy: Please clock in via Attendance to access transactions.")
+        return redirect(url_for("cashier_attendance"))
 
     cur = mysql.connection.cursor(DictCursor)
     cur.execute(
@@ -6467,6 +6565,14 @@ def api_products_pos():
     """
     if "employee_id" not in session and not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    if _is_cashier():
+        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+        if _is_cashier_attendance_locked(emp_id):
+            return jsonify({
+                "success": False,
+                "message": "POS Terminal is locked. Mandatory attendance clock-in required before processing sales."
+            }), 403
 
     try:
         d = _get_pos_products()
@@ -8584,6 +8690,14 @@ def api_pos_checkout():
     if "employee_id" not in session and not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
+    if _is_cashier():
+        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+        if _is_cashier_attendance_locked(emp_id):
+            return jsonify({
+                "success": False,
+                "message": "POS Terminal is locked. Mandatory attendance clock-in required before processing sales."
+            }), 403
+
     data = request.get_json(silent=True) or {}
     items_raw = data.get("items") or []
     if not items_raw:
@@ -8944,6 +9058,14 @@ def api_pos_transactions():
     if "employee_id" not in session and not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
+    if _is_cashier():
+        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+        if _is_cashier_attendance_locked(emp_id):
+            return jsonify({
+                "success": False,
+                "message": "POS Terminal is locked. Mandatory attendance clock-in required before processing sales."
+            }), 403
+
     try:
         limit = min(int(request.args.get("limit", 50) or 50), 500)
     except (TypeError, ValueError):
@@ -9035,6 +9157,14 @@ def api_pos_transaction_detail(transaction_id):
     """Return full receipt detail for a single transaction."""
     if "employee_id" not in session and not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    if _is_cashier():
+        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+        if _is_cashier_attendance_locked(emp_id):
+            return jsonify({
+                "success": False,
+                "message": "POS Terminal is locked. Mandatory attendance clock-in required before processing sales."
+            }), 403
 
     try:
         cur = mysql.connection.cursor(DictCursor)
@@ -10879,6 +11009,14 @@ def api_products_stream():
     if "employee_id" not in session and not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
+    if _is_cashier():
+        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+        if _is_cashier_attendance_locked(emp_id):
+            return jsonify({
+                "success": False,
+                "message": "POS Terminal is locked. Mandatory attendance clock-in required before processing sales."
+            }), 403
+
     q: _queue.Queue = _queue.Queue(maxsize=10)
     with _sse_lock:
         _sse_subscribers.append(q)
@@ -10933,6 +11071,14 @@ def api_pos_products():
     """
     if "employee_id" not in session and not is_admin():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    if _is_cashier():
+        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+        if _is_cashier_attendance_locked(emp_id):
+            return jsonify({
+                "success": False,
+                "message": "POS Terminal is locked. Mandatory attendance clock-in required before processing sales."
+            }), 403
 
     try:
         d = _get_pos_products()
@@ -13168,6 +13314,51 @@ def api_reset_rbac_permissions():
     return jsonify({"success": False, "message": "Failed to reset permissions"}), 500
 
 
+# ── Mandatory Cashier Attendance Setting API ───────────────────────────────────
+
+
+@app.route("/api/settings/mandatory_attendance", methods=["GET"])
+def api_get_mandatory_attendance():
+    """Admin-only: return current mandatory attendance workflow setting."""
+    if not is_super_admin() and not has_permission(session.get("role", ""), "settings"):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    return jsonify({"success": True, "enabled": _is_mandatory_attendance_enabled()})
+
+
+@app.route("/api/settings/mandatory_attendance", methods=["POST"])
+@csrf.exempt
+def api_set_mandatory_attendance():
+    """Admin-only: toggle mandatory attendance workflow setting."""
+    if not is_super_admin() and not has_permission(session.get("role", ""), "settings"):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get("enabled", False))
+    ok = _set_mandatory_attendance_enabled(enabled)
+    if not ok:
+        return jsonify({"success": False, "message": "Failed to update setting"}), 500
+
+    msg = "Mandatory attendance workflow enabled." if enabled else "Mandatory attendance workflow disabled."
+    app.logger.info(f"[mandatory_attendance] Setting changed to {enabled} by {session.get('username')}")
+    return jsonify({"success": True, "enabled": enabled, "message": msg})
+
+
+@app.route("/api/cashier/attendance_lock_status", methods=["GET"])
+def api_cashier_attendance_lock_status():
+    """Return whether the current cashier session is locked by mandatory attendance."""
+    if not _is_cashier():
+        return jsonify({"success": True, "locked": False, "mandatory_enabled": False})
+    emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+    enabled = _is_mandatory_attendance_enabled()
+    locked = _is_cashier_attendance_locked(emp_id) if enabled else False
+    return jsonify({
+        "success": True,
+        "locked": locked,
+        "mandatory_enabled": enabled,
+        "employee_id": emp_id
+    })
+
+
 @app.route("/api/attendance/edit_deduction", methods=["POST"])
 @csrf.exempt
 def api_edit_attendance_deduction():
@@ -13622,9 +13813,13 @@ def cashier_inventory():
         flash("Access Denied: You do not have permission to access Supply Monitor.")
         return redirect(url_for("dashboard") if role in ("admin", "manager") else url_for("login"))
 
+    emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
+    if _is_cashier_attendance_locked(emp_id):
+        flash("Mandatory Attendance Policy: Please clock in via Attendance to access Supply Monitor.")
+        return redirect(url_for("cashier_attendance"))
+
     employee = None
     try:
-        emp_id = session.get("employee_id") or session.get("cashier_auth_emp_id")
         cur = mysql.connection.cursor(DictCursor)
         cur.execute(
             "SELECT employee_id, full_name, username, role "
